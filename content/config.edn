@@ -1,5 +1,5 @@
 {:site-title                   "Yet Another Useless Blog (YAUB)"
- :author                       "Toni Schmidbauer"
+ :author                       "Toni Schmidbauer & Thomas Jungbauer"
  :description                  "Braindump of a forgetful"
  :site-url                     "http://blog.stderr.at/"
  :post-root                    "posts"
