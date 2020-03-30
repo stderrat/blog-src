@@ -19,3 +19,5 @@ git status
 git add .
 git commit -m "changes of $current_date"
 git push -u origin master
+
+cd $current_dir
