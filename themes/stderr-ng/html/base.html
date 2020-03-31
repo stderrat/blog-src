@@ -76,6 +76,7 @@
             <p><span class="fa fa-reorder"></span><strong>Menu</strong></p>
         </div>
         <ul class="menu">
+
             <li {% if home %} class="active" {% endif %}><a title="Home" href="{{index-uri}}">Home</a></li>
             <li {% if archives %} class="active" {% endif %}><a title="Archives" href="{{archives-uri}}">Archives</a></li>
             {% if tags|not-empty %}
@@ -90,6 +91,15 @@
         </ul>
     </div>
 
+    <hr class="menuhr">
+      <div id="menucont">
+        <ul class="menu">
+          <li class="active">Recent Posts:</li>
+          {% for post in latest-posts %}
+            <li class="smallpadding small"><a class="nospacing" href="{{post.uri}}">{{post.title}}</a></li>
+          {% endfor %}
+        </ul>
+      </div>
 </div>
 
 <div id="right" class="clearfix">
