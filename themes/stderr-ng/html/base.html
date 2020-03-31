@@ -105,11 +105,8 @@
 {% script "js/highlight.pack.js" %}
 <script>hljs.initHighlightingOnLoad();</script>
 
-<script src="js/clipboard.js"></script>
-<script src="js/clipboard.integration.js"></script>
-</script>
-
-
+{% script "/js/clipboard.js" %}
+{% script "/js/clipboard.integration.js" %}
 
 {% script "js/scripts.js" %}
 {% if post.klipse %} {{post.klipse|safe}} {% endif %}
