@@ -100,6 +100,17 @@
           {% endfor %}
         </ul>
       </div>
+    <hr class="menuhr">
+      <div id="menucont">
+        <ul class="menu">
+          <li class="active">Links:</li>
+          <li class="smallpadding small"><a class="nospacing" href="https://redhat.com">Red Hat</a></li>
+          <li class="smallpadding small"><a class="nospacing" href="https://docs.openshift.com/">OpenShift Docs</a></li>
+            {% for page in sidebar-pages %}
+              <li class="smallpadding small"><a class="nospacing" href="{{page.uri}}">{{page.title}}</a></li>
+            {% endfor %}
+        </ul>
+      </div>
 </div>
 
 <div id="right" class="clearfix">

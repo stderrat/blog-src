@@ -17,7 +17,7 @@
  :archive-group-format         "yyyy MMMM"
  :sass-src                     []
  :sass-path                    "sass"
- :theme                        "stderr-ng"
+ :theme                        "stderr-ocp"
  :resources                    ["img"]
  :keep-files                   [".git"]
  :disqus?                      false
