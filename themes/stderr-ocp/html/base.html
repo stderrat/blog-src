@@ -27,6 +27,7 @@
     <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css" rel="stylesheet">
     <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.7.0/styles/tomorrow-night-eighties.min.css">
     <!--[if lt IE 9]><script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+    <link rel="stylesheet" href="/css/font-awesome-animation.min.css"> 
 
 <style>
  .listingblock:hover .clipboard {
@@ -61,13 +62,13 @@
 
 </head>
 <body>
-
 <div id="left">
 
     <p id="logo">
         <a title="{{title}}" href="{{index-uri}}">
-            <span class="fa fa-cloud-upload"></span>
-            <span class="text">YAUB</span>
+            <span class="fa fa-cloud-upload faa-float animated"></span>
+            <span class="text center">YAUB</span>
+            <span class="text center small">Yet another Useless Blog</span>
         </a>
     </p>
 
@@ -106,6 +107,7 @@
           <li class="active">Links:</li>
           <li class="smallpadding small"><a class="nospacing" href="https://redhat.com">Red Hat</a></li>
           <li class="smallpadding small"><a class="nospacing" href="https://docs.openshift.com/">OpenShift Docs</a></li>
+          <li class="smallpadding small"><a class="nospacing" href="https://github.com/stderrat/stderrat.github.io">Source</a></li>
             {% for page in sidebar-pages %}
               <li class="smallpadding small"><a class="nospacing" href="{{page.uri}}">{{page.title}}</a></li>
             {% endfor %}
