@@ -109,7 +109,7 @@
         <ul class="menu">
           <li>Recent Posts:</li>
           {% for post in latest-posts %}
-            <li class="smallpadding small"><a class="nospacing" href="{{post.uri}}">{{post.title}}</a></li>
+            <a class="nospacing left" href="{{post.uri}}"><li class="smallpadding small">{{post.title}}</li></a>
           {% endfor %}
         </ul>
       </div>
@@ -117,11 +117,11 @@
       <div id="menucont">
         <ul class="menu">
           <li>Links:</li>
-          <li class="smallpadding small"><a class="nospacing" href="https://redhat.com">Red Hat</a></li>
-          <li class="smallpadding small"><a class="nospacing" href="https://docs.openshift.com/">OpenShift Docs</a></li>
-          <li class="smallpadding small"><a class="nospacing" href="https://github.com/stderrat/stderrat.github.io">Source</a></li>
+          <a class="nospacing left" href="https://redhat.com" rel="external"><li class="smallpadding small">Red Hat</li></a>
+          <a class="nospacing left" href="https://docs.openshift.com/" rel="external"><li class="smallpadding small">OpenShift Docs</li></a>
+          <a class="nospacing left" href="https://github.com/stderrat/stderrat.github.io" rel="external"><li class="smallpadding small">Source</li></a>
             {% for page in sidebar-pages %}
-              <li class="smallpadding small"><a class="nospacing" href="{{page.uri}}">{{page.title}}</a></li>
+              <a class="nospacing left" href="{{page.uri}}"><li class="smallpadding small">{{page.title}}</li></a>
             {% endfor %}
         </ul>
       </div>
