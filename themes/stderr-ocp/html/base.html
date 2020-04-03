@@ -77,18 +77,30 @@
             <p><span class="fa fa-reorder"></span><strong>Menu</strong></p>
         </div>
         <ul class="menu">
+          <a class="left" title="Home" href="{{index-uri}}">
+            <li {% if home %} class="active" {% endif %}>Home</li>
+          </a>
 
-            <li {% if home %} class="active" {% endif %}><a title="Home" href="{{index-uri}}">Home</a></li>
-            <li {% if archives %} class="active" {% endif %}><a title="Archives" href="{{archives-uri}}">Archives</a></li>
+          <a class="left" title="Archives" href="{{archives-uri}}">
+            <li {% if archives %} class="active" {% endif %}>Archives</li>
+          </a>
+
             {% if tags|not-empty %}
-            <li {%ifequal uri tags-uri %} class="active" {% endifequal %}><a title="Tags" href="{{tags-uri}}">Tags</a></li>
+            <a class="left" title="Tags" href="{{tags-uri}}">
+            <li {%ifequal uri tags-uri %} class="active" {% endifequal %}>Tags</li>
+            </a>
             {% endif %}
+            
             {% for nav-page in navbar-pages %}
+            <a class="left" href="{{nav-page.uri}}">
             <li {%ifequal page.uri nav-page.uri %} class="active" {% endifequal %}>
-                <a href="{{nav-page.uri}}">{{nav-page.title}}</a>
+                {{nav-page.title}}
             </li>
+            </a>
             {% endfor %}
-            <li><a title="RSS" href="{{rss-uri}}">RSS</a></li>
+            <a class="left" title="RSS" href="{{rss-uri}}">
+            <li>RSS</li>
+            </a>
         </ul>
     </div>
 
