@@ -16,7 +16,7 @@
  :post-date-format             "yyyy-MM-dd"
  :archive-group-format         "yyyy MMMM"
  :sass-src                     []
- :sass-path                    "sass"
+ :sass-path                    "sassc"
  :theme                        "stderr-ocp"
  :resources                    ["img"]
  :keep-files                   [".git"]
