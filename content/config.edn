@@ -1,6 +1,6 @@
-{:site-title                   "Yet Another Useless Blog (YAUB)"
+{:site-title                   "Yet Aother Useless Blog (YAUB)"
  :author                       "Toni Schmidbauer & Thomas Jungbauer"
- :description                  "Braindump of a forgetful"
+ :description                  "TechBlog about OpenShift 4.x and other solutions"
  :site-url                     "http://blog.stderr.at/"
  :post-root                    "posts"
  :page-root                    "pages"
