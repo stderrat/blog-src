@@ -1,5 +1,16 @@
 {% extends "/html/base.html" %}
 {% block content %}
+
+{% if tags|not-empty %}
+<div id="floatright">
+    <p>
+    <a class="button right" title="Tags" href="{{tags-uri}}">
+        Sort by Tags
+    </a>
+    </p>
+</div>
+{% endif %}
+
 <div id="post">
     {% for post in posts %}
     <div class="post-header">

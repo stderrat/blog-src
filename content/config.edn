@@ -23,7 +23,7 @@
  :disqus?                      false
  :disqus-shortname             ""
  :ignored-files                [#"\.#.*" #".*\.swp$"]
- :previews?                    false
+ :previews?                    true
  :posts-per-page               5
  :blocks-per-preview           2
  :clean-urls                   :trailing-slash
