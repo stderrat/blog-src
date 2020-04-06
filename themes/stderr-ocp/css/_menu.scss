@@ -1,21 +1,38 @@
+@import "vars";
+
 /** Menu Styles **/
 
-#menucont ul.menu {
-    margin: 0;
-}
+#menucont {
+    ul.menu {
+        margin: 0;
 
-#menucont ul.menu li {
-    position: relative;
-    float: left;
-    width: 100%;
-    list-style-type: none;
-    padding: 10px 20px;
+        li.active {
+            background: $menu-color-active;
+        }
+        li:hover {
+            background: $menu-color-hover;
+        }
+        li.smallpadding {
+            padding: 5px 20px 5px 30px;
+        }
+        li {
+            position: relative;
+            float: left;
+            width: 100%;
+            list-style-type: none;
+            padding: 10px 20px;
 
+            a.nospacing {
+                letter-spacing: 0;
+                text-decoration: none;
+            }
+        }
+    }
 }
 
 #menucont ul.menu li a {
-    float: left;
-    color: #FFF;
+    /* float: left; */
+    color: $left-navbar-font-color;
     width: 100%;
     /* padding: 10px 20px; */
     margin: 0;
@@ -23,16 +40,16 @@
     /* text-transform: uppercase; */
     line-height: 22px;
     text-decoration: none;
-    letter-spacing: 2px;
-}
+    letter-spacing: 0px;
 
-#menucont ul.menu li a:hover {
-    background: rgba(0, 0, 0, 0.2);
+    &:hover {
+        background: $menu-color-hover;
+    }
 }
 
 #menucont ul.menu li.active a,
 #menucont ul.menu li.active a:hover {
-    background: rgba(0, 0, 0, 0.2);
+    background: $menu-color-active;
     font-weight: 600;
 }
 
@@ -76,12 +93,12 @@
     #menucont ul.menu li.active a,
     #menucont ul.menu li.active a:hover {
         font-weight: 600;
-        color: #FFF;
+        color: $simple-white;
         background: none;
     }
 
     #menucont ul.menu li a:hover {
-        color: #FFF;
+        color: $simple-white;
         background: none;
     }
 
@@ -96,7 +113,7 @@
         display: block;
         cursor: pointer;
         text-align: left;
-        color: #FFF;
+        color: $simple-white;
         text-transform: uppercase;
     }
 

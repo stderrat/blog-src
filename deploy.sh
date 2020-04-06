@@ -3,6 +3,9 @@
 current_dir=$PWD
 current_date=`date +%Y%M%d:%H%m`
 
+echo "pulling latest changes"
+git pull
+
 echo "Pushing local changes"
 
 git status
