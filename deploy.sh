@@ -5,7 +5,7 @@ current_date=`date +%Y%M%d:%H%m`
 
 echo "pulling latest changes"
 git pull
-cd ../../stderrat.github.io
+cd ../stderrat.github.io
 git pull
 cd $current_dir
 
