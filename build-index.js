@@ -49,7 +49,9 @@ function readHtml(root, file, fileId) {
     var filename = path.join(root, file);
     var txt = fs.readFileSync(filename).toString();
     var $ = cheerio.load(txt);
-    var title = $("title").text();
+    /* remove blog title from title field */
+    var title = $("title").text().replace('Yaub: ','');
+
     if (typeof title == 'undefined') title = file;
     var description = $("meta[name=description]").attr("content");
     if (typeof description == 'undefined') description = "";

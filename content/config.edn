@@ -1,6 +1,6 @@
 {:site-title                   "Yaub"
  :author                       "Toni Schmidbauer & Thomas Jungbauer"
- :description                  "TechBlog about OpenShift 4.x and other solutions"
+ :description                  "TechBlog about OpenShift/Ansible/Satellite and much more"
  :site-url                     "http://blog.stderr.at/"
  :post-root                    "posts"
  :page-root                    "pages"
