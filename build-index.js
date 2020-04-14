@@ -5,7 +5,7 @@ var cheerio = require("cheerio");
 
 
 // Change these constants to suit your needs
-const HTML_FOLDER = "public";  // folder with your HTML files
+const HTML_FOLDER = "public/posts-output";  // folder with your HTML files
 // Valid search fields: "title", "description", "keywords", "body"
 const SEARCH_FIELDS = ["title", "description", "keywords", "body"];
 const EXCLUDE_FILES = ["search.html"];
@@ -61,7 +61,7 @@ function readHtml(root, file, fileId) {
     if (typeof body == 'undefined') body = "";
     var data = {
         "id": fileId,
-        "link": file,
+        "link": "posts-output/"+file,
         "t": title,
         "d": description,
         "k": keywords,
