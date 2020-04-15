@@ -1,5 +1,6 @@
 (ns cryogen.server
   (:require 
+   [cryogen.compile]
    [clojure.string :as string]
    [compojure.core :refer [GET defroutes]]
    [compojure.route :as route]
@@ -7,16 +8,17 @@
    [ring.util.codec :refer [url-decode]]
    [cryogen-core.watcher :refer [start-watcher!]]
    [cryogen-core.plugins :refer [load-plugins]]
-   [cryogen-core.compiler :refer [compile-assets-timed]]
+   ;[cryogen-core.compiler :refer [compile-assets-timed]]
    [cryogen-core.config :refer [resolve-config]]
    [cryogen-core.io :refer [path]]))
 
 (defn init []
   (load-plugins)
-  (compile-assets-timed)
+  ;(compile-assets-timed)
+  (cryogen.compile/compile-site)
   (let [ignored-files (-> (resolve-config) :ignored-files)]
-    (start-watcher! "content" ignored-files compile-assets-timed)
-    (start-watcher! "themes" ignored-files compile-assets-timed)))
+    (start-watcher! "content" ignored-files cryogen.compile/compile-site)
+    (start-watcher! "themes" ignored-files cryogen.compile/compile-site)))
 
 (defn wrap-subdirectories
   [handler]

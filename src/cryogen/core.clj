@@ -1,8 +1,10 @@
 (ns cryogen.core
-  (:require [cryogen-core.compiler :refer [compile-assets-timed]]
+  (:require [cryogen.compile]
+            ;[cryogen-core.compiler :refer [compile-assets-timed]]
             [cryogen-core.plugins :refer [load-plugins]]))
 
 (defn -main []
   (load-plugins)
-  (compile-assets-timed)
+  ;(compile-assets-timed)
+  (cryogen.compile/compile-site)  
   (System/exit 0))
