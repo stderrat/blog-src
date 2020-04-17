@@ -18,7 +18,7 @@
  :sass-src                     []
  :sass-path                    "sass"
  :theme                        "stderr-ocp"
- :resources                    ["img"]
+ :resources                    ["img" "robots.txt"]
  :keep-files                   [".git"]
  :disqus?                      false
  :disqus-shortname             ""
