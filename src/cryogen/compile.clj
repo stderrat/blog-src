@@ -40,10 +40,10 @@
 (defn compile-site []
   (compile-assets-timed
     {:update-article-fn
-     (fn update-article [{:keys [slug] :as article} config]
-       (if slug
-         (assoc article :uri (str "/" slug "/"))
-         article))
+      (fn update-article [article config]
+       ;; Skip articles with `:ignore? true` in metadata
+       (when-not (:ignore? article)
+         (autolink-headings article config)))
 
      :extend-params-fn
      (fn extend-params [params site-data]
