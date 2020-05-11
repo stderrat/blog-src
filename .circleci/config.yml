@@ -55,7 +55,7 @@ jobs:
           command: |
             cd stderrat.github.io
             git status
-            echo 'git push origin master'
+            git push origin master
 
 workflows:
   version: 2
