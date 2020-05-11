@@ -1,5 +1,8 @@
 #!/bin/bash
 
+echo "Do not use - Use circleCI instead"
+exit
+
 current_dir=$PWD
 current_date=`date +%Y%M%d:%H%m`
 

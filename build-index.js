@@ -65,7 +65,7 @@ function readHtml(root, file, fileId) {
         "t": title,
         "d": description,
         "k": keywords,
-        "b": body
+        //"b": body
     }
     return data;
 }
