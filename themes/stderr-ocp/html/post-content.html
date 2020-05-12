@@ -16,7 +16,7 @@
     <br/> 
     <b>Tags: </b>
     {% for tag in post.tags %}
-    <a href="{{tag.uri}}">{{tag.name}}</a>
+    <a class="post-tags-class" href="{{tag.uri}}">{{tag.name}}</a>
     {% endfor %}
 </div>
 {% endif %}
