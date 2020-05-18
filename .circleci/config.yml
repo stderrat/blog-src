@@ -26,6 +26,9 @@ jobs:
             - public
 
   deploy:
+    branches:
+      only:
+        - master
     docker:
       - image: stderrat/blogbuilder:latest
     steps:
