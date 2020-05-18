@@ -24,7 +24,6 @@ jobs:
           root: /home/deployer/project
           paths:
             - public
-
   deploy:
     branches:
       only:
