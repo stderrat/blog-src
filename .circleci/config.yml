@@ -13,8 +13,11 @@ jobs:
 #          name: Install node dependencies
 #          command: npm install
       - run:
+          name: Switch folder
+          command: cd /home/deployer/project
+      - run:
           name: Build blog content
-          command: cd /home/deployer/project && hugo --minify --enableGitInfo
+          command: hugo --minify --enableGitInfo
 #      - run:
 #          name: Build search index
 #          command: node ./build-index.js
