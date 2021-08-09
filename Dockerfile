@@ -1,7 +1,7 @@
 FROM registry.access.redhat.com/ubi8/ubi:8.1
 
 RUN yum --disableplugin=subscription-manager -y update \
-  && yum --disableplugin=subscription-manager -y install git ruby \
+  && yum --disableplugin=subscription-manager -y install git ruby rsync \
   && yum --disableplugin=subscription-manager clean all
 
 RUN gem install asciidoctor
