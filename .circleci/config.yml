@@ -26,7 +26,7 @@ jobs:
             - public
   deploy:
     docker:
-      - image: quay.io/tjungbau/hugobuilderlatest
+      - image: quay.io/tjungbau/hugobuilder:latest
     steps:
       - attach_workspace:
           at: /tmp/public
