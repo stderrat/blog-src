@@ -1,0 +1,282 @@
+--- 
+title: "Advanced Routing Example" 
+description: "OpenShift 4.x and Service Mesh/istio Tutorial 6 - Advanced Routing. Try routing traffic based on canary, mirroring or loadbalancing traffic."
+date: "2020-04-03"
+doctype: book
+
+weight: 6
+
+author: Thomas Jungbauer
+type: post
+draft: false
+categories:
+   - Service Mesh
+   - OpenShift
+tags: ["Istio", "Service Mesh", "OpenShift", "OCP", "Grayscale", "Canary", "DestinationRule", "Mirror", "Loadbalancer"] 
+
+aliases: [ 
+	 "/posts-output/2020-04-03-Istio-Tutorial6/",
+] 
+---
+
+:imagesdir: /service-mesh/images/
+:icons: font
+:toc:
+
+Welcome to part 6 of *OpenShift 4 and Service Mesh* Advanced routing, like Canary Deployments, traffic mirroring and loadbalancing are discussed and tested. All operations have been successdully tested on OpenShift 4.3.
+
+<!--more--> 
+
+== Advanced Routing
+During link:/service-mesh/2020/04/routing-example[Issue #5] some simple routing was implemented. The traffic was split by 100% to a new version (v2) of the _recommendation_ microservice. 
+This section shall give a brief overview of advanced routing possibilities. 
+
+=== Canary Deployments
+A canary deployment is a strategy to roll out a new version of your service by using traffic splitting. A small amount of traffic (10%) will be sent to the new version, while most of the traffic will be sent to the old version still. The traffic to the new version can be analysed and if everything works as expected more and more traffic can be sent to the new version. 
+
+To enable split traffic, the VirtualService must be update:
+
+
+[source,yaml]
+----
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: recommendation
+spec:
+  hosts:
+  - recommendation
+  http:
+  - route:
+    - destination:
+        host: recommendation
+        subset: version-v1
+      weight: 90
+    - destination:
+        host: recommendation
+        subset: version-v2
+      weight: 10
+----
+
+Apply the change
+
+[source,bash]
+----
+oc apply -f VitualService_split_v1_and_v1.yaml
+----
+
+Test the traffic and verify that 10% will be sent to v2
+
+[source,bash]
+----
+sh ~/run.sh 100 $GATEWAY_URL
+
+# 0: customer => preference => recommendation v1 from 'f11b097f1dd0': 1060
+# 1: customer => preference => recommendation v1 from 'f11b097f1dd0': 1061
+# 2: customer => preference => recommendation v2 from '3cbba7a9cde5': 2060
+# 3: customer => preference => recommendation v1 from 'f11b097f1dd0': 1062
+# 4: customer => preference => recommendation v1 from 'f11b097f1dd0': 1063
+...
+----
+
+WARNING: If an error is shown, then you most probably forget to configure the DestinationRule as described link:/service-mesh/2020/04/routing-example[here]. 
+
+.Kiali split traffic 90/10
+image::Kiali_Canary_90_10.png?width=940px&height=224px[]
+
+
+
+<<<
+=== Routing based on user-agent header
+It is possible to send traffic to different versions based on the browser type which is calling the application. 
+In our test application the service _customer_ is setting the header *baggage-user-agent* and propagates it to the other services. 
+
+
+NOTE: >> headers.putSingle("baggage-user-agent", userAgent);
+
+Create the following file
+
+[source,yaml]
+----
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: recommendation
+spec:
+  hosts:
+  - recommendation
+  http:
+  - match:
+    - headers:
+        baggage-user-agent:
+          regex: .*Safari.*
+    route:
+    - destination:
+        host: recommendation
+        subset: version-v2
+  - route:
+    - destination:
+        host: recommendation
+        subset: version-v1
+----
+
+and apply the change
+
+[source,bash]
+----
+oc apply -f VitualService_safari.yaml
+----
+
+In order to test the result, either use the appropriate browser or use _curl_ to set the user-agent. As expected, request from _Safari_ are sent to v2, other are sent to v1. 
+
+*Safari*
+[source,bash]
+----
+curl -v -A Safari $GATEWAY_URL
+[...]
+> User-Agent: Safari
+[...]
+customer => preference => recommendation v2 from '3cbba7a9cde5': 2365
+----
+
+*Firefox*
+[source,bash]
+----
+curl -v -A Firefox $GATEWAY_URL
+[...]
+> User-Agent: Firefox
+[...]
+customer => preference => recommendation v1 from 'f11b097f1dd0': 3762
+----
+
+
+<<<
+=== Mirroring Traffic
+Mirroring Traffic, aka Dark Launch, will duplicate the traffic to another service, allowing you to analyse it before sending production data to it. Responses of the mirrored requests are ignored. 
+
+Run the following command and be sure that recommendation-v1 and recommendation-v2 are both running:
+
+[source,bash]
+----
+oc get pod -n tutorial| grep recommendation
+recommendation-v1-69db8d6c48-h8brv   2/2     Running   0          24h
+recommendation-v2-6c5b86bbd8-jnk8b   2/2     Running   0          23h
+----
+
+Update the VirtualService, so that version v2 will receive mirrored traffic, while the actual request will be sent to v1:
+
+[source,yaml]
+----
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: recommendation
+spec:
+  hosts:
+  - recommendation
+  http:
+  - route:
+    - destination:
+        host: recommendation
+        subset: version-v1
+    mirror: <1>
+      host: recommendation
+      subset: version-v2
+----
+<1> This must be set to 'mirror'
+
+Apply the change
+
+[source,bash]
+----
+oc apply -f VitualService_mirrored-traffic.yaml
+----
+
+Now lets open and follow the logs of recommandation-v2 in order to see that traffic will reach this service, but responses are ignored:
+
+[source,bash]
+----
+oc logs -f $(oc get pods|grep recommendation-v2|awk '{ print $1 }') -c recommendation
+----
+
+In a second terminal window send some traffic to our service. 
+
+[source,bash]
+----
+sh ~/run.sh 100 $GATEWAY_URL
+----
+
+You will see that only v1 answers, while in the 2nd window, v2 gets the same traffic. 
+
+=== Load Balancing
+In the default OpenShift environment the kube-proxy forwards all requests to pods randomly. With Red Hat ServiceMesh it is possible to add more complexity and let the Envoy proxy handle load balancing for your services. 
+
+Three methods are supported:
+
+- random
+- round-robin
+- least connection
+
+The round robin function is used by default, when there is no DestinationRule configured. We can use the DestinationRule to use the least connection option to see how the traffic is sent.
+
+Before we start we need to delete the VirtualService for the recommendation microservice
+
+[source,bash]
+----
+oc delete virtualservice recommendation
+----
+
+The we scale version v2 to 3:
+
+[source,bash]
+----
+oc scale deployment recommendation-v2 --replicas=3
+----
+
+After a few seconds the folling pods should run now:
+
+[source,bash]
+----
+NAME                                 READY   STATUS    RESTARTS   AGE
+customer-6948b8b959-jdjlg            2/2     Running   1          25h
+preference-v1-7fdb89c86b-nktqn       2/2     Running   0          25h
+recommendation-v1-69db8d6c48-h8brv   2/2     Running   0          25h
+recommendation-v2-6c5b86bbd8-6lgz6   2/2     Running   0          91s
+recommendation-v2-6c5b86bbd8-dnc8b   2/2     Running   0          91s
+recommendation-v2-6c5b86bbd8-jnk8b   2/2     Running   0          24h
+----
+
+If you send traffic to the application, you would see that 3 quarter are sent to v1 and one is sent to v1.
+
+With the following DestinationRule the traffic will be sent randomly to the application
+
+[source,yaml]
+----
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: recommendation
+spec:
+  host: recommendation
+  trafficPolicy:
+      loadBalancer:
+        simple: RANDOM
+----
+
+If you now sent traffic to the service, you will see that the traffic is sent randomly to the versions. (verify the serial number)
+
+[source,bash]
+----
+sh ~/run.sh 100 $GATEWAY_URL
+
+# 140: customer => preference => recommendation v2 from '3cbba7a9cde5': 5729
+# 141: customer => preference => recommendation v1 from 'f11b097f1dd0': 7119
+# 142: customer => preference => recommendation v2 from '3cbba7a9cde5': 361
+# 143: customer => preference => recommendation v2 from '3cbba7a9cde5': 362
+# 144: customer => preference => recommendation v2 from '3cbba7a9cde5': 5730
+# 145: customer => preference => recommendation v2 from '3cbba7a9cde5': 362
+# 146: customer => preference => recommendation v1 from 'f11b097f1dd0': 7120
+# 147: customer => preference => recommendation v1 from 'f11b097f1dd0': 7121
+# 148: customer => preference => recommendation v2 from '3cbba7a9cde5': 363
+...
+----

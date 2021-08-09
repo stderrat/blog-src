@@ -1,0 +1,162 @@
+--- 
+title: "Deploy Example Bookinfo Application"
+description: "OpenShift 4.x and Service Mesh/Istio Tutorial 11 - Deploy Example Bookinfo Application"
+date: "2020-04-30"
+doctype: book
+
+weight: 12
+
+author: Thomas Jungbauer
+type: post
+draft: false
+categories:
+   - Service Mesh
+   - OpenShift
+tags: ["Istio", "Service Mesh", "OpenShift", "OCP", "Bookinfo", "Example"] 
+
+aliases: [ 
+	 "/posts-output/2020-04-30-Istio-Tutorial11/",
+] 
+---
+
+:imagesdir: /service-mesh/images/
+:icons: font
+:toc:
+
+To test a second application, a bookinfo application shall be deployed as an example. 
+
+The following section finds it's origin at:
+
+* https://istio.io/docs/examples/bookinfo/[Istio - Bookinfo Application^]
+* https://docs.openshift.com/container-platform/4.3/service_mesh/service_mesh_day_two/ossm-example-bookinfo.html[OpenShift 4 - Example Application^]
+
+<!--more--> 
+
+[.quote]
+----
+
+The Bookinfo application displays information about a book, similar to a single catalog entry of an online book store. 
+Displayed on the page is a description of the book, book details (ISBN, number of pages, and other information), and book reviews.
+
+The Bookinfo application consists of these microservices:
+
+* The productpage microservice calls the details and reviews microservices to populate the page.
+* The details microservice contains book information.
+* The reviews microservice contains book reviews. It also calls the ratings microservice.
+* The ratings microservice contains book ranking information that accompanies a book review.
+
+There are three versions of the reviews microservice:
+
+* Version v1 does not call the ratings Service.
+* Version v2 calls the ratings Service and displays each rating as one to five black stars.
+* Version v3 calls the ratings Service and displays each rating as one to five red stars.
+
+The end-to-end architecture of the application is shown below.
+----
+
+
+.Bookinfo Application End2End Overview
+image::bookinfo.png?width=640px[]
+
+To use the bookinfo application inside service mesh, no code changes are required. Instead an Envoy proxy is added as a sidecar container to all containers (product, review, details) which intercepts the traffic. 
+
+--- 
+
+// Table of Content
+toc::[options="nonumbers"]
+
+
+== Installation
+Let's start right away:
+
+. Create a new project
++
+[source, bash]
+----
+oc new-project bookinfo
+----
+
+. Add the new project to our Service Mesh
++
+[source, yaml]
+----
+apiVersion: maistra.io/v1
+kind: ServiceMeshMember
+metadata:
+  name: default
+  namespace: bookinfo
+spec:
+  controlPlaneRef:
+    name: basic-install
+    namespace: istio-system
+----
+
+. Create the application
++
+[source,bash]
+----
+oc apply -n bookinfo -f https://raw.githubusercontent.com/Maistra/istio/maistra-1.1/samples/bookinfo/platform/kube/bookinfo.yaml
+----
+
+. Create the Gateway and the VirtuaService
++
+[source,bash]
+----
+oc apply -n bookinfo -f https://raw.githubusercontent.com/Maistra/istio/maistra-1.1/samples/bookinfo/networking/bookinfo-gateway.yaml
+----
+
+. Check if the services and pods are up and running
++
+[source,bash]
+----
+oc get svc,pods
+NAME                  TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE
+service/details       ClusterIP   172.30.178.172   <none>        9080/TCP   7m16s
+service/productpage   ClusterIP   172.30.78.96     <none>        9080/TCP   7m13s
+service/ratings       ClusterIP   172.30.154.12    <none>        9080/TCP   7m15s
+service/reviews       ClusterIP   172.30.138.174   <none>        9080/TCP   7m14s
+
+NAME                                  READY   STATUS    RESTARTS   AGE
+pod/details-v1-d7db4d55b-mwzsk        2/2     Running   0          7m14s
+pod/productpage-v1-5f598fbbf4-svkbc   2/2     Running   0          7m11s
+pod/ratings-v1-85957d89d8-v2lrs       2/2     Running   0          7m11s
+pod/reviews-v1-67d9b4bcc-x6s2v        2/2     Running   0          7m11s
+pod/reviews-v2-67b465c497-zpz6z       2/2     Running   0          7m11s
+pod/reviews-v3-7bd659b757-j6rwn       2/2     Running   0          7m11s
+----
+
+== Verify that application is accessible
+
+. Export the Gateway URL into a variable
++
+[source,bash]
+----
+export GATEWAY_URL=$(oc -n istio-system get route istio-ingressgateway -o jsonpath='{.spec.host}')
+----
+
+. Verify if the productpage is accessible
++
+[source,bash]
+----
+curl -s http://${GATEWAY_URL}/productpage | grep -o "<title>.*</title>"
+<title>Simple Bookstore App</title>
+----
+
+. You can also access the Productpage in your browser. When you reload the page several times, you will see different results for the Reviews. This comes due to 3 different versions: one without any rating, one with black stars and one with red stars. http://${GATEWAY_URL}/productpage
++
+.Bookinfo Application
+image::bookinfo-productpage.png?width=940px[]
+
+== Adding default Destination Rule
+
+[source,bash]
+----
+oc apply -n bookinfo -f https://raw.githubusercontent.com/Maistra/istio/maistra-1.1/samples/bookinfo/networking/destination-rule-all-mtls.yaml
+----
+
+This will add default routing to all endpoints with same weight. As you can see in Kiali, the _Reviews_ microservice is contacted equally. 
+
+.Kiali: Bookinfo Application
+image::bookinfo-kiali.png?width=940px[]
+
+Feel free to play with other DestinationRules to controll your traffic. 

@@ -1,0 +1,653 @@
+--- 
+title: "Writing Operator using Ansible"
+description: "Example of an Kubernetes Operator based on Ansible"
+date: "2021-01-27"
+doctype: book
+
+weight: 6
+
+author: Thomas Jungbauer
+type: post
+draft: false
+categories:
+   - OpenShift
+tags: ["Operator", "OpenShift", "OCP", "Kubernetes"]
+
+aliases: [ 
+	 "/posts-output/2021-01-27-WritingOperatorAnsible/",
+] 
+
+---
+
+:imagesdir: /OpenShift/images/
+:icons: font
+:toc:
+
+
+This quick post shall explain, without any fancy details, how to write an Operator based on Ansible. It is assumed that you know what purpose an Operator has.
+
+As a short summary: Operators are a way to create custom controllers in OpenShift or Kubernetes. It watches for custom resource objects and creates the application based on the parameters in such custom resource object. 
+Often written in *Go*, the SDK supports *Ansible*, *Helm* and (new) *Java* as well. 
+
+<!--more--> 
+
+In this example we will install Gogs, a painless self-hosted Git services. 
+
+As general prerequisites we have:
+
+* Installed OpenShift 4.6+ cluster (could be Minicube)
+* Possibility to execute Ansible scripts and oc/kubectl commands
+* Commands: make, docker (or podman)
+
+---
+
+## Install Operator SDK
+
+As explained at https://sdk.operatorframework.io/docs/installation/ the following prerequisites must be met prior installing the SDK at least: 
+
+* Docker v17.03+ or podman v1.9.3+ or buildah v1.7+
+* OpenShift CLU v4.6+
+* Kubernetes/OpenShift cluster
+* Access to container registry, for example quay.io
+* Optional: Go v1.13+ (for Operators based on Golang)
+* Ansible v2.9.0+
+
+Following the instructions of the SDK documentation, the *operator-sdk* command will be installed. 
+
+
+## Creating the Operator
+
+To begin we create a new folder for the Operator and initialize the Operator project.
+
+[source,bash]
+----
+mkdir gogs-operator
+cd gogs-operator
+
+operator-sdk init --plugins=ansible --domain=example.com.at
+operator-sdk create api --group gogs --version=v1alpha1 --kind Gogs --generate-playbook
+----
+
+This will create a new project structure with the following parameters:
+
+*--plugin*: Type of Operator (Ansible or Helm)
+
+*--domain*: Defines the api endpoint together with group and version.
+
+*--group*: Usually short product name
+
+*--version*: Defines version of API endpoint
+
+The folder structure which will be created automatically looks as follows:
+
+[source,bash]
+----
+.
+|-- Dockerfile
+|-- Makefile
+|-- PROJECT
+|-- config
+|   |-- crd
+|   |   |-- bases
+|   |   |   |-- gogs.example.com.at_gogs.yaml
+|   |   |-- kustomization.yaml
+|   |-- default
+|   |   |-- kustomization.yaml
+|   |   |-- manager_auth_proxy_patch.yaml
+|   |-- manager
+|   |   |-- kustomization.yaml
+|   |   |-- manager.yaml
+|   |-- prometheus
+|   |   |-- kustomization.yaml
+|   |   |-- monitor.yaml
+|   |-- rbac
+|   |   |-- auth_proxy_client_clusterrole.yaml
+|   |   |-- auth_proxy_role.yaml
+|   |   |-- auth_proxy_role_binding.yaml
+|   |   |-- auth_proxy_service.yaml
+|   |   |-- gogs_editor_role.yaml
+|   |   |-- gogs_viewer_role.yaml
+|   |   |-- kustomization.yaml
+|   |   |-- leader_election_role.yaml
+|   |   |-- leader_election_role_binding.yaml
+|   |   |-- role.yaml
+|   |   |-- role_binding.yaml
+|   |-- samples
+|   |   |-- gogs_v1alpha1_gogs.yaml
+|   |   |-- kustomization.yaml
+|   |-- scorecard
+|   |   |-- bases
+|   |   |   |-- config.yaml
+|   |   |-- kustomization.yaml
+|   |   |-- patches
+|   |       |-- basic.config.yaml
+|   |       |-- olm.config.yaml
+|   |-- testing
+|       |-- debug_logs_patch.yaml
+|       |-- kustomization.yaml
+|       |-- manager_image.yaml
+|       |-- pull_policy
+|           |-- Always.yaml
+|           |-- IfNotPresent.yaml
+|           |-- Never.yaml
+|-- molecule
+|   |-- default
+|   |   |-- converge.yml
+|   |   |-- create.yml
+|   |   |-- destroy.yml
+|   |   |-- kustomize.yml
+|   |   |-- molecule.yml
+|   |   |-- prepare.yml
+|   |   |-- tasks
+|   |   |   |-- gogs_test.yml
+|   |   |-- verify.yml
+|   |-- kind
+|       |-- converge.yml
+|       |-- create.yml
+|       |-- destroy.yml
+|       |-- molecule.yml
+|-- playbooks
+|   |-- gogs.yml
+|-- requirements.yml
+|-- roles
+|-- watches.yaml
+----
+
+The *watches.yaml* file maps Custom Resources (identified by Group, Version, and Kind [GVK]) to Ansible Roles and Playbooks. It tells the Operator where to find the actual Ansible playbook. 
+
+[source,yaml]
+----
+---
+# Use the 'create api' subcommand to add watches to this file.
+- version: v1alpha1
+  group: gogs.example.com.at
+  kind: Gogs
+  playbook: playbooks/gogs.yml
+# +kubebuilder:scaffold:watch
+----
+
+Other files, especially inside *playbooks* and *roles* are created as placeholders. These files (or folders) are waiting for you to add the Ansible logic. 
+
+## Defining Roles and Playbook
+
+With the folder structure above, a playbook and different roles can be created in order to tell the Operator what it needs to do. 
+
+CAUTION: Since the Operator will constantly watch for changes, all tasks must be *idempotent* 
+
+In our example we will try to install Gogs, a Git service. It contains a Postgres database system and a webservice. 
+To use some example roles and not fully start from scratch let's clone the following repository and copy the folders to our Operator.
+
+[source,bash]
+----
+cd ..
+https://github.com/tjungbauer/ansible-operator-roles
+cd gogs-operator
+
+# Remove placeholder
+rm -Rf roles/
+
+# Copy Postgres deployment role
+cp -R ../ansible-operator-roles/roles/postgresql-ocp ./roles
+
+# Copy Gogs Deplyoment role
+cp -R ../ansible-operator-roles/roles/gogs-ocp ./roles
+----
+
+When we examine the folder, we see 2 typical Ansible roles. The simple purpose is, to create all required OpenShift objects, like Deployment, Route, Service and so on, fully automated by the Operator.
+
+[source,bash]
+----
+|-- playbooks
+|   |-- gogs.yaml
+|-- roles
+    |-- gogs-ocp
+    |   |-- README.adoc
+    |   |-- defaults
+    |   |   |-- main.yml
+    |   |-- meta
+    |   |   |-- main.yml
+    |   |-- tasks
+    |   |   |-- main.yml
+    |   |-- templates
+    |       |-- config_map.j2
+    |       |-- deployment.j2
+    |       |-- persistent_volume_claim.j2
+    |       |-- route.j2
+    |       |-- service.j2
+    |       |-- service_account.j2
+    |-- postgresql-ocp
+        |-- README.adoc
+        |-- defaults
+        |   |-- main.yml
+        |-- meta
+        |   |-- main.yml
+        |-- tasks
+        |   |-- main.yml
+        |-- templates
+            |-- deployment.j2
+            |-- persistent_volume_claim.j2
+            |-- secret.j2
+            |-- service.j2
+----
+
+Copy (or create) the following playbook under *playbooks/gogs.yaml*. As you can see there are 2 tasks: the first one will create the postgres application, the seconds one the Gogs service. 
+
+[source,yaml]
+----
+---
+# Persistent Gogs deployment playbook.
+#
+# The Playbook expects the following variables to be set in the CR:
+# (Note that Camel case gets converted by the ansible-operator to Snake case)
+# - PostgresqlVolumeSize
+# - GogsVolumeSize
+# - GogsSSL
+# The following variables come from the ansible-operator
+# - ansible_operator_meta.namespace
+# - ansible_operator_meta.name (from the name of the CR)
+
+- hosts: localhost
+  gather_facts: no
+  tasks:
+  - name: Set up PostgreSQL
+    include_role:
+      name: ../roles/postgresql-ocp <1>
+    vars: <2>
+      _postgresql_namespace: "{{ ansible_operator_meta.namespace }}"
+      _postgresql_name: "postgresql-gogs-{{ ansible_operator_meta.name }}"
+      _postgresql_database_name: "gogsdb"
+      _postgresql_user: "gogsuser"
+      _postgresql_password: "gogspassword"
+      _postgresql_volume_size: "{{ postgresql_volume_size|d('4Gi') }}"
+      _postgresql_image: "{{ postgresql_image|d('registry.redhat.io/rhscl/postgresql-10-rhel7') }}"
+      _postgresql_image_tag: "{{ postgresql_image_tag|d('latest') }}"
+      _postgresql_size: 1
+
+  - name: Set Gogs Service name to default value
+    set_fact:
+      gogs_service_name: "gogs-{{ ansible_operator_meta.name }}"
+    when:
+      gogs_service_name is not defined
+  - name: Set up Gogs
+    include_role:
+      name: ../roles/gogs-ocp <3>
+    vars: <4>
+      _gogs_namespace: "{{ ansible_operator_meta.namespace }}"
+      _gogs_name: "{{ gogs_service_name }}"
+      _gogs_ssl: "{{ gogs_ssl|d(False)|bool }}"
+      _gogs_route: "{{ gogs_route | d('') }}"
+      _gogs_image_tag: "{{ gogs_image_tag | d('latest') }}"
+      _gogs_volume_size: "{{ gogs_volume_size|d('4Gi') }}"
+      _gogs_postgresql_service_name: "postgresql-gogs-{{ ansible_operator_meta.name }}"
+      _gogs_postgresql_database_name: gogsdb
+      _gogs_postgresql_user: gogsuser
+      _gogs_postgresql_password: gogspassword
+      _gogs_size: 1
+----
+<1> Path to Postgres Role
+<2> Parameters for Postgres service
+<3> Path to Gogs Role
+<4> Parameters for Gogs service
+
+
+## Operator Permissions
+
+The Operator will require correct permissions in order to create objects like Routes or Services in OpenShift. The SDK automatically created a default role.yaml which can be modified. 
+Open the file *config/rbac/role.yaml* and add permissions for:
+
+. for apiGroups ""
+.. services
+.. routes
+.. peristentvlumeclaims
+.. serviceaccounts
+.. configmaps
+. for apiGroups: route.operanshift.io the resource *routes*
+
+At the end, the role.yaml should look like this:
+
+[source,yaml]
+----
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+  ##
+  ## Base operator rules
+  ##
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+      - pods
+      - pods/exec
+      - pods/log
+      - services
+      - routes
+      - configmaps
+      - persistentvolumeclaims
+      - serviceaccounts
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+      - daemonsets
+      - replicasets
+      - statefulsets
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  ##
+  ## Rules for gogs.example.com.at/v1alpha1, Kind: Gogs
+  ##
+  - apiGroups:
+      - gogs.example.com.at
+    resources:
+      - gogs
+      - gogs/status
+      - gogs/finalizers
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - route.openshift.io
+    resources:
+      - routes
+    verbs:
+      - create
+      - update
+      - delete
+      - get
+      - list
+      - watch
+      - patch
+  - apiGroups:
+      - route.openshift.io
+    resources:
+      - routes
+    verbs:
+      - create
+      - update
+      - delete
+      - get
+      - list
+      - watch
+      - patch
+----
+
+## Building and Deploy the Operator
+
+Now it is time to build the Operator and push it to a repository. In this example a repository was created at quay.io and is called *gogs-operator*.
+The SDK will automatically create a Makefile during the initialization, which we will use now.
+
+CAUTION: The Makefile is prepared for _docker_. If you use *podman* some modifications must be done first. Run the command *sed -i 's/docker/podman/g' Makefile* to replace all docker commands inside the Makefile.
+
+The next commands will _build, push, install and deploy_ the Operator. Before we start we must be logged in to you Registry of choice (i.e. docker login ...) as well as into our OpenShift cluster. 
+Moreover, it is required that the *IMG* environment variable is exported with the correct value. 
+
+. Build the Operator and push into the registry
++
+[source,bash]
+----
+# export IMG, be sure that the correct tag is used
+export IMG=quay.io/tjungbau/gogs-operator:v1.0.0
+
+# Build and push into registry
+make podman-build podman-push
+
+podman build . -t quay.io/tjungbau/gogs-operator:v1.0.0
+STEP 1: FROM quay.io/operator-framework/ansible-operator:v1.3.0
+STEP 2: COPY requirements.yml ${HOME}/requirements.yml
+--> Using cache 4f84e7064b066c2cac5179b56490a0ef85591170c501ec8a480b617d6e91cff3
+STEP 3: RUN ansible-galaxy collection install -r ${HOME}/requirements.yml  && chmod -R ug+rwx ${HOME}/.ansible
+--> Using cache 2a3a5d44451a45a4c38e1c314e8887c6c45f2551cbef87ef0d1ce518c1969c0d
+STEP 4: COPY watches.yaml ${HOME}/watches.yaml
+--> Using cache 642f8361a7b358b89d2e4e5211c1c7a1e22488c53bba0bf1ba2ba275fd56ee69
+STEP 5: COPY roles/ ${HOME}/roles/
+--> Using cache 93c1af8782bad84d8b81d2d2294c405caab70e2d01c232440f7eb8e5001746c1
+STEP 6: COPY playbooks/ ${HOME}/playbooks/
+--> Using cache 1cdeee1456ac67d70d4233b0f9ed8052465aaa2cded6bd8ae962dfcc848e5b92
+STEP 7: COMMIT quay.io/tjungbau/gogs-operator:v1.0.0
+--> 1cdeee1456a
+1cdeee1456ac67d70d4233b0f9ed8052465aaa2cded6bd8ae962dfcc848e5b92
+podman push quay.io/tjungbau/gogs-operator:v1.0.0
+Getting image source signatures
+Copying blob d5ca8c3b3d34 skipped: already exists
+Copying blob 4b036ae478b7 skipped: already exists
+Copying blob 5cfcd0621ffc skipped: already exists
+Copying blob c6f3d1432bd0 skipped: already exists
+Copying blob 92538e92de29 skipped: already exists
+Copying blob eb7bf34352ca skipped: already exists
+Copying blob 80c43a11288f done
+Copying blob 803eb2035c9a done
+Copying blob 40d943ae1834 done
+Copying blob f4d9024614ee done
+Copying blob 5143a36c6002 done
+Copying blob 5050e1080446 skipped: already exists
+Copying config 1cdeee1456 done
+Writing manifest to image destination
+Copying config 1cdeee1456 [--------------------------------------] 0.0b / 6.2KiB
+Writing manifest to image destination
+Writing manifest to image destination
+Storing signatures
+----
+
+. Install the CRD into OpenShift
++
+[source,bash]
+----
+# Install the custom resource definition
+make install
+
+/root/projects/gogs-operator/bin/kustomize build config/crd | kubectl apply -f -
+customresourcedefinition.apiextensions.k8s.io/gogs.gogs.example.com.at created
+----
+
+. Deploy the Operator and all required objects into OpenShift
++
+[source,bash]
+----
+# Deploy the Operator into OpenShift
+make deploy
+
+cd config/manager && /root/projects/gogs-operator/bin/kustomize edit set image controller=quay.io/tjungbau/gogs-operator:v1.0.0
+/root/projects/gogs-operator/bin/kustomize build config/default | kubectl apply -f -
+namespace/gogs-operator-system created
+customresourcedefinition.apiextensions.k8s.io/gogs.gogs.example.com.at unchanged
+role.rbac.authorization.k8s.io/gogs-operator-leader-election-role created
+clusterrole.rbac.authorization.k8s.io/gogs-operator-manager-role created
+clusterrole.rbac.authorization.k8s.io/gogs-operator-metrics-reader created
+clusterrole.rbac.authorization.k8s.io/gogs-operator-proxy-role created
+rolebinding.rbac.authorization.k8s.io/gogs-operator-leader-election-rolebinding created
+clusterrolebinding.rbac.authorization.k8s.io/gogs-operator-manager-rolebinding created
+clusterrolebinding.rbac.authorization.k8s.io/gogs-operator-proxy-rolebinding created
+service/gogs-operator-controller-manager-metrics-service created
+deployment.apps/gogs-operator-controller-manager created
+----
+
+This will create a new project in OpenShift called *gogs-operator-system*. Here, the Operator is running and waiting that somebody creates a CRD of the kind *Gogs*. Once this happens the Operator will execute the playbooks and therefore create a Postgres and a Gogs pod. 
+
+[source,bash]
+----
+# Operator Namespace
+oc get pods -n gogs-operator-system
+NAME                                               READY   STATUS    RESTARTS   AGE
+gogs-operator-controller-manager-6747bb6c6-s8794   2/2     Running   0          6m8s
+----
+
+## Using the Operator
+
+Now we need to create a CRD of the kind _Gogs_. This will happen in a new project, where the Gogs service shall be hosted.
+
+. Create a new OpenShift project
++
+[source,bash]
+----
+oc new-project gogs
+----
+
+. Verify the sample resource
++
+[source,bash]
+----
+cat config/samples/gogs_v1alpha1_gogs.yaml
+apiVersion: gogs.example.com.at/v1alpha1
+kind: Gogs
+metadata:
+  name: gogs-sample
+spec:
+  foo: bar
+----
+
+. Apply the sample resource
++
+[source,bash]
+----
+oc apply -f config/samples/gogs_v1alpha1_gogs.yaml -n gogs
+----
+
+This will create two services:
+
+. postgresql
+. Gogs
+
+The Operator will be responsible to roll out all required objects. This includes the Deployments for the container, the Openshift service and the route. 
+
+[source,bash]
+----
+oc get all -n gogs
+NAME                                              READY   STATUS    RESTARTS   AGE
+pod/gogs-gogs-sample-57778fd76-ghg8j              1/1     Running   0          74s
+pod/postgresql-gogs-gogs-sample-bbc49b794-mnltb   1/1     Running   0          115s
+
+NAME                                  TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE
+service/gogs-gogs-sample              ClusterIP   172.30.47.31    <none>        3000/TCP   80s
+service/postgresql-gogs-gogs-sample   ClusterIP   172.30.47.158   <none>        5432/TCP   117s
+
+NAME                                          READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/gogs-gogs-sample              1/1     1            1           74s
+deployment.apps/postgresql-gogs-gogs-sample   1/1     1            1           115s
+
+NAME                                                    DESIRED   CURRENT   READY   AGE
+replicaset.apps/gogs-gogs-sample-57778fd76              1         1         1       74s
+replicaset.apps/postgresql-gogs-gogs-sample-bbc49b794   1         1         1       115s
+
+NAME                                        HOST/PORT                                    PATH   SERVICES           PORT    TERMINATION   WILDCARD
+route.route.openshift.io/gogs-gogs-sample   gogs-gogs-sample-gogs.apps.ocp.ispworld.at          gogs-gogs-sample   <all>                 None
+----
+
+At the end, all Pods are alive, ready and are fully controlled by the Operator. We can access the Gogs web interface via the route and start using our own Git service.
+
+
+## Updating Operator
+
+While the Operator is running fine now, at some point you might want to do some changes. For example, let's run the Gog service with a replica of 3. 
+
+Perform the following actions:
+
+. Set the variable *_gogs_size* to 3 in playbooks/gogs.yml
+
+. Build and push the new version
++
+[source,bash]
+----
+export IMG=quay.io/tjungbau/gogs-operator:v1.0.8
+
+make podman-build podman-push
+
+podman build . -t quay.io/tjungbau/gogs-operator:v1.0.8
+STEP 1: FROM quay.io/operator-framework/ansible-operator:v1.3.0
+STEP 2: COPY requirements.yml ${HOME}/requirements.yml
+--> Using cache 4f84e7064b066c2cac5179b56490a0ef85591170c501ec8a480b617d6e91cff3
+STEP 3: RUN ansible-galaxy collection install -r ${HOME}/requirements.yml  && chmod -R ug+rwx ${HOME}/.ansible
+--> Using cache 2a3a5d44451a45a4c38e1c314e8887c6c45f2551cbef87ef0d1ce518c1969c0d
+STEP 4: COPY watches.yaml ${HOME}/watches.yaml
+--> Using cache 642f8361a7b358b89d2e4e5211c1c7a1e22488c53bba0bf1ba2ba275fd56ee69
+STEP 5: COPY roles/ ${HOME}/roles/
+--> Using cache 55785493e215d933ef7a93fe000afa6fbb088d87eeffcdddeea4e7fd1896f5b5
+STEP 6: COPY playbooks/ ${HOME}/playbooks/
+STEP 7: COMMIT quay.io/tjungbau/gogs-operator:v1.0.8
+--> bb9d6a995d0
+bb9d6a995d059eab7758f9ac17d3ce12f8759518e231f77d32a4b820e4b14396
+podman push quay.io/tjungbau/gogs-operator:v1.0.8
+Getting image source signatures
+Copying blob 5cfcd0621ffc skipped: already exists
+Copying blob d5ca8c3b3d34 skipped: already exists
+Copying blob eb7bf34352ca skipped: already exists
+Copying blob 4b036ae478b7 skipped: already exists
+Copying blob c6f3d1432bd0 skipped: already exists
+Copying blob 92538e92de29 skipped: already exists
+Copying blob 41e53e538a36 done
+Copying blob 5050e1080446 skipped: already exists
+Copying blob 40d943ae1834 skipped: already exists
+Copying blob 803eb2035c9a skipped: already exists
+Copying blob 80c43a11288f skipped: already exists
+Copying blob ee0361a14e3b skipped: already exists
+Copying config bb9d6a995d done
+Writing manifest to image destination
+Copying config bb9d6a995d [--------------------------------------] 0.0b / 6.2KiB
+Writing manifest to image destination
+Writing manifest to image destination
+Storing signatures
+----
+
+. Deploy the new version
++
+[source,bash]
+----
+make deploy
+
+cd config/manager && /root/projects/gogs-operator/bin/kustomize edit set image controller=quay.io/tjungbau/gogs-operator:v1.0.8
+/root/projects/gogs-operator/bin/kustomize build config/default | kubectl apply -f -
+namespace/gogs-operator-system unchanged
+customresourcedefinition.apiextensions.k8s.io/gogs.gogs.example.com.at unchanged
+role.rbac.authorization.k8s.io/gogs-operator-leader-election-role unchanged
+clusterrole.rbac.authorization.k8s.io/gogs-operator-manager-role unchanged
+clusterrole.rbac.authorization.k8s.io/gogs-operator-metrics-reader unchanged
+clusterrole.rbac.authorization.k8s.io/gogs-operator-proxy-role unchanged
+rolebinding.rbac.authorization.k8s.io/gogs-operator-leader-election-rolebinding unchanged
+clusterrolebinding.rbac.authorization.k8s.io/gogs-operator-manager-rolebinding unchanged
+clusterrolebinding.rbac.authorization.k8s.io/gogs-operator-proxy-rolebinding unchanged
+service/gogs-operator-controller-manager-metrics-service unchanged
+deployment.apps/gogs-operator-controller-manager configured
+----
+
+The Operator will restart with a new version. After a while the changes will take affect and 3 Gogs pods will run.
+
+[source,bash]
+----
+oc get pods -n gogs
+NAME                                          READY   STATUS    RESTARTS   AGE
+gogs-gogs-sample-57778fd76-4m98m              1/1     Running   0          12m
+gogs-gogs-sample-57778fd76-5hrdn              1/1     Running   0          6m23s
+gogs-gogs-sample-57778fd76-xgh2f              1/1     Running   0          6m24s
+postgresql-gogs-gogs-sample-bbc49b794-z84wt   1/1     Running   0          13m
+----
+
+## What Else? - References
+
+Above example is a very quick overview about what can be done. There are many other options. You can create Operators using Go or Helm. 
+
+The best starting points are the following websites:
+
+* https://redhat-connect.gitbook.io/certified-operator-guide/[Certified Operator Build Guide]
+* https://sdk.operatorframework.io/docs/[Operator SDK Documentation]

@@ -1,0 +1,61 @@
+baseURL = "https://blog.stderr.at/"
+languageCode = "en-us"
+title = "TechBlog about OpenShift/Ansible/Satellite and much more"
+theme = "hugo-theme-learn"
+enableGitInfo = true
+copyright = "Toni Schmidbauer & Thomas Jungbauer"
+enableRobotsTXT = true
+rssLimit = 20
+
+[sitemap]
+changefreq = 'monthly'
+filename = 'sitemap.xml'
+priority = 0.5
+
+# For search functionality
+[outputs]
+home = [ "HTML", "RSS", "JSON"]
+
+[permalinks]
+    posts = "/:sections/:year/:month/:slug/"
+    service-mesh = "/:sections/:year/:month/:slug/"
+    openshift = "/:sections/:year/:month/:slug/"
+    compliance = "/:sections/:year/:month/:slug/"
+    ansible = "/:sections/:year/:month/:slug/"
+    general = "/:sections/:year/:month/:slug/"
+    page = "/:slug/"
+
+[params]
+  themeVariant = "yaub"
+  editURL = "https://github.com/stderrat/stderrat.github.io/"
+  # Author of the site, will be used in meta information
+  # Shows a checkmark for visited pages on the menu
+  showVisitedLinks = false 
+  disableInlineCopyToClipBoard = false
+  description = "TechBlog about OpenShift/Ansible/Satellite and much more"
+  author = "Toni Schmidbauer & Thomas Jungbauer"
+  disableBreadcrumb = false
+  disableNextPrev = false
+  disableMermaid = true
+  titleSeparator = "::"
+  mainSections = ['service-mesh', 'openshift', 'ansible', 'compliance', 'general']
+  recent_posts_number = 10
+  
+
+[params.yaub]
+  copyrightstart = "2020"
+
+[[menu.shortcuts]]
+name = "<i class='fas fa-tags'></i> Tags"
+url = "/tags"
+weight = 1
+
+[[menu.shortcuts]]
+name = "<i class='far fa-bookmark'></i> Catagories"
+url = "/categories"
+weight = 2
+
+[[menu.shortcuts]]
+name = "<i class='fab fa-redhat'></i> Red Hat"
+url = "https://www.redhat.com"
+weight = 30

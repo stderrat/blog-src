@@ -1,0 +1,28 @@
+{{ partial "header.html" . }}
+
+<p class="tracked">
+<time class="f6 mv4 dib tracked" {{ printf `datetime="%s"` (.Date.Format "2006-01-02T15:04:05Z07:00") | safeHTMLAttr }}>
+	<strong>{{- .Date.Format "January 2, 2006" -}}</strong>
+</time>
+
+{{ with .Params.author }}
+	By: 
+	{{ if reflect.IsSlice . }}
+		{{ delimit . ", " | markdownify }}
+	{{else}}
+		{{ . | markdownify }}
+	{{ end }}
+</p>
+{{ end }}
+
+
+{{ .Content }}
+
+<footer class="footline">
+	{{with .Params.LastModifierDisplayName}}
+	    <i class='fas fa-user'></i> <a href="mailto:{{ $.Params.LastModifierEmail }}">{{ . }}</a> {{with $.Date}} <i class='fas fa-calendar'></i> {{ .Format "02/01/2006" }}{{end}}
+	    </div>
+	{{end}}
+</footer>
+
+{{ partial "footer.html" . }}

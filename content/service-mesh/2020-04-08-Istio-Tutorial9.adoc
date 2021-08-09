@@ -1,0 +1,246 @@
+--- 
+title: "Mutual TLS Authentication" 
+description: "OpenShift 4.x and Service Mesh/Istio Tutorial 9 - Mutual TLS/mTLS Authentication"
+date: "2020-04-08"
+doctype: book
+
+weight: 9
+
+author: Thomas Jungbauer
+type: post
+draft: false
+categories:
+   - Service Mesh
+   - OpenShift
+tags: ["Istio", "Service Mesh", "OpenShift", "OCP", "mTLS"] 
+
+aliases: [ 
+	 "/posts-output/2020-04-08-Istio-Tutorial9/",
+] 
+---
+
+:imagesdir: /service-mesh/images/
+:icons: font
+:toc:
+
+When more and more microservices are involved in an application, more and more traffic is sent on the network. It should be considered to secure this traffic, to prevent the possibility to inject malicious packets. Mutual TLS/mTLS authentication or two-way authentication offers a way to encrypt service traffic with certificates.
+
+With Red Hat OpenShift Service Mesh, Mutual TLS can be used without the microservice knowing that it is happening. The TLS is managed completely by the Service Mesh Operator between two Envoy proxies using a defined mTLS policy.
+
+<!--more--> 
+
+Issue 9 of *OpenShift 4 and Service Mesh* will explain how to enable Mutual TLS inside the Service Mesh to secure the traffic between the different microservices. 
+
+== How does it work?
+
+. If a microservice sends a request to a server, it must pass the local sidecar Envoy proxy first. 
+
+. The proxy will intercept the outbound request and starts a mutual TLS handshake with the proxy at the server side. During this handshake the certificates are exchanged and loaded into the proxy containers by Service Mesh. 
+
+. The client side Envoy starts a mutual TLS handshake with the server side Envoy.
+
+. The client proxy does a secure naming check on the server's certificate to verify that the identity in the certificate is authorized. 
+
+. A mutual TLS connection is established between the client and the server. 
+
+. The Envoy proxy at the server sides decrypts the traffic and forwards it to the application through a local TCP connection.
+
+==  Preparations
+. Before we can start be sure that the services are setup like in link:/service-mesh/2020/03/ingress-traffic/[Issue #3]. +
+In addition, be sure that the following DestinationRule already exists:
++
+[source,yaml]
+----
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: recommendation
+spec:
+  host: recommendation
+  subsets:
+  - labels:
+      version: v1
+    name: version-v1
+  - labels:
+      version: v2
+    name: version-v2
+----
+
+
+. Now we will create a pod, which is running outside of the Service Mesh. It will not have a sidecar proxy and will simply curl our application. 
++
+Store the following yaml and create the object in our cluster. 
++
+[source,yaml]
+----
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: curl
+    version: v1
+  name: curl
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: curl
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: curl
+        version: v1
+      annotations: <1>
+        sidecar.istio.io/proxyCPU: "500m"
+        sidecar.istio.io/proxyMemory: 400Mi
+    spec:
+      containers:
+      - image: quay.io/maistra_demos/curl:latest
+        command: ["/bin/sleep", "3650d"]
+        imagePullPolicy: Always
+        name: curl
+----
+<1> since no sidecar is injected (sidecar.istio.io/inject: "true"), only 1 container will be started.
+
+The traffic coming from the microservice _customer_ AND from the external client _curl_ must be simulated. To achieve this the following shell script can be used: 
+
+[source,bash]
+----
+#!/bin/sh
+
+export CURL_POD=$(oc get pods -n tutorial -l app=curl | grep curl | awk '{ print $1}' )
+export CUSTOMER_POD=$(oc get pods -n tutorial -l app=customer | grep customer | awk '{ print $1}' )
+
+echo "A load generating script is running in the next step. Ctrl+C to stop"
+
+while :; do
+
+echo "Executing curl in curl pod"
+oc exec -n tutorial $CURL_POD -- curl -s http://preference:8080 > /dev/null
+sleep 0.5
+
+echo "Executing curl in customer pod"
+oc exec -n tutorial $CUSTOMER_POD -c customer -- curl -s http://preference:8080 > /dev/null
+
+sleep 0.5
+
+done
+----
+
+By executing this, it will first execute a curl command out of the _curl_ pod and then the same curl command out of the _customer_ container.
+*Kepp this script running*
+
+
+== Enabling Mutual TLS
+
+Lets execute the shell script above and verify Kiali. As you notice there are requests coming from the _customer_ microservice and from the source called _unknown_, which is the curl-service running outside the Service Mesh.
+
+.Kiali: traffic coming from customer microserver and external pod
+image::Kiali-mtls_1.png[]
+
+Enable the policy by creating the following object:
+
+[source,yaml]
+----
+apiVersion: "authentication.istio.io/v1alpha1"
+kind: "Policy"
+metadata:
+  name: "preference-mutualtls"
+spec:
+  targets:
+  - name: preference
+  peers:
+  - mtls:
+      mode: STRICT <1>
+----
+<1> We are enforcing mtls for the target preference
+
+After a few seconds the curl pod cannot reach the application anymore:
+
+[source,bash]
+----
+Executing curl in curl pod
+command terminated with exit code 56
+Executing curl in customer pod
+Executing curl in curl pod
+command terminated with exit code 56
+Executing curl in customer pod
+Executing curl in curl pod
+command terminated with exit code 5
+----
+
+This is expected, since the _preference_ service allows traffic over mutual TLS only. This was enforced by the Policy object (*STRICT* mode). The _customer_ service, which is running inside the Service Mesh receives the error "5053 Service Unavalable" since it tries to send traffic, but it does not know yet to use mTLS.
+ 
+In Kiali you will see the following:
+
+.Kiali: traffic is blocked
+image::Kiali-mtls_2.png[]
+
+NOTE: The _curl_ pod is greyed out, since the traffic it tries to send, never reaches the preference service and is therefor not counted in the metric.
+
+To make _customer_ aware that mutual TLS shall be used, a DestinationRule must be configured:
+
+[source,yaml]
+----
+apiVersion: "networking.istio.io/v1alpha3"
+kind: "DestinationRule"
+metadata:
+  name: "preference-destination-rule"
+spec:
+  host: "preference"
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL <1>
+----
+<1> Let's use mTLS 
+
+This defines that *ISTIO_MUTUAL* shall be used for the service _preference_. The _customer_ service recognizes this and automatically enables mTLS. After a few minutes the traffic graph in Kiali will show "green" traffic from _customer_ through _preference_ to _recommendation:
+
+.Kiali: traffic for Service Mesh components is fine again.
+image::Kiali-mtls_3.png[]
+
+'''
+
+== Mutual TLS Migration
+
+As you can see in the previous section, the _curl_ pod cannot reach the application inside the Service Mesh. This happens because _prefernce_ is strictly enforcing encrypted traffic, but _curl_ only sends plain text. Luckily, Istio provides a method to gradually monitor the traffic and migrate to mTLS. Instead of STRICT mode PERMISSIVE can be used. Enabling permissive mode, _preference_ will accept both, encrypted and plain-text traffic.
+
+Replace the Policy object with the following configuration:
+
+[source,yaml]
+----
+apiVersion: "authentication.istio.io/v1alpha1"
+kind: "Policy"
+metadata:
+  name: "preference-mutualtls"
+spec:
+  targets:
+  - name: preference
+  peers:
+  - mtls:
+      mode: PERMISSIVE
+----
+
+[source,bash]
+----
+oc replace -f Policy-permissive.yaml
+----
+
+Now let's wait a few minutes and observe Kiali, which should end up with:
+
+.Kiali: Encrypted and Plain-Text traffic
+image::Kiali-mtls_4.png[]
+
+As you can see with the lock icon, the traffic between _cunstomer_ and _preference_ is encrypted, while the traffic from _unknown_ (which is our curl pod), is plain-text. 
+
+WARNING: The errors you may see in Kiali happen due a known issue: https://issues.jboss.org/browse/MAISTRA-1000
+
+== Cleanup 
+Clean up your environment:
+
+[source,bash]
+----
+oc delete policy -n tutorial preference-mutualtls
+oc delete destinationrule -n tutorial preference-destination-rule
+----

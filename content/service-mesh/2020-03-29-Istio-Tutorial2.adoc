@@ -1,0 +1,228 @@
+--- 
+title: "Deploy Microservices"
+description: "Openshift 4.x and Service Mesh/Istio Tutorial 2 - Deploy some example microservices, which are used in future tutorials."
+date: "2020-03-29"
+doctype: book
+
+weight: 2
+
+author: Thomas Jungbauer
+type: post
+draft: false
+categories:
+   - Service Mesh
+   - OpenShift
+tags: ["Istio", "Service Mesh", "OpenShift", "OCP"] 
+
+aliases: [ 
+	 "/posts-output/2020-03-29-Istio-Tutorial2/",
+] 
+---
+
+:imagesdir: /service-mesh/images/
+:icons: font
+:toc:
+
+The second tutorials explains how to install an example application containing thee microservices. All operations have been successfully tested on OpenShift 4.3. 
+
+<!--more--> 
+
+== Introduction
+As quickly explained at link:/service-mesh/2020/03/installation/[Issue #1], OpenShift 4.3 and the Service Mesh shall be installed already. At this point you should have all 4 operators installed and ready. 
+The test application used in this scenario is based on Java and contains 3 microservices in the following traffic flow: 
+
+[.text-center]
+Customer => Preference => Recomandation
+
+The microservices are the same as used at the https://learn.openshift.com/servicemesh[Interactive Learning Portal].
+
+== Deploy microservices
+
+. First lets create a new project for our tests
++
+[source,bash]
+----
+oc new-project tutorial
+----
+
+. *EITHER*: Add _tutorial_ to ServiceMeshMemberRoll
+
+TIP: Service Mesh 1.1 now supports the object *ServiceMember* which can created under the application namespace and which automatically configures the ServiceMemberRoll. However, below description still works. 
++
+OpenShift will auto-inject the sidecar proxy to pods of a namespace, if the namespace is configured in the ServiceMeshMemberRoll object which was created for the operator. 
+
+.. Create the file _memberroll.yaml_:
++
+[source,yaml]
+----
+cat <<'EOF' > memberroll.yaml
+apiVersion: maistra.io/v1
+kind: ServiceMeshMemberRoll
+metadata:
+  name: default
+spec:
+  members:
+    - tutorial
+EOF
+----
+
+.. Add the namespace to the member roll:
++
+[source,bash]
+----
+oc apply -f memberroll.yaml -n istio-system
+----
+
+WARNING: If you already have namespaces configured for ServiceMeshMemberRoll, better modify the object manually. Custom Resource Definitions (CRD) do not like to be modified on the fly (currently?)
+
+. *OR*: Create ServiceMeshMember object:
+Available since ServiceMesh 1.1
++
+[source,yaml]
+----
+apiVersion: maistra.io/v1
+kind: ServiceMeshMember
+metadata:
+  name: default
+  namespace: tutorial
+spec:
+  controlPlaneRef:
+    name: basic-install
+    namespace: istio-system
+----
+
+. Download the tutorial application locally
++
+[source,bash]
+----
+git clone https://github.com/redhat-developer-demos/istio-tutorial/
+----
+
+=== Deploy microservice: _customer_
+
+To deploy the first microservice 2 objects (Deployment and Service) must be created. Moreover, the service will be exposed, since the service _customer_ is our entry point. +
+Verify ~/istio-tutorial/customer/kubernetes/Deployment.yml to check where the actual image is coming from: quay.io/rhdevelopers/istio-tutorial-customer:v1.1
+
+[source,bash]
+----
+cd ~/istio-tutorial/customer
+oc apply -f kubernetes/Deployment.yml -n tutorial
+oc apply -f kubernetes/Service.yml -n tutorial
+oc expose service customer
+----
+
+Check if pods are running with two containers:
+[source,bash]
+----
+oc get pods -w
+----
+
+The result should look somehow like this:
+[source,bash]
+----
+NAME                             READY   STATUS    RESTARTS   AGE
+customer-6948b8b959-g77bs        2/2     Running   0          52m
+----
+
+WARNING: If there is only 1 container running, indicated by READY = 1/1, then most likely the ServiceMeshMemberRoll was not updated with the name _tutorial_ or contains a wrong project name.
+
+=== Deploy microservice: _preference_
+
+The deployment of the microservice _preference_ is exactly like it is done for _customer_, except that no service must be exposed:
+
+[source,bash]
+----
+cd ~/istio-tutorial/preference/
+oc apply -f kubernetes/Deployment.yml -n tutorial
+oc apply -f kubernetes/Service.yml -n tutorial
+----
+
+Check if pods are running with two containers:
+[source,bash]
+----
+oc get pods -w
+----
+
+The result should look somehow like this:
+[source,bash]
+----
+NAME                                 READY   STATUS    RESTARTS   AGE
+customer-6948b8b959-g77bs            2/2     Running   0          4d15h
+preference-v1-7fdb89c86b-gkk5g       2/2     Running   0          4d14h
+----
+
+
+=== Deploy microservice: _recommendation_
+
+The deployment of the microservice _recommendation_ is exactly like it is done for _preference_:
+
+[source,bash]
+----
+cd ~/istio-tutorial/recommendation/
+oc apply -f kubernetes/Deployment.yml -n tutorial
+oc apply -f kubernetes/Service.yml -n tutorial
+----
+
+Check if pods are running with two containers:
+[source,bash]
+----
+oc get pods -w
+----
+
+The result should look somehow like this:
+[source,bash]
+----
+NAME                                 READY   STATUS    RESTARTS   AGE
+customer-6948b8b959-g77bs            2/2     Running   0          4d15h
+preference-v1-7fdb89c86b-gkk5g       2/2     Running   0          4d14h
+recommendation-v1-69db8d6c48-p9w2b   2/2     Running   0          4d14h
+----
+
+== Optional: build the images
+
+It is possible (and probably a good training) to build the microservices locally to understand how this works. 
+In order to achieve this the packages _maven_ and _podman_ must be installed.
+
+=== Build _customer_
+
+Go to the source folder of _customer_ application and build it:
+[source,bash]
+----
+cd ~/projects/istio-tutorial/customer/java/springboot
+mvn package
+----
+
+It will take a few seconds, but it should give "BUILD SUCCESS" as output, if everything worked.
+
+Now the image will be built using podman
+
+[source,bash]
+----
+podman build -t example/customer .
+----
+
+=== Build _preference_ 
+
+The image build process of the second microservice follows the same flow as _customer_:
+
+[source,bash]
+----
+cd ~/istio-tutorial/preference/java/springboot
+mvn package
+podman build -t example/preference:v1 .
+----
+
+NOTE: the "v1" tag at the image name is important and must be used.
+
+=== Build _recommendation_ 
+
+The image build process of the third microservice follows the same flow as _preference_:
+
+[source,bash]
+----
+cd ~/projects/istio-tutorial/recommendation/java/vertx
+mvn package
+podman build -t example/recommendation:v1 .
+----
+
+NOTE: the "v1" tag at the image name is important and must be used. Later other versions will be deployed.
