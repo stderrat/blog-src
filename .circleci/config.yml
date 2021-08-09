@@ -3,21 +3,21 @@ version: 2.1
 jobs:
   build:
     docker:
-      - image: stderrat/blogbuilder:latest
+      - image: quay.io/repository/tjungbau/hugobuilder:latest
     steps:
       - checkout
       - add_ssh_keys:
           fingerprints:
             - "d5:24:e8:57:5d:ce:d4:60:19:a3:0c:d9:db:ad:b0:f4"
-      - run:
-          name: Install node dependencies
-          command: npm install
+#      - run:
+#          name: Install node dependencies
+#          command: npm install
       - run:
           name: Build blog content
-          command: lein run
-      - run:
-          name: Build search index
-          command: node ./build-index.js
+          command: hugo --minify --enableGitInfo
+#      - run:
+#          name: Build search index
+#          command: node ./build-index.js
       # - store_artifacts:
       #     path: public/
       - persist_to_workspace:
@@ -26,7 +26,7 @@ jobs:
             - public
   deploy:
     docker:
-      - image: stderrat/blogbuilder:latest
+      - image: quay.io/repository/tjungbau/hugobuilderlatest
     steps:
       - attach_workspace:
           at: /tmp/public
