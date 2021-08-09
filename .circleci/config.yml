@@ -9,15 +9,9 @@ jobs:
       - add_ssh_keys:
           fingerprints:
             - "d5:24:e8:57:5d:ce:d4:60:19:a3:0c:d9:db:ad:b0:f4"
-#      - run:
-#          name: Install node dependencies
-#          command: npm install
       - run:
           name: Build blog content
           command: cd /home/deployer/project && hugo --minify --enableGitInfo
-#      - run:
-#          name: Build search index
-#          command: node ./build-index.js
       # - store_artifacts:
       #     path: public/
       - persist_to_workspace:
