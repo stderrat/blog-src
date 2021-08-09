@@ -3,7 +3,7 @@ version: 2.1
 jobs:
   build:
     docker:
-      - image: quay.io/repository/tjungbau/hugobuilder:latest
+      - image: quay.io/tjungbau/hugobuilder:latest
     steps:
       - checkout
       - add_ssh_keys:
@@ -14,7 +14,7 @@ jobs:
 #          command: npm install
       - run:
           name: Build blog content
-          command: hugo --minify --enableGitInfo
+          command: cd /home/deployer/project && hugo --minify --enableGitInfo
 #      - run:
 #          name: Build search index
 #          command: node ./build-index.js
@@ -26,7 +26,7 @@ jobs:
             - public
   deploy:
     docker:
-      - image: quay.io/repository/tjungbau/hugobuilderlatest
+      - image: quay.io/tjungbau/hugobuilderlatest
     steps:
       - attach_workspace:
           at: /tmp/public
