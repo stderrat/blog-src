@@ -4,7 +4,6 @@ description: "OpenShift 4.x and Service Mesh/istio Tutorial 6 - Advanced Routing
 date: "2020-04-03"
 doctype: book
 
-weight: 6
 
 author: Thomas Jungbauer
 type: post

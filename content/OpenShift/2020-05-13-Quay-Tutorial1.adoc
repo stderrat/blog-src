@@ -4,7 +4,6 @@ description: "Red Hat Quay Registry - Overview and Installation"
 date: "2020-05-13"
 doctype: book
 
-weight: 3
 
 author: Thomas Jungbauer
 type: post

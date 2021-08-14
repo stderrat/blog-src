@@ -4,7 +4,6 @@ description: "OpenShift 4.x and Service Mesh/Istio Tutorial 9 - Mutual TLS/mTLS 
 date: "2020-04-08"
 doctype: book
 
-weight: 9
 
 author: Thomas Jungbauer
 type: post

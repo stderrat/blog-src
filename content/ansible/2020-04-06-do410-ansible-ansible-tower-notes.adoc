@@ -4,7 +4,6 @@ description: "Notes taken during the DO410 online training course"
 date: "2020-04-06"
 doctype: book
 
-weight: 2
 
 author: Thomas Jungbauer
 type: post

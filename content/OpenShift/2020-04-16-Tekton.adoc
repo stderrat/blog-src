@@ -4,7 +4,6 @@ description: "Using OpenShift 4.x and OpenShift Pipelines using Tekton for your 
 date: "2020-04-16"
 doctype: book
 
-weight: 2
 
 author: Thomas Jungbauer
 type: post

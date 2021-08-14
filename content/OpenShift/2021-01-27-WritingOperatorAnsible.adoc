@@ -4,7 +4,6 @@ description: "Example of an Kubernetes Operator based on Ansible"
 date: "2021-01-27"
 doctype: book
 
-weight: 6
 
 author: Thomas Jungbauer
 type: post

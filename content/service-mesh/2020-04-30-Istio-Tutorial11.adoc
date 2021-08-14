@@ -4,7 +4,6 @@ description: "OpenShift 4.x and Service Mesh/Istio Tutorial 11 - Deploy Example 
 date: "2020-04-30"
 doctype: book
 
-weight: 12
 
 author: Thomas Jungbauer
 type: post

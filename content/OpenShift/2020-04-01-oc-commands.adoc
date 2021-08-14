@@ -4,7 +4,6 @@ description: "Openshift 4.x - Collection of usefull oc/kubectl commands."
 date: "2020-04-01"
 doctype: book
 
-weight: 1
 
 author: Toni Schmidbauer
 type: post

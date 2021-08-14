@@ -4,7 +4,6 @@ description: "How to leverage different Thanos Querier services."
 date: "2020-12-10"
 doctype: book
 
-weight: 5
 
 author: Thomas Jungbauer
 type: post

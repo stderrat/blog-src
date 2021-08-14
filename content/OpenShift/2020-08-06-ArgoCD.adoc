@@ -4,7 +4,6 @@ description: "Using Argo CD to manage OpenShift resources"
 date: "2020-08-06"
 doctype: book
 
-weight: 4
 
 author: Thomas Jungbauer
 type: post

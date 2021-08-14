@@ -4,7 +4,6 @@ description: "Cheat sheet for Red Hat Satellite"
 date: "2020-04-15"
 doctype: book
 
-weight: 2
 
 author: Toni Schmidbauer
 type: post

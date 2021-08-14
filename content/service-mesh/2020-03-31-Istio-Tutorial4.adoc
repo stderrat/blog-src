@@ -4,7 +4,6 @@ description: "Openshift 4.x and Service Mesh/Istio Tutorial 4 - Use a custom dom
 date: "2020-03-31"
 doctype: book
 
-weight: 4
 
 author: Thomas Jungbauer
 type: post

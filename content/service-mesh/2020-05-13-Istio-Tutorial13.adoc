@@ -4,7 +4,6 @@ description: "OpenShift 4.x and Service Mesh/Istio Tutorial 13 - Automatic route
 date: "2020-05-13"
 doctype: book
 
-weight: 14
 
 author: Thomas Jungbauer
 type: post

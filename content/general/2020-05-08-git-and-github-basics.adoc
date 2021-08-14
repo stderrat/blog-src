@@ -4,7 +4,6 @@ description: "Using git for contributing to projects hosted on github.com"
 date: "2020-05-08"
 doctype: book
 
-weight: 3
 
 author: Toni Schmidbauer
 type: post

@@ -4,7 +4,6 @@ description: "Openshift 4.x and Service Mesh/Istio Tutorial 1 - Installation and
 date: "2020-03-28"
 doctype: book
 
-weight: 1
 
 author: Thomas Jungbauer
 type: post

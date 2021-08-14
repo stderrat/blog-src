@@ -4,7 +4,6 @@ description: "Using the oc client plugin os-compliance"
 date: "2021-07-20"
 doctype: book
 
-weight: 2
 
 author: Thomas Jungbauer
 type: post

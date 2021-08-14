@@ -1,17 +1,8 @@
-+++
-title = "{{ replace .Name "-" " " | title }}"
-date =  {{ .Date }}
-weight = 5
-+++
-
-Lorem Ipsum.
-
 --- 
 title: "{{ replace .Name "-" " " | title }}"
 date: {{ .Date }}
 doctype: book
 
-weight: 10
 
 author: TnT
 draft: true

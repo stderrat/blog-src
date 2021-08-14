@@ -4,7 +4,6 @@ description: "Using Ansible Azure Resource Manager to create a Virtual Machine"
 date: "2020-04-27"
 doctype: book
 
-weight: 2
 
 author: Thomas Jungbauer
 type: post

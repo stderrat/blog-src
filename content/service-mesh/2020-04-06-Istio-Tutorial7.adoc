@@ -4,7 +4,6 @@ description: "OpenShift 4.x and Service Mesh/istio Tutorial 7 - Test and control
 date: "2020-04-06"
 doctype: book
 
-weight: 7
 
 author: Thomas Jungbauer
 type: post

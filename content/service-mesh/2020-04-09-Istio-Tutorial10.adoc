@@ -4,7 +4,6 @@ description: "OpenShift 4.x and Service Mesh/Istio Tutorial 10 - Authentication 
 date: "2020-04-09"
 doctype: book
 
-weight: 10
 
 author: Thomas Jungbauer
 type: post

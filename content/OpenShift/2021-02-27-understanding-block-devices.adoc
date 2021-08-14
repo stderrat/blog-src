@@ -4,7 +4,6 @@ description: "A basic introduction into block device usage"
 date: "2021-02-27"
 doctype: book
 
-weight: 7
 
 author: Toni Schmidbauer
 type: post

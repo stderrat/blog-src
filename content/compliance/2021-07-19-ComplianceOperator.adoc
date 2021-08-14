@@ -4,7 +4,6 @@ description: "Hardening OpenShift using the Compliance Operator"
 date: "2021-07-19"
 doctype: book
 
-weight: 1
 
 author: Thomas Jungbauer
 type: post

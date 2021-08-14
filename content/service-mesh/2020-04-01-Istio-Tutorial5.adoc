@@ -4,7 +4,6 @@ description: "Openshift 4.x and Service Mesh/Istio Tutorial 5 - Routing Examples
 date: "2020-04-01"
 doctype: book
 
-weight: 5
 
 author: Thomas Jungbauer
 type: post

@@ -4,7 +4,6 @@ description: "OpenShift 4.x and Service Mesh/Istio Tutorial 8 - Faul Injection/C
 date: "2020-04-07"
 doctype: book
 
-weight: 8
 
 author: Thomas Jungbauer
 type: post

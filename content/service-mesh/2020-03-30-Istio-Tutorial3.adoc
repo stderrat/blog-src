@@ -4,7 +4,6 @@ description: "Openshift 4.x and Service Mesh/Istio Tutorial 3 - Get traffic into
 date: "2020-03-30"
 doctype: book
 
-weight: 3
 
 author: Thomas Jungbauer
 type: post
