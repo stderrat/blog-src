@@ -57,8 +57,8 @@
 
     {{ if .Site.Copyright }}
     <div class="copyright">
-      <p>Copyright &copy; {{ with .Site.Params.yaub.copyrightstart }} {{ . }}{{ end }} - {{ dateFormat "2006" now }} {{ .Site.Copyright }}</p>
-      <p>Built with <a href="https://github.com/matcornic/hugo-theme-learn" target="_blank" rel="noopener noreferrer">Hugo Learn Theme</i></a> and <a href="https://gohugo.io/" target="_blank" rel="noopener noreferrer">Hugo</a> using <a href="https://asciidoctor.org/" target="_blank" rel="noopener noreferrer">Asciidoctor</a></p>
+      <p>{{ $.Param "copyright" | default (i18n "Copyright") }} &copy; {{ with .Site.Params.yaub.copyrightstart }} {{ . }}{{ end }} - {{ dateFormat "2006" now }} {{ .Site.Copyright }}</p>
+      <p>Built with <a href="https://github.com/matcornic/hugo-theme-learn" target="_blank" rel="noopener noreferrer">Hugo Learn Theme</i></a> and <a href="https://gohugo.io/" target="_blank" rel="noopener noreferrer">Hugo</a></p>
     </div>
     {{ end }}
 

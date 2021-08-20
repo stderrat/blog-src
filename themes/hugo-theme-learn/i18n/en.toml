@@ -42,3 +42,6 @@ other = "Expand me..."
 
 [BinaryPrefix-kilobyte]
 other = "kb"
+
+[Copyright]
+other = "Copyright"
