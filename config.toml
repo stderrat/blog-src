@@ -27,7 +27,7 @@ home = [ "HTML", "RSS", "JSON"]
 
 [params]
   themeVariant = "yaub"
-  editURL = "https://github.com/stderrat/stderrat.github.io/"
+  #editURL = "https://github.com/stderrat/stderrat.github.io/"
   # Author of the site, will be used in meta information
   # Shows a checkmark for visited pages on the menu
   showVisitedLinks = false 
