@@ -1,0 +1,89 @@
+---
+title: "Ansible Tower and downloading collections"
+description: "Getting Ansible Tower to download collections can be hard"
+date: "2021-07-31"
+doctype: book
+
+author: Toni Schmidbauer
+type: post
+draft: false
+categories:
+   - Ansible
+tags: ["Ansible", "Ansible Tower"]
+
+aliases: [
+	 "/posts-output/2020-07-31-AnsibleTowerCollectionsdownload/",
+]
+---
+
+// Asciidoc Parameters
+// toc is set here since I like unnumbered tocs more
+:icons: font
+:toc:
+
+Every wondered why Ansible Tower does not start downloading required
+collections when you synchronize a project? Here are the stumbling
+blocks we discovered so far:
+
+== Wrong name for requirements.yml
+
+When downloading collections Ansible Tower searches for a file
+`requirements.yml` in the collections directory.
+
+Be careful with the file extension: `requirements.yml` has to end with
+the extension `.yml` and *not* `.yaml`.
+
+== Collections download is disabled in Ansible Tower
+
+Within Ansible Tower there is a setting called `ENABLE COLLECTION(S)
+DOWNLOAD` under `Settings`/`Jobs`. This has to be set to true, which
+is also the default.
+
+== No Ansible Galaxy credential defined for the organization
+
+Last but not least an Ansible Galaxy credential needs to be defined
+for the organization where the project is defined. With the default
+installation of Ansible Tower, when the sample playbooks are installed
+there is a credential called `Ansible Galaxy` defined. You need to assign
+this credential to the organization.
+
+If you skip installing the sample playbooks, *no* `Ansible Galaxy`
+credential will be defined for you and you have to create it manually.
+
+== How does this actually work?
+
+Ansible Tower uses a Python virtual environment for running
+Ansible. The default environment is installed in
+`/var/lib/awx/venv/awx`. You can also create custom environments, see
+https://docs.ansible.com/ansible-tower/latest/html/upgrade-migration-guide/virtualenv.html[Using virtualenv with Ansible Tower].
+
+In the default setup the following files define how collections are downloaded:
+
+* `lib/python3.6/site-packages/awx/main/tasks.py`
+* `lib/python3.6/site-packages/awx/playbooks/project_update.yml`
+
+=== task.py
+
+`task.py` defines various internal tasks Tower has to run on various
+occasions. For example in line number 1930 (Ansible Tower 3.8.3) the
+task `RunProjectUpdate` gets defined. This is the task Tower
+has to run whenever a project update is required.
+
+In our case the function `build_extra_vars_file` (line 2083 with
+Ansible Tower 3.8.3) defines the variable `galaxy_creds_are_defined`
+only if the organization has a galaxy credential defined (line 2099
+Ansible Tower 3.8.3).
+
+Line 2120 (Ansible Tower 3.8.3) finally defines the Ansible extra
+variable `collections_enabled` depending on
+`galaxy_creds_are_defined`.
+
+=== project_update.yml
+
+So `task.py` defines the extra variable `collections_enabled` (see
+above). Finally the playbook `project_update.yml` consumes this extra
+variable and only downloads collections if `collections_enabled` is
+set to `true`, see the block string at line 192 (Ansible Tower 3.8.3)
+in `project_update.yml.
+
+So long and thanks for all the fish!
