@@ -1,0 +1,20 @@
+#+title: Stumbling in to Java: maven default pom.xml
+#+author: Toni Schmidbauer
+#+lastmod: [2021-03-04 Thu 12:37]
+#+categories[]: Java
+#+draft: true
+#+variable: value
+#+list[]: value_1 value_2 value_3
+
+* blabla
+  blabla
+
+NOTE: test
+
+
+#+begin_src java
+bla
+#+end_src
+
+| :note: bla |
+|------------|
