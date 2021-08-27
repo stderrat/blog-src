@@ -10,24 +10,13 @@
 * blabla
   blabla
 
+{{% notice note %}}
+this is a notice
+{{% /notice %}}
+
 NOTE: test
 
 : this is a text
-
-{{<rawhtml>}}
-<div class="admonitionblock note">
-<table>
-<tbody><tr>
-<td class="icon">
-<i class="fa icon-note" title="Note"></i>
-</td>
-<td class="content">
-You need Go installed on your node.
-</td>
-</tr>
-</tbody></table>
-</div>
-{{</rawhtml>}}
 
 
 #+begin_src java
