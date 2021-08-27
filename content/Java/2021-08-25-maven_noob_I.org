@@ -36,3 +36,16 @@ bla
 
 | :note: bla |
 |------------|
+
+#+begin_src java :results output
+  public class Main { <1>
+      public static void main(String[] args) {
+          System.out.print("hello, world");
+      }
+  }
+#+end_src
+<1> test
+
+#+begin_src emacs-lisp
+(message "Hello world")
+#+end_src
