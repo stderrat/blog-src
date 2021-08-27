@@ -38,3 +38,15 @@ bla
 #+begin_src emacs-lisp
 (message "Hello world")
 #+end_src
+
+{{% notice warning %}}
+Warning
+{{% /notice %}}
+
+{{% notice note %}}
+Note
+{{% /notice %}}
+
+{{% notice caution %}}
+Caution
+{{% /notice %}}
