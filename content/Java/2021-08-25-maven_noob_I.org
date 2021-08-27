@@ -1,10 +1,19 @@
-#+title: Stumbling in to Java: maven default pom.xml
-#+author: Toni Schmidbauer
-#+lastmod: [2021-03-04 Thu 12:37]
-#+categories[]: Java
-#+draft: true
-#+variable: value
-#+list[]: value_1 value_2 value_3
+--- 
+title: "Stumbling in to Java: maven default pom.xml"
+description: "Description"
+date: "2021-03-04"
+
+
+author: Toni Schmidbauer
+type: post
+draft: true
+categories:
+   - Java
+tags: ["value_1", "value_2", "value_2"]
+
+---
+
+
 
 * blabla
   blabla
@@ -18,3 +27,16 @@ bla
 
 | :note: bla |
 |------------|
+
+#+begin_src java :results output
+  public class Main { <1>
+      public static void main(String[] args) {
+          System.out.print("hello, world");
+      }
+  }
+#+end_src
+<1> test
+
+#+begin_src emacs-lisp
+(message "Hello world")
+#+end_src
