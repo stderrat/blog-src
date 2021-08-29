@@ -25,6 +25,8 @@ Every wondered why Ansible Tower does not start downloading required
 collections when you synchronize a project? Here are the stumbling
 blocks we discovered so far:
 
+<!--more--> 
+
 == Wrong name for requirements.yml
 
 When downloading collections Ansible Tower searches for a file

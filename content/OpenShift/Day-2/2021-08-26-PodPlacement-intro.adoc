@@ -1,0 +1,87 @@
+--- 
+title: "Pod Placement - Introduction"
+description: "Introduction to Pod Placement"
+date: "2021-08-26"
+doctype: book
+
+author: Thomas Jungbauer
+type: post
+draft: true
+categories:
+   - OpenShift
+   - Day-2
+   - Pod Placement
+tags: ["OCP", "Day-2", "OpenShift", "Pod Placement", "NodeSelector", "Affinity", "Anti-Affinity"] 
+
+---
+
+:imagesdir: /OpenShift/Day-2/images/
+:icons: font
+:toc:
+
+Pod scheduling is an internal process that determines placement of new pods onto nodes within the cluster. It is probably one of the most important tasks for a Day-2 scenario and should be considered very early. OpenShift/Kubernetes is already shipped with a *default scheduler* which schedules pods as they get created accross the cluster, without any manual steps. 
+
+However, there are scenarios where a more advanced approach is required. Kubernetes provides different options: 
+
+* Controlling placement with node selectors
+* Controller placement with pod/node affinity/anit-affinity rules
+* Controller placement with trains and tolerations
+
+This series will try to go into the detail of the different options and explains in simple examples how to work with pod placement rules. 
+
+<!--more--> 
+
+== Prerequisites
+
+NOTE: The following prerequisites are used for all examples.
+
+Let's image that our cluster (OpenShift 4) has 4 compute nodes
+
+[source,bash]
+----
+oc get node --selector='node-role.kubernetes.io/worker'
+
+NAME        STATUS   ROLES           AGE     VERSION
+compute-0   Ready    worker          7h1m    v1.19.0+d59ce34
+compute-1   Ready    worker          7h1m    v1.19.0+d59ce34
+compute-2   Ready    worker          7h1m    v1.19.0+d59ce34
+compute-3   Ready    worker          7h1m    v1.19.0+d59ce34
+----
+
+An example application has been deployed in the namespace `podtesting`. It contains by default 1 pod for a PostGresql database and one pod for a frontend web application. 
+
+[source,bash]
+----
+oc get pods -n podtesting -o wide | grep Running
+django-psql-example-1-h6kst    1/1     Running     0          20m   10.130.2.97   compute-2   <none>           <none>
+postgresql-1-4pcm4             1/1     Running     0          21m   10.131.0.51   compute-3   <none>           <none>
+----
+
+
+Without any configuration the OpenShift scheduler will try to spread the pods evenly accross the cluster. 
+
+Let's increase the replica of the web frontend: 
+
+[source,bash]
+----
+oc scale --replicas=4 dc/django-psql-example -n podtesting
+----
+
+Eventually 4 additional pods will be started accross the compute nodes of the cluster: 
+
+[source,bash]
+----
+oc get pods -n podtesting -o wide | grep Running
+
+django-psql-example-1-842fl    1/1     Running             0          2m7s   10.131.0.65   compute-3   <none>           <none>
+django-psql-example-1-h6kst    1/1     Running             0          24m    10.130.2.97   compute-2   <none>           <none>
+django-psql-example-1-pxhlv    1/1     Running             0          2m7s   10.128.2.13   compute-0   <none>           <none>
+django-psql-example-1-xms7x    1/1     Running             0          2m7s   10.129.2.10   compute-1   <none>           <none>
+postgresql-1-4pcm4             1/1     Running             0          26m    10.131.0.51   compute-3   <none>           <none>
+----
+
+As you can see, the scheduler already tries to spread the pods evenly, so that every worker node will host one frontend pod. 
+
+However, let's try to apply a more advanced configuration for the pod placement, starting with the  
+http://localhost:1313/openshift/day-2/2021-08-27-podplacement/[Pod Placement - NodeSelector]
+

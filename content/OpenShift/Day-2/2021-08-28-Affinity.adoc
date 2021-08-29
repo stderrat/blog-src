@@ -1,0 +1,28 @@
+--- 
+title: "Pod Placement - Pod Affinity/Anti-Affinity"
+description: "Placeing Pods Using the Affinity rules"
+date: "2021-08-28"
+doctype: book
+
+author: Thomas Jungbauer
+type: post
+draft: true
+categories:
+   - OpenShift
+   - Day-2
+   - Pod Placement
+   - Affinity
+   - Anti-Affinity
+tags: ["OCP", "Day-2", "OpenShift", "Pod Placement", "Affinity", "Anti-Affinity"] 
+
+---
+
+:imagesdir: /OpenShift/Day-2/images/
+:icons: font
+:toc:
+
+XXXX
+
+<!--more--> 
+
+XXX
