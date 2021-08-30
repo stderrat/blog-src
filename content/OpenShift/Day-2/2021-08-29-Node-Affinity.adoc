@@ -1,0 +1,92 @@
+--- 
+title: "Pod Placement - Node Affinity"
+description: "Placeing Pods Using the Node Affinity rules"
+date: "2021-08-29"
+doctype: book
+
+author: Thomas Jungbauer
+type: post
+draft: true
+categories:
+   - OpenShift
+   - Day-2
+   - Pod Placement
+   - Affinity
+   - Anti-Affinity
+tags: ["OCP", "Day-2", "OpenShift", "Pod Placement", "Affinity"] 
+
+---
+
+:imagesdir: /OpenShift/Day-2/images/
+:icons: font
+:toc:
+
+Node Affinity allows to place a pod to a specific group of nodes. The node itself does not have control over the placement. For example, it is possible to run a pod only on nodes with a specific CPU or disktype. The disktype was used as an example for the `nodeSelector` and yes ... Node Affinity is conceptually similar to nodeSelector. 
+
+<!--more--> 
+
+== Using Node Affinity 
+
+Currently two types of pod affinity are known: 
+
+* requiredDuringSchedulingIgnoreDuringExecuption (short _required_) - a hard requirement which must be met before a pod can be scheduled
+* preferredDuringSchedulingIgnoredDuringExecution (short _preferred_) - a soft requirement the scheduler *tries* to meet, but does not guarantee it
+
+NOTE: Both types can be specified. In such case the node must first meet the required rule and then attempt to meet the preferred rule.
+
+=== Preparing node labels
+
+NOTE: Remember the prerequisites explained in the "Pod Placement - Introduction". We have 4 compute nodes and an example web application up and running.
+
+Before we start with affinity rules we need to label all nodes. Let's create 2 zones (east and west) for our compute nodes. 
+
+NOTE: You can skip this, if these labels are still set.
+
+.Node Zones
+image::affinity-kubernetes.zones.png[Node Zones]
+
+[source,bash]
+----
+oc label nodes compute-0 compute-1 topology.kubernetes.io/zone=east
+
+oc label nodes compute-2 compute-3 topology.kubernetes.io/zone=west
+----
+
+=== Configure node affinity rule
+
+Like pod affinity the node affinity is defined on the pod specification: 
+
+[source,yaml]
+----
+kind: DeploymentConfig
+apiVersion: apps.openshift.io/v1
+metadata:
+  name: django-psql-example
+  namespace: podtesting
+[...]
+spec:
+[...]
+  template:
+[...]
+    spec:
+[...]
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: topology.kubernetes.io/zone
+                    operator: In
+                    values:
+                      - west
+----
+
+In this example the pods are started only on nodes of the zone "West". Since the value is an array, multiple zones can be defined letting the web application be executed on West and East for example. 
+
+== What happened to Node Anti-Affinity? 
+
+Unlike Pod Anti-Affinity, there is no concept to define a node Anti Affinity. Instead you can use the `NotIn` and `DoesNotExist` operators to achieve this bahaviour.  
+
+== Summary
+
+This concludes the quick overview of the node affinity. Further information can be found at https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#node-affinity[Node Affinity^]

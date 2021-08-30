@@ -1,0 +1,30 @@
+--- 
+title: "Pod Placement - Taints and Tolerations"
+description: "Placeing Pods Using Taints and Tolerations"
+date: "2021-08-30"
+doctype: book
+
+author: Thomas Jungbauer
+type: post
+draft: true
+categories:
+   - OpenShift
+   - Day-2
+   - Pod Placement
+   - Taints
+   - Tolerations
+tags: ["OCP", "Day-2", "OpenShift", "Pod Placement", "Taints", "Tolerations"] 
+
+---
+
+:imagesdir: /OpenShift/Day-2/images/
+:icons: font
+:toc:
+
+While Node Affinity is a property of pods that attracts them to a set of nodes, taints are the exact opposite. They mark (taint) nodes and allows the node to refuse a pods to be scheduled as long that pod has not a matching toleration configured. 
+
+A common use case would be to mark certain nodes as infrastructure nodes, where only specific pods are allowed to be executed or to taint nodes with a special hardware (i.e. GPU).
+
+<!--more--> 
+
+xxxx
