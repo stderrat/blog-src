@@ -15,6 +15,9 @@ categories:
    - Tolerations
 tags: ["OCP", "Day-2", "OpenShift", "Pod Placement", "Taints", "Tolerations"] 
 
+aliases: [ 
+	 "/openshift/day-2/pod-placement-taints-and-tolerations",
+] 
 ---
 
 :imagesdir: /OpenShift/Day-2/images/

@@ -19,17 +19,27 @@ tags: ["OCP", "Day-2", "OpenShift", "Pod Placement", "NodeSelector", "Affinity",
 :icons: font
 :toc:
 
-Pod scheduling is an internal process that determines placement of new pods onto nodes within the cluster. It is probably one of the most important tasks for a Day-2 scenario and should be considered very early. OpenShift/Kubernetes is already shipped with a *default scheduler* which schedules pods as they get created accross the cluster, without any manual steps. 
+Pod scheduling is an internal process that determines placement of new pods onto nodes within the cluster. It is probably one of the most important tasks for a Day-2 scenario and should be considered at a very early stage for a new cluster. OpenShift/Kubernetes is already shipped with a *default scheduler* which schedules pods as they get created accross the cluster, without any manual steps. 
 
-However, there are scenarios where a more advanced approach is required. Kubernetes provides different options: 
+However, there are scenarios where a more advanced approach is required, like for example using a specifc group of nodes for dedicated workload or make sure that certain applications do not run on the same nodes. Kubernetes provides different options: 
 
 * Controlling placement with node selectors
-* Controller placement with pod/node affinity/anit-affinity rules
-* Controller placement with trains and tolerations
+* Controlling placement with pod/node affinity/anti-affinity rules
+* Controlling placement with trains and tolerations
+* Controlling placement with topology spread constraints
 
 This series will try to go into the detail of the different options and explains in simple examples how to work with pod placement rules. 
+It is not a replacement for any official documentation, so always check out Kubernetes and or OpenShift documentations.
 
 <!--more--> 
+
+== Pod Placement Series 
+
+. link:/openshift/day-2/pod-placement-nodeselector/[NodeSelector]
+. link:/openshift/day-2/pod-placement-pod-affinity/[Pod Affinity and Anti Affinity]
+. link:/openshift/day-2/pod-placement-node-affinity/[Node Affinity]
+. link:/openshift/day-2/pod-placement-taints-and-tolerations[Taints and Tolerations]
+. link:/openshift/day-2/pod-placement-topology-spread-constraints/[Topology Spread Constraints]
 
 == Prerequisites
 
@@ -48,7 +58,7 @@ compute-2   Ready    worker          7h1m    v1.19.0+d59ce34
 compute-3   Ready    worker          7h1m    v1.19.0+d59ce34
 ----
 
-An example application has been deployed in the namespace `podtesting`. It contains by default 1 pod for a PostGresql database and one pod for a frontend web application. 
+An example application (from the catalog Django + Postgres) has been deployed in the namespace `podtesting`. It contains by default 1 pod for a PostGresql database and one pod for a frontend web application. 
 
 [source,bash]
 ----
@@ -83,5 +93,5 @@ postgresql-1-4pcm4             1/1     Running             0          26m    10.
 As you can see, the scheduler already tries to spread the pods evenly, so that every worker node will host one frontend pod. 
 
 However, let's try to apply a more advanced configuration for the pod placement, starting with the  
-http://localhost:1313/openshift/day-2/2021-08-27-podplacement/[Pod Placement - NodeSelector]
+link:/openshift/day-2/2021-08-27-podplacement/[Pod Placement - NodeSelector]
 
