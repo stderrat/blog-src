@@ -6,7 +6,6 @@ doctype: book
 
 author: Thomas Jungbauer
 type: post
-draft: true
 categories:
    - OpenShift
    - Day-2
@@ -18,7 +17,7 @@ aliases: [
 ] 
 ---
 
-:imagesdir: /OpenShift/Day-2/images/
+:imagesdir: /Day-2/images/
 :icons: font
 :toc:
 

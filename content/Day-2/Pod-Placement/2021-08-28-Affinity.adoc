@@ -1,12 +1,11 @@
 ---
 title: "Pod Placement - Pod Affinity/Anti-Affinity"
 description: "Placeing Pods Using the Affinity rules"
-date: "2021-08-28"
+date: "2021-08-26"
 doctype: book
 
 author: Thomas Jungbauer
 type: post
-draft: true
 categories:
    - OpenShift
    - Day-2
@@ -20,7 +19,7 @@ aliases: [
 ] 
 ---
 
-:imagesdir: /OpenShift/Day-2/images/
+:imagesdir: /Day-2/images/
 :icons: font
 :toc:
 

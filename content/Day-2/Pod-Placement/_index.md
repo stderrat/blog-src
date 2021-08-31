@@ -1,7 +1,6 @@
 ---
-title: OpenShift Day-2
+title: Pod Placement
 weight: 1
 chapter: true
 layout: summary
-draft: true
 ---

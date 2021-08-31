@@ -1,12 +1,11 @@
 --- 
 title: "Pod Placement - Taints and Tolerations"
 description: "Placeing Pods Using Taints and Tolerations"
-date: "2021-08-30"
+date: "2021-08-26"
 doctype: book
 
 author: Thomas Jungbauer
 type: post
-draft: true
 categories:
    - OpenShift
    - Day-2
@@ -20,7 +19,7 @@ aliases: [
 ] 
 ---
 
-:imagesdir: /OpenShift/Day-2/images/
+:imagesdir: /Day-2/images/
 :icons: font
 :toc:
 
@@ -42,7 +41,7 @@ Please check out other ways of pod placements:
 
 == Understanding Taints and Tolerations
 
-Matchting taints and tolerations is defined by a key/value pair and a taint effect. 
+Matching taints and tolerations is defined by a key/value pair and a taint effect. 
 
 For example, a node can be tained as: 
 
@@ -111,7 +110,7 @@ First we will set the toleration to the DeploymentConfig:
 oc edit dc/django-psql-example -n podtesting
 ----
 
-And add a toleration for the key/value pair, the effect NoExecute and a tolerationSeconds of 3600 seconds. 
+And add a toleration for the key/value pair, the effect NoExecute and a tolerationSeconds of X seconds. 
 
 [source,yaml]
 ----
@@ -198,9 +197,9 @@ spec:
     value: enabled
 ----
 
-OpenShift will allow pods, which are not tolerating the taints, to keep on running for 10 seconds. After that, these pods will be evicted and started elsewhere. 
+OpenShift will allow pods, which are not tolerating the taints, to keep on running for 30 seconds. After that, these pods will be evicted and started elsewhere. 
 
-When we check after the tolerationSeconds time has passed which pods are running on the node compute-0, we will see that most pods have disappeared, except the pods for the webapplication and pods which are part of DaemonSets. (DaemonSets are defined to run on all or specific nodes and are not evicted.)
+When we check after the tolerationSeconds time has passed which pods are running on the node compute-0, we will see that most pods have disappeared, except the pods for the webapplication and pods which are part of DaemonSets. (DaemonSets are defined to run on all or specific nodes and are not evicted. The cluster-DaemonSets are tolerating everything)
 
 [source,bash]
 ----
@@ -224,7 +223,7 @@ django-psql-example-25-sb6hr                              compute-0   Running
 
 == Removing taints 
 
-Taints can be simply removed with the oc command added a training `-` 
+Taints can be simply removed with the oc command added a trailing `-` 
 
 [source,bash]
 ----
@@ -246,7 +245,7 @@ The following list is quoted from the OpenShift documentation and provides a lis
 * `node.kubernetes.io/unschedulable`: The node is unschedulable.
 * `node.cloudprovider.kubernetes.io/uninitialized`: When the node controller is started with an external cloud provider, this taint is set on a node to mark it as unusable. After a controller from the cloud-controller-manager initializes this node, the kubelet removes this taint.
 
-Depending on the condition, the node will either have the effect `NoSchedule`, which means no new pods will be started there (unless a toleration is configured) or the effect `NoExecute`, which will evict pods with no tolerations from the node. Typical examples for NoSchedule condition would be for example: memory-pressure or disk-pressure. If a node is unreachable or not-ready, then it will be automatically tainted with the effect NoExecute. `tolerationSeconds` (default 300) will be respected. 
+Depending on the condition, the node will either have the effect `NoSchedule`, which means no new pods will be started there (unless a toleration is configured) or the effect `NoExecute`, which will evict pods with no tolerations from the node. Typical examples for NoSchedule condition would be: memory-pressure or disk-pressure. If a node is unreachable or not-ready, then it will be automatically tainted with the effect NoExecute. `tolerationSeconds` (default 300) will be respected. 
 
 == Tolerating all taints 
 
@@ -264,3 +263,29 @@ spec:
 ----
 
 NOTE: Some cluster daemonsets (i.e. tuned) are configured this way. 
+
+== Cleanup 
+
+Remove the taint from the node: 
+
+[source,bash]
+----
+oc adm taint nodes compute-0 gpu=enabled:NoExecute-
+----
+
+And remove the toleration specification from the DeploymentConfig
+
+[source,yaml]
+----
+spec:
+[...]
+  template:
+[...]
+    spec:
+      tolerations:
+      - key: "gpu" 
+        value: "enabled"
+        operator: "Equal"
+        effect: "NoExecute"
+        tolerationSeconds: 30 <1>
+----
