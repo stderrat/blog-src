@@ -28,6 +28,16 @@ Node Affinity allows to place a pod to a specific group of nodes. The node itsel
 
 <!--more--> 
 
+== Pod Placement Series 
+
+Please check out other ways of pod placements:
+
+. link:/openshift/day-2/pod-placement-nodeselector/[NodeSelector]
+. link:/openshift/day-2/pod-placement-pod-affinity/[Pod Affinity and Anti Affinity]
+. link:/openshift/day-2/pod-placement-node-affinity/[Node Affinity]
+. link:/openshift/day-2/pod-placement-taints-and-tolerations[Taints and Tolerations]
+. link:/openshift/day-2/pod-placement-topology-spread-constraints/[Topology Spread Constraints]
+
 == Using Node Affinity 
 
 Currently two types of pod affinity are known: 

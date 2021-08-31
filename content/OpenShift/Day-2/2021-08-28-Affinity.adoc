@@ -24,13 +24,24 @@ aliases: [
 :icons: font
 :toc:
 
-While noteSelector provides a very easy way to control where a pod shall be scheduled, the affinity/anti-affinity features, expands this configuration which more expressive rules like logical AND operator, constraints against labels on other pods or soft rules instead of hard requirements.
+While noteSelector provides a very easy way to control where a pod shall be scheduled, the affinity/anti-affinity feature, expands this configuration with more expressive rules like logical AND operators, constraints against labels on other pods or soft rules instead of hard requirements.
 
 The feature comes with two types:
+
 * pod affinity/anti-affinity - allows constrains against other pod labels rather than node labels.
 * node affinity - allows pods to specify a group of nodes they can be placed on
 
 <!--more-->
+
+== Pod Placement Series 
+
+Please check out other ways of pod placements:
+
+. link:/openshift/day-2/pod-placement-nodeselector/[NodeSelector]
+. link:/openshift/day-2/pod-placement-pod-affinity/[Pod Affinity and Anti Affinity]
+. link:/openshift/day-2/pod-placement-node-affinity/[Node Affinity]
+. link:/openshift/day-2/pod-placement-taints-and-tolerations[Taints and Tolerations]
+. link:/openshift/day-2/pod-placement-topology-spread-constraints/[Topology Spread Constraints]
 
 == Pod Affinity and Anti-Affinity
 
