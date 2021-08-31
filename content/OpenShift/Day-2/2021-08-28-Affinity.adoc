@@ -45,43 +45,45 @@ Please check out other ways of pod placements:
 
 == Pod Affinity and Anti-Affinity
 
-*Affinity* and *Anti-Affinity* controls the nodes on which a pod should (or should not) be scheduled based on labels on Pods that are already scheduled on the node.
+*Affinity* and *Anti-Affinity* controls the nodes on which a pod should (or should not) be scheduled _based on labels on Pods that are already scheduled on the node_. This is a different approach than nodeSelector, since it does not directly take the node labels into account. That said, one example for such setup would be: You have dedicated nodes for developement and production workload and you have to be sure that pods of dev or prod applications do not run on the same node. 
+
+Affinity and Anti-Affinity are shortly defined as: 
 
 * Pod affinity - tells scheduler to put a new pod onto the same node as other pods (selection is done using label selectors)
 +
 For example:
 +
-- I want to run where this other pod is running (Pods from same service shall be running on same node.)
+- I want to run where this other labelled pod is already running (Pods from same service shall be running on same node.)
 
 
 * Pod Anti-Affinity - prevents the scheduler to place a new pod onto the same nodes with pods with the same labels
 +
 For example:
 +
-- I definitely do not want to where this other pod is running (to prevent that all Pods of same service are running in the same availability zone.)
+- I definitely do not want to start a pod where this other pod with the defined label is running (to prevent that all Pods of same service are running in the same availability zone.)
 
 [WARNING]
 ====
 As described in the official https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity[Kubernetes documention^] two things should be considered:
 
 . The affinity feature requires processing which can slow down the cluster. Therefore, it is not recommended for cluster with more than 100 nodes.
-. The feature requires that all nodes are appropriately labelled (`topologyKey`). Unintended behaviour might happen if labels are missing.
+. The feature requires that all nodes are consistently labelled (`topologyKey`). Unintended behaviour might happen if labels are missing.
 ====
 
 == Using Affinity/Anti-Affinity
 
 Currently two types of pod affinity/anti-affinity are known:
 
-* requiredDuringSchedulingIgnoreDuringExecuption (short _required_) - a hard requirement which must be met before a pod can be scheduled
-* preferredDuringSchedulingIgnoredDuringExecution (short _preferred_) - a soft requirement the scheduler *tries* to meet, but does not guarantee it
+* *requiredDuringSchedulingIgnoreDuringExecuption* (short _required_) - a hard requirement which must be met before a pod can be scheduled
+* *preferredDuringSchedulingIgnoredDuringExecution* (short _preferred_) - a soft requirement the scheduler *tries* to meet, but does not guarantee it
 
-NOTE: Both types can be specified. In such case the node must first meet the required rule and then attempt to meet the preferred rule.
+NOTE: Both types can be defined in the same specification. In such case the node must first meet the required rule and then attempt based on best effort to meet the preferred rule.
 
 === Preparing node labels
 
-NOTE: Remember the prerequisites explained in the "Pod Placement - Introduction". We have 4 compute nodes and an example web application up and running.
+NOTE: Remember the prerequisites explained in the . link:/openshift/day-2/pod-placement-pod-affinity/[Pod Placement - Introduction]. We have 4 compute nodes and an example web application up and running.
 
-Before we start with affinity rules we need to label all nodes. Let's create 2 zones (east and west) for our compute nodes.
+Before we start with affinity rules we need to label all nodes. Let's create 2 zones (east and west) for our compute nodes using the well-known label `topology.kubernetes.io/zone`
 
 .Node Zones
 image::affinity-kubernetes.zones.png[Node Zones]
@@ -97,22 +99,22 @@ oc label nodes compute-2 compute-3 topology.kubernetes.io/zone=west
 
 In our example we have one database pod and multiple web application pods. Let's image we would like to always run these pods in the same zone.
 
-The pod affinity defines that a pod can be scheduled onto a node ONLY if that node is in the same zone as at least one already-running pod with a certain label.
+*The pod affinity defines that a pod can be scheduled onto a node ONLY if that node is in the same zone as at least one already-running pod with a certain label.*
 
-This means we must first label the postgres pod accordingly. Let's labels the pod with "security=zone1"
+This means we must first label the postgres pod accordingly. Let's labels the pod with `security=zone1`
 
 [source,bash]
 ----
 oc patch dc postgresql -n podtesting --type='json' -p='[{"op": "add", "path": "/spec/template/metadata/labels/security", "value": "zone1" }]'
 ----
 
-After a while the postgres pod is restarted on one of the 4 compute nodes - here compute-1 (zone == east):
+After a while the postgres pod is restarted on one of the 4 compute nodes (since we did not specify in which zone this single pod shall be started) - here compute-1 (zone == east):
 
 [source,bash]
 oc get pods -n podtesting -o wide | grep Running
 postgresql-5-6v5h6              1/1     Running       0          119s   10.129.2.24    compute-1   <none>           <none>
 
-As a second step the deployment configuration of the web application must be modified. Remember, we want to run web application pods only on nodes located in the same zone as the postgres pods. In our example this would be either compute-0 or compute-1.
+As a second step, the deployment configuration of the web application must be modified. Remember, we want to run web application pods only on nodes located in the same zone as the postgres pods. In our example this would be either compute-0 or compute-1.
 
 Modify the config accordingly:
 
@@ -140,7 +142,7 @@ spec:
               topologyKey: topology.kubernetes.io/zone <4>
 ----
 <1> The key of the label of a pod which is already running on that node is "security"
-<2> As operator "In" is used. Other options like "NotIn", "DoesNotExist" or "Exact" are available as well
+<2> As operator "In" is used the postgres pod must have a matching key (security) containing the value (zone1). Other options like "NotIn", "DoesNotExist" or "Exact" are available as well
 <3> The value must be "zone1"
 <4> As topology the topology.kubernetes.io/zone is used. The application can be deployed on nodes with the same label
 
@@ -212,9 +214,44 @@ django-psql-example-16-zb5fg    1/1     Running     0          28s     10.130.2.
 postgresql-5-6v5h6              1/1     Running     0          18m     10.129.2.24    compute-1   <none>           <none>
 ----
 
+
+== Combining required and preferred affinities
+
+It is possible to combine requiredDuringSchedulingIgnoredDuringExecution and preferredDuringSchedulingIgnoredDuringExecution. In such case the required affinity MUST be met, while the preferred affinity is tried to be met. The following examples combines these two types in an affinity and anti-affinity specification.
+
+The `podAffinity` block defines the same as above: schedule the pod on a node of the same zone, where a pod with the label `security=zone1` is running. 
+The `podAntiAffinity` defines that the pod should not be started on a node if that node has a pod running with the label `security=zone2`. However, the scheduler might decide to do so as long the `podAffinity` rule is met. 
+
+[source,yaml]
+----
+spec:
+  affinity:
+    podAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+          - key: security
+            operator: In
+            values:
+            - zone1
+        topologyKey: topology.kubernetes.io/zone
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100 <1>
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+            - key: security
+              operator: In
+              values:
+              - zone2
+          topologyKey: topology.kubernetes.io/zone
+----
+<1> The `weight` field is used by the scheduler to create a scoring. The higher the scoring the more preferred is that node.
+
 === topologyKey
 
-It is important to understand the `topologyKey`. It is the key for the node label. All nodes must be labelled consistently, otherwise unintended behaviour might occur.
+It is important to understand the `topologyKey` setting. This is the key for the node label. If an affinity rule is met, Kubernetes will try to find suitable nodes which are labelled with the topologyKey. All nodes must be labelled consistently, otherwise unintended behaviour might occur.
 
 As described in the Kubernetes documentation at https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity[Pod Affinity and Anit-Affinity^], the topologyKey has some constraints:
 
@@ -227,6 +264,10 @@ _Quote Kubernetes:_
 
 _End of quote_
 
+== Cleanup
+
+As cleanup simply remove the affinity specification from the DeploymentConf. The node labels can stay as they are since they do not hurt.
+
 == Summary
 
-This concludes the quick overview of the node affinity. Further information can be found at https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity[Pod Affinity/Anti-Affinity^]
+This concludes the quick overview of the pod affinity. The next chapter will discuss link:/openshift/day-2/pod-placement-node-affinity/[Node Affinity] rules, which allows affinity based on node specifications.

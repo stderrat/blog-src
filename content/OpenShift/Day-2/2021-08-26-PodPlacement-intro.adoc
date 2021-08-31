@@ -13,6 +13,9 @@ categories:
    - Pod Placement
 tags: ["OCP", "Day-2", "OpenShift", "Pod Placement", "NodeSelector", "Affinity", "Anti-Affinity"] 
 
+aliases: [ 
+	 "/openshift/day-2/pod-placement-pod-affinity",
+] 
 ---
 
 :imagesdir: /OpenShift/Day-2/images/

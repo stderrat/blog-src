@@ -24,7 +24,7 @@ aliases: [
 :icons: font
 :toc:
 
-Node Affinity allows to place a pod to a specific group of nodes. The node itself does not have control over the placement. For example, it is possible to run a pod only on nodes with a specific CPU or disktype. The disktype was used as an example for the `nodeSelector` and yes ... Node Affinity is conceptually similar to nodeSelector. 
+Node Affinity allows to place a pod to a specific group of nodes. For example, it is possible to run a pod only on nodes with a specific CPU or disktype. The disktype was used as an example for the `nodeSelector` and yes ... Node Affinity is conceptually similar to nodeSelector but allows a more granular configuration.
 
 <!--more--> 
 
@@ -40,7 +40,7 @@ Please check out other ways of pod placements:
 
 == Using Node Affinity 
 
-Currently two types of pod affinity are known: 
+Currently two types of affinity settings are known: 
 
 * requiredDuringSchedulingIgnoreDuringExecuption (short _required_) - a hard requirement which must be met before a pod can be scheduled
 * preferredDuringSchedulingIgnoredDuringExecution (short _preferred_) - a soft requirement the scheduler *tries* to meet, but does not guarantee it
@@ -49,7 +49,7 @@ NOTE: Both types can be specified. In such case the node must first meet the req
 
 === Preparing node labels
 
-NOTE: Remember the prerequisites explained in the "Pod Placement - Introduction". We have 4 compute nodes and an example web application up and running.
+NOTE: Remember the prerequisites explained in the . link:/openshift/day-2/pod-placement-pod-affinity/[Pod Placement - Introduction]. We have 4 compute nodes and an example web application up and running.
 
 Before we start with affinity rules we need to label all nodes. Let's create 2 zones (east and west) for our compute nodes. 
 
@@ -95,10 +95,17 @@ spec:
 ----
 
 In this example the pods are started only on nodes of the zone "West". Since the value is an array, multiple zones can be defined letting the web application be executed on West and East for example. 
+With this setup you can control on which node a specific application shall be executed. For example: you have a group of nodes which provide a GPU and your GPU application must be started only on this group of nodes. 
+
+Like with pod affinity you can combine required and preferred settings. 
 
 == What happened to Node Anti-Affinity? 
 
-Unlike Pod Anti-Affinity, there is no concept to define a node Anti Affinity. Instead you can use the `NotIn` and `DoesNotExist` operators to achieve this bahaviour.  
+Unlike Pod Anti-Affinity, there is no concept to define a node Anti-Affinity. Instead you can use the `NotIn` and `DoesNotExist` operators to achieve this bahaviour.  
+
+== Cleanup
+
+As cleanup simply remove the affinity specification from the DeploymentConf. The node labels can stay as they are since they do not hurt.
 
 == Summary
 
