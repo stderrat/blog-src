@@ -6,14 +6,16 @@
 </time>
 
 {{ with .Params.author }}
-	By: 
+	- By: 
 	{{ if reflect.IsSlice . }}
 		{{ delimit . ", " | markdownify }}
 	{{else}}
 		{{ . | markdownify }}
 	{{ end }}
-</p>
 {{ end }}
+
+( {{ $.Param "Lastmodification" | default (i18n "Lastmodification") }} {{.Page.Lastmod.Format "2006-01-02"}} )
+</p>
 
 
 {{ .Content }}

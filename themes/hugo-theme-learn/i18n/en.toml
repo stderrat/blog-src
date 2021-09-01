@@ -45,3 +45,12 @@ other = "kb"
 
 [Copyright]
 other = "Copyright"
+
+[Authorname]
+other = "Author: "
+
+[Lastmodification]
+other = "Lastmod: "
+
+[Published]
+other = "Published: "
