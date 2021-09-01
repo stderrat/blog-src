@@ -27,7 +27,7 @@ However, there are scenarios where a more advanced approach is required, like fo
 
 * Controlling placement with node selectors
 * Controlling placement with pod/node affinity/anti-affinity rules
-* Controlling placement with trains and tolerations
+* Controlling placement with taints and tolerations
 * Controlling placement with topology spread constraints
 
 This series will try to go into the detail of the different options and explains in simple examples how to work with pod placement rules. 
