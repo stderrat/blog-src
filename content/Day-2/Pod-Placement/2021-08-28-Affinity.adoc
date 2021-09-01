@@ -41,6 +41,7 @@ Please check out other ways of pod placements:
 . link:/openshift/day-2/pod-placement-node-affinity/[Node Affinity]
 . link:/openshift/day-2/pod-placement-taints-and-tolerations[Taints and Tolerations]
 . link:/openshift/day-2/pod-placement-topology-spread-constraints/[Topology Spread Constraints]
+. link:/openshift/day-2/descheduler/[Descheduler]
 
 == Pod Affinity and Anti-Affinity
 

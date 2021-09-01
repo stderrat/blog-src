@@ -42,6 +42,7 @@ It is not a replacement for any official documentation, so always check out Kube
 . link:/openshift/day-2/pod-placement-node-affinity/[Node Affinity]
 . link:/openshift/day-2/pod-placement-taints-and-tolerations[Taints and Tolerations]
 . link:/openshift/day-2/pod-placement-topology-spread-constraints/[Topology Spread Constraints]
+. link:/openshift/day-2/descheduler/[Descheduler]
 
 == Prerequisites
 
