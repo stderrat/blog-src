@@ -36,12 +36,14 @@ The feature comes with two types:
 
 Please check out other ways of pod placements:
 
+{{% expand %}}
 . link:/openshift/day-2/pod-placement-nodeselector/[NodeSelector]
 . link:/openshift/day-2/pod-placement-pod-affinity/[Pod Affinity and Anti Affinity]
 . link:/openshift/day-2/pod-placement-node-affinity/[Node Affinity]
 . link:/openshift/day-2/pod-placement-taints-and-tolerations[Taints and Tolerations]
 . link:/openshift/day-2/pod-placement-topology-spread-constraints/[Topology Spread Constraints]
 . link:/openshift/day-2/descheduler/[Descheduler]
+{{% /expand %}}
 
 == Pod Affinity and Anti-Affinity
 
