@@ -1,5 +1,5 @@
 --- 
-title: "Pod Placement - Taints and Tolerations"
+title: "Taints and Tolerations"
 description: "Placeing Pods Using Taints and Tolerations"
 date: "2021-08-26"
 doctype: book

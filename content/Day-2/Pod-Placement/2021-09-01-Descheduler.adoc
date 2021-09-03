@@ -1,7 +1,7 @@
 --- 
-title: "Descheduler"
+title: "Using Descheduler"
 description: "Evicting pods using the Descheduler"
-date: "2021-09-01"
+date: "2021-08-26"
 doctype: book
 
 author: Thomas Jungbauer

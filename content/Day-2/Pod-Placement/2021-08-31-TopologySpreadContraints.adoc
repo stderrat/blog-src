@@ -1,5 +1,5 @@
 --- 
-title: "Pod Placement - Topology Spread Constraints"
+title: "Topology Spread Constraints"
 description: "Placeing Pods Using Topology Spread Constraints"
 date: "2021-08-26"
 doctype: book

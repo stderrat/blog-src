@@ -1,5 +1,5 @@
 --- 
-title: "Pod Placement - Node Affinity"
+title: "Node Affinity"
 description: "Placeing Pods Using the Node Affinity rules"
 date: "2021-08-26"
 doctype: book

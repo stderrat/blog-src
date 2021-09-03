@@ -1,5 +1,5 @@
 --- 
-title: "Pod Placement - Introduction"
+title: "Introduction"
 description: "Introduction to Pod Placement"
 date: "2021-08-26"
 doctype: book
