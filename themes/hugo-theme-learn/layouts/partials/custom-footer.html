@@ -8,12 +8,16 @@
 
     const btn = document.querySelector(".btn-toggle");
     const prefersDarkScheme = window.matchMedia("(prefers-color-scheme: dark)");
+
+    var savedTheme = localStorage.getItem("dark-mode-storage") || prefersDarkScheme;
     
     btn.addEventListener("click", function () {
       if (prefersDarkScheme.matches) {
         document.body.classList.toggle("light-theme");
+        localStorage.setItem("dark-mode-storage", "light");
       } else {
         document.body.classList.toggle("dark-theme");
+        localStorage.setItem("dark-mode-storage", "dark");
       }
     });
     
