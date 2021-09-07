@@ -3,6 +3,7 @@
   <head>
     <meta name="google-site-verification" content="yq2Ib3doJVHVlEW2wtHap5WY54JhS2CCvI40y30F0FI" />
     <meta charset="utf-8">
+    <meta name="color-scheme" content="dark light">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     {{ hugo.Generator }}
     {{ partial "meta.html" . }}
@@ -50,7 +51,7 @@
       {{ printf `<link rel="%s" type="%s" href="%s" title="%s" />` .Rel .MediaType.Type .Permalink $.Site.Title | safeHTML }}
     {{ end -}}
   </head>
-  <body class="" data-url="{{ .RelPermalink }}">
+  <body data-url="{{ .RelPermalink }}">
     <button onclick="scrollTopAnimated()" id="myBtn" class="top-btn button fa fa-arrow-up" title="Go to top"></button>
 
     {{ partial "menu.html" . }}

@@ -50,3 +50,11 @@ Note
 {{% notice caution %}}
 Caution
 {{% /notice %}}
+
+{{% notice tip %}}
+Tip
+{{% /notice %}}
+
+{{% notice important %}}
+Important
+{{% /notice %}}

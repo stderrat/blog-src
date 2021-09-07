@@ -10,6 +10,11 @@
         {{ partial "search.html" . }}
     {{end}}
   </div>
+
+  <div class="togglemode">
+    <button id="dark-mode-toggle" class="btn-toggle btn-default btn">Toggle Dark-Mode</button>
+  </div>
+
   {{if not .Site.Params.disableLandingPageButton }}
     <section id="homelinks">
       <ul>

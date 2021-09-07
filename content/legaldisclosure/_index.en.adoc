@@ -19,6 +19,9 @@ Toni Schmidbauer & Thomas Jungbauer +
 E-Mail: 
 
 image::ts.png[] 
+
+{nbsp}
+
 image::tju.png[]
 
 Internet address: https://blog.stderr.at/
