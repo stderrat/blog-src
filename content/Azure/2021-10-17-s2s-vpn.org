@@ -21,6 +21,8 @@ cluster.
 * Resources
   - [[https://blog.notnot.ninja/2020/09/19/azure-site-to-site-vpn/][Build an Azure site-to-site VPN for DevTest]]
   - [[https://docs.microsoft.com/en-us/azure/vpn-gateway/vpn-gateway-howto-site-to-site-resource-manager-cli][Create a virtual network with a Site-to-Site VPN connection using CLI]]
+* IPsec basics
+  #TODO#
 
 * Azure Setup
 
