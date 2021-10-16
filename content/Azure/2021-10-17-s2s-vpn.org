@@ -1,0 +1,191 @@
+#+title: Stumbling into Azure: Building a site-to-site VPN tunnel for testing
+#+author: Toni Schmidbauer
+#+lastmod: [2021-10-16 Sat 16:40]
+#+categories[]: Azure ARO OpenShift
+#+draft: true
+#+variable: value
+#+date: 2021-10-16
+#+list[]: value_1 value_2 value_3
+
+So we want to play with ARO (Azure Red Hat OpenShift) private
+clusters. A private cluster is *not* reachable from the internet
+(suprise) and should be only reachable via a VPN tunnel from other
+networks.
+
+This blog post describes how we created a site-to-site VPN between a
+Hetzner dedicated server running multiple VM's via libvirt and Azure.
+
+An upcoming blog post is going to cover the setup of the private ARO
+cluster.
+
+* Resources
+  - [[https://blog.notnot.ninja/2020/09/19/azure-site-to-site-vpn/][Build an Azure site-to-site VPN for DevTest]]
+  - [[https://docs.microsoft.com/en-us/azure/vpn-gateway/vpn-gateway-howto-site-to-site-resource-manager-cli][Create a virtual network with a Site-to-Site VPN connection using CLI]]
+
+* Azure Setup
+
+  1) Environment variables
+     #+begin_src sh
+export RESOUREGROUP=aro-rg
+export GATWAY_SUBNET="192.168.128.0/24"
+export MASTER_SUBNET="192.168.129.0/24"
+export WORKER_SUBNET="192.168.129.0/24"
+export HETZNER_VM_NETWORKS="10.0.0.0/24 192.168.122.0/24 172.16.100.0/24"
+     #+end_src
+  2) Create a VNET
+     #+begin_src sh
+az network vnet create \
+   --resource-group $RESOURCEGROUP \
+   --name aro-vnet \
+   --address-prefixes 192.168.128.0/18
+  #+end_src
+  3) Create ~GatewaySubnet~
+     #+begin_src sh
+az network vnet subnet create \
+--resource-group $RESOURCEGROUP \
+--vnet-name aro-vnet \
+--name GatewaySubnet \
+--address-prefixes $GATEWAY_SUBNET
+#+end_src
+  4) Create the master subnet
+     #+begin_src sh
+az network vnet subnet create \
+  --resource-group $RESOURCEGROUP \
+  --vnet-name aro-vnet \
+  --name master-subnet \
+  --address-prefixes $MASTER_SUBNET \
+  --service-endpoints Microsoft.ContainerRegistry
+     #+end_src
+  5) Create the worker subnet
+     #+begin_src sh
+az network vnet subnet create \
+  --resource-group $RESOURCEGROUP \
+  --vnet-name aro-vnet \
+  --name master-subnet \
+  --address-prefixes $WORKER_SUBNET \
+  --service-endpoints Microsoft.ContainerRegistry
+     #+end_src
+  6) Create a ~public IP~ resource
+     #+begin_src sh
+az network public-ip create \
+   --name GatewayIP \
+   --resource-group $RESOURCEGROUP \
+   --allocation-method Dynamic
+     #+end_src
+  7) Create a ~local-gateway~ resource
+     #+begin_src sh
+az network local-gateway create \
+   --name playground \
+   --resource-group $RESOURCEGROUP \
+   --local-address-prefixes $HETZNER_VM_NETWORKS \
+   --gateway-ip-address 95.217.42.98
+     #+end_src
+  8) Create a ~vnet-gateway~ resource (takes around 30 minutes)
+     #+begin_src sh
+az network vnet-gateway create \
+   --name vpn-gateway \
+   --public-ip-address GatewayIP \
+   --resource-group $RESOURCEGROUP \
+   --vnet aro-vnet \
+   --gateway-type Vpn \
+   --vpn-type RouteBased \
+   --sku Basic \
+   --no-wait
+     #+end_src
+  9) Define a ~vpn-connection~
+     #+begin_src sh
+az network vpn-connection create \
+   --name VNet1toSite2 \
+   --resource-group $RESOURCEGROUP \
+   --vnet-gateway1 vpn-gateway \
+   --local-gateway2 playground \
+   --location westeurope \
+   --shared-key thepassword
+     #+end_src
+
+* Libreswan setup on Centos Stream
+
+  1) Install the Libreswan packages
+     #+begin_src h
+dnf install libreswan
+     #+end_src
+  2) Create a Azure configuration for Libreswan in ~/etc/ipsec.d/azure.conf
+     #+begin_src
+conn masterSubnet
+  also=azureTunnel
+  leftsubnet=192.168.129.0/24
+  rightsubnet=172.16.100.0/24
+  auto=start
+
+conn azureTunnel
+    authby=secret
+    auto=start
+    dpdaction=restart
+    dpddelay=30
+    dpdtimeout=120
+    ike=aes256-sha1;modp1024
+    ikelifetime=3600s
+    ikev2=insist
+    keyingtries=3
+    pfs=yes
+    phase2alg=aes128-sha1
+    left=51.137.113.44
+    leftsubnets=192.168.128.0/24
+    right=%defaultroute
+    rightsubnets=172.16.100.0/24
+    salifetime=3600s
+    type=tunnel
+    ipsec-interface=yes
+     #+end_src
+  3) Create a Libreswan secrets file for Azure in ~/etc/ipsec.d/azure.secrets~:
+     #+begin_src
+%any %any : PSK "abc123"
+     #+end_src
+  4) Enable and start the IPsec service
+     #+begin_src sh
+systemctl enable --now ipsec
+     #+end_src
+  5) We had to explicitly load the IPsec configuration via
+     #+begin_src sh
+ipsec addconn --config /etc/ipsec.d/azure.conf azureTunnel
+     #+end_src
+
+* Libreswan IPSEC debugging tips
+
+  - Check the state of the IPsec systemd service
+    #+begin_src sh
+systemctl status ipsec
+    #+end_src
+  - Check the full log of the IPsec systemd service
+    #+begin_src sh
+journalctl -e -u ipsec
+    #+end_src
+  - Check the state of the tunnels with the ~ipsec~ command line tool
+    #+begin_src sh
+ipsec status
+    #+end_src
+
+    Check for the following lines
+    #+begin_src sh
+000 Total IPsec connections: loaded 5, active 2
+000
+000 State Information: DDoS cookies not required, Accepting new IKE connections
+000 IKE SAs: total(1), half-open(0), open(0), authenticated(1), anonymous(0)
+000 IPsec SAs: total(2), authenticated(2), anonymous(0)
+000
+000 #130: "azureTunnel/1x1":500 STATE_V2_ESTABLISHED_CHILD_SA (IPsec SA established); EVENT_SA_REKEY in 2003s; newest IPSEC; eroute owner; isakmp#131; idle;
+000 #130: "azureTunnel/1x1" esp.56cf4304@51.137.113.44 esp.6f49e8d3@95.217.42.98 tun.0@51.137.113.44 tun.0@95.217.42.98 Traffic: ESPin=0B ESPout=0B! ESPmax=0B
+000 #129: "masterSubnet/0x0":500 STATE_V2_ESTABLISHED_CHILD_SA (IPsec SA established); EVENT_SA_REKEY in 1544s; newest IPSEC; eroute owner; isakmp#131; idle;
+000 #129: "masterSubnet/0x0" esp.6e81e8da@51.137.113.44 esp.6f72bbc8@95.217.42.98 tun.0@51.137.113.44 tun.0@95.217.42.98 Traffic: ESPin=0B ESPout=0B! ESPmax=0B
+000 #131: "masterSubnet/0x0":500 STATE_V2_ESTABLISHED_IKE_SA (established IKE SA); EVENT_SA_REKEY in 2121s; newest ISAKMP; idle;
+    #+end_src
+
+    IPsec specifies properties of connections via [[https://en.wikipedia.org/wiki/IPsec#Security_association][security
+    associations (SA)]]. The parent SA is describes the IKEv2
+    connections, the child sa is the ESP (encapsulated security
+    payload) connection.
+
+  {{% notice warning %}}
+
+  bla
+  {{% /notice %}}
