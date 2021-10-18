@@ -5,12 +5,12 @@
 #+draft: true
 #+variable: value
 #+date: 2021-10-16
+#+imagesdir: Azure/images/
 #+list[]: value_1 value_2 value_3
 
 So we want to play with ARO (Azure Red Hat OpenShift) private
 clusters. A private cluster is *not* reachable from the internet
-(suprise) and should be only reachable via a VPN tunnel from other
-networks.
+(suprise) and is only reachable via a VPN tunnel from other networks.
 
 This blog post describes how we created a site-to-site VPN between a
 Hetzner dedicated server running multiple VM's via libvirt and Azure.
@@ -18,15 +18,41 @@ Hetzner dedicated server running multiple VM's via libvirt and Azure.
 An upcoming blog post is going to cover the setup of the private ARO
 cluster.
 
-* Resources
-  - [[https://blog.notnot.ninja/2020/09/19/azure-site-to-site-vpn/][Build an Azure site-to-site VPN for DevTest]]
-  - [[https://docs.microsoft.com/en-us/azure/vpn-gateway/vpn-gateway-howto-site-to-site-resource-manager-cli][Create a virtual network with a Site-to-Site VPN connection using CLI]]
-* IPsec basics
-  #TODO#
-
 * Azure Setup
 
-  1) Environment variables
+  The diagram below depicts our planned setup:
+
+  #+attr_html: :width 100px
+  #+attr_latex: :width 100px
+  [[file:/Azure/images/azure_network_setup.png]]
+
+  On the righthand side can see the resources required for our lab:
+
+  - a virtual network (vnet 192.168.128.0/19). This vnet will be split
+    into 3 separate subnets
+  - a master subnet (192.168.129.0/24) holding the ARO control plane nodes
+  - a node subnet (192.168.130.0/24) holding ARO worker nodes
+  - and finally a subnet call ~GatewaySubnet~ where we are going to
+    deploy our Azure VPN gateway (called a ~vnet-gateway~)
+
+    {{% notice warning %}}
+
+    The subnet where the Azure VPN gateway is located needs to have
+    the name ~GatewaySubnet~. Otherwise creating the Azure VPN gateway
+    will fail.
+
+    {{% /notice %}}
+
+  - we also need a ~publicIP~ resource that we are going to connect to
+    our ~vnet-gateway~ (the VPN gateway)
+  - and finally a ~local-gateway~ resource that tells the
+    ~vnet-gateway~ which networks are reachable on the left, in our
+    case the Hetzner server.
+
+** Creating the required Azure resources
+
+  1) First we are going to set some environment variable. Those
+     variables are used in the upcoming commands:
      #+begin_src sh
 export RESOUREGROUP=aro-rg
 export GATWAY_SUBNET="192.168.128.0/24"
@@ -34,14 +60,14 @@ export MASTER_SUBNET="192.168.129.0/24"
 export WORKER_SUBNET="192.168.129.0/24"
 export HETZNER_VM_NETWORKS="10.0.0.0/24 192.168.122.0/24 172.16.100.0/24"
      #+end_src
-  2) Create a VNET
+  2) Nexte create a VNET resource holding our sub networks:
      #+begin_src sh
 az network vnet create \
    --resource-group $RESOURCEGROUP \
    --name aro-vnet \
    --address-prefixes 192.168.128.0/18
   #+end_src
-  3) Create ~GatewaySubnet~
+  3) Create the  ~GatewaySubnet~ subnet
      #+begin_src sh
 az network vnet subnet create \
 --resource-group $RESOURCEGROUP \
@@ -105,6 +131,23 @@ az network vpn-connection create \
    --shared-key thepassword
      #+end_src
 
+* IPsec basics
+
+  A few basic points in regards to
+* Required iptables (nf tables) hacks for libvirt
+
+** Skip NAT rules if the destination network is in Azure
+#+begin_src sh
+iptables -I LIBVIRT_PRT 2 -t nat -d 192.168.129.0/24 -j RETURN
+iptables -I LIBVIRT_PRT 2 -t nat -d 192.168.130.0/24 -j RETURN
+#+end_src
+
+** Skip NAT rules if the client is connected via tailscale
+
+   #+begin_src sh
+iptables -I ts-postrouting 1 -t nat -d 192.168.129.0/24 -j RETURN
+iptables -I ts-postrouting 1 -t nat -d 192.168.130.0/24 -j RETURN
+   #+end_src
 * Libreswan setup on Centos Stream
 
   1) Install the Libreswan packages
@@ -187,7 +230,7 @@ ipsec status
     connections, the child sa is the ESP (encapsulated security
     payload) connection.
 
-  {{% notice warning %}}
 
-  bla
-  {{% /notice %}}
+* Additonal Resources
+  - [[https://blog.notnot.ninja/2020/09/19/azure-site-to-site-vpn/][Build an Azure site-to-site VPN for DevTest]]
+  - [[https://docs.microsoft.com/en-us/azure/vpn-gateway/vpn-gateway-howto-site-to-site-resource-manager-cli][Create a virtual network with a Site-to-Site VPN connection using CLI]]
