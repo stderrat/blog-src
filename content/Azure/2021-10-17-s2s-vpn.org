@@ -136,13 +136,13 @@ az network vpn-connection create \
   A few basic points in regards to
 * Required iptables (nf tables) hacks for libvirt
 
-** Skip NAT rules if the destination network is in Azure
+** Skip NAT rules if the destination network is in Azure and the client network deploy via libvirt
 #+begin_src sh
 iptables -I LIBVIRT_PRT 2 -t nat -d 192.168.129.0/24 -j RETURN
 iptables -I LIBVIRT_PRT 2 -t nat -d 192.168.130.0/24 -j RETURN
 #+end_src
 
-** Skip NAT rules if the client is connected via tailscale
+** Skip NAT rules if the destination network is in Azure and the client is connected via tailscale
 
    #+begin_src sh
 iptables -I ts-postrouting 1 -t nat -d 192.168.129.0/24 -j RETURN
@@ -230,7 +230,26 @@ ipsec status
     connections, the child sa is the ESP (encapsulated security
     payload) connection.
 
+    Check IPsec tranformation policies
+
+    #+begin_src sh
+ip xfrm policy
+    #+end_src
+
+    Check the state of IPsec tranformstaion policies
+    #+begin_src
+ip xfrm state
+    #+end_src
+
+    Check for dropped packages on the IPsec interface (ipsec1 in our case)
+
+    #+begin_src
+ip -s link show dev ipsec1
+    #+end_src
 
 * Additonal Resources
   - [[https://blog.notnot.ninja/2020/09/19/azure-site-to-site-vpn/][Build an Azure site-to-site VPN for DevTest]]
   - [[https://docs.microsoft.com/en-us/azure/vpn-gateway/vpn-gateway-howto-site-to-site-resource-manager-cli][Create a virtual network with a Site-to-Site VPN connection using CLI]]
+  - [[https://libreswan.org/wiki/FAQ#Why_is_it_recommended_to_disable_rp_filter_in_.2Fproc.2Fsys.2Fnet_.3F][Libreswan: Disable rp_filter for IPsec]]
+  - [[https://libreswan.org/wiki/FAQ#NAT_.2B_IPsec_is_not_working][Libreswan: NAT and IPsec not working]]
+  - [[https://libreswan.org/wiki/Subnet_to_subnet_VPN][Libreswan: Subnet to subnet VPN]]
