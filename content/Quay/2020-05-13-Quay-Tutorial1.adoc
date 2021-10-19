@@ -11,6 +11,7 @@ draft: false
 categories:
    - OpenShift
    - Tekton
+   - Quay
 tags: ["Quay", "Registry", "OpenShift", "Container Security"] 
 
 aliases: [ 
