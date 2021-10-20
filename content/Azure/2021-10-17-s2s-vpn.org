@@ -236,7 +236,7 @@ ipsec status
 ip xfrm policy
     #+end_src
 
-    Check the state of IPsec tranformstaion policies
+    Check the state of IPsec transformation policies
     #+begin_src
 ip xfrm state
     #+end_src
