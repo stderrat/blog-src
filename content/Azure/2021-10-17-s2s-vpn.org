@@ -54,10 +54,10 @@ cluster.
   1) First we are going to set some environment variable. Those
      variables are used in the upcoming commands:
      #+begin_src sh
-export RESOUREGROUP=aro-rg
+export RESOURCEGROUP=aro-rg
 export GATWAY_SUBNET="192.168.128.0/24"
 export MASTER_SUBNET="192.168.129.0/24"
-export WORKER_SUBNET="192.168.129.0/24"
+export WORKER_SUBNET="192.168.130.0/24"
 export HETZNER_VM_NETWORKS="10.0.0.0/24 192.168.122.0/24 172.16.100.0/24"
      #+end_src
   2) Nexte create a VNET resource holding our sub networks:
@@ -89,7 +89,7 @@ az network vnet subnet create \
 az network vnet subnet create \
   --resource-group $RESOURCEGROUP \
   --vnet-name aro-vnet \
-  --name master-subnet \
+  --name worker-subnet \
   --address-prefixes $WORKER_SUBNET \
   --service-endpoints Microsoft.ContainerRegistry
      #+end_src
@@ -131,6 +131,7 @@ az network vpn-connection create \
    --shared-key thepassword
      #+end_src
 
+
 * IPsec basics
 
   A few basic points in regards to
@@ -161,6 +162,12 @@ conn masterSubnet
   leftsubnet=192.168.129.0/24
   rightsubnet=172.16.100.0/24
   auto=start
+
+conn workerSubnet
+     also=azureTunnel
+     leftsubnet=192.168.130.0/24
+     rightsubnet=172.16.100.0/24
+     auto=start
 
 conn azureTunnel
     authby=secret
