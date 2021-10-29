@@ -1,0 +1,252 @@
+---
+title: "Automation Controller ad LDAP Authentication"
+description: "Enable LDAP authentication and create an example LDAP server"
+date: "2021-10-25"
+doctype: book
+
+author: Thomas Jungbauer
+type: post
+draft: false
+categories:
+   - Ansible
+tags: ["Ansible", "Controller", "Automation Controller", "LDAP", "Authentication"]
+
+aliases: [
+	 "/posts-output/2020-07-31-AnsibleTowerCollectionsdownload/",
+]
+---
+
+// Asciidoc Parameters
+// toc is set here since I like unnumbered tocs more
+:imagesdir: /ansible/images/
+:icons: font
+:toc:
+
+The following article shall quickly, without huge background information, deploy an Identity Management Server (based on FreeIPA) and connect this IDM to an existing Automation Controller so authentication can be tested and verified based on LDAP.
+
+<!--more--> 
+
+== Install FreeIPA
+
+Run the following command to deploy and configure the IPA Server: 
+
+. `yum module enable idm:DL1`
+. `yum distro-sync`
+. `yum -y module install idm:DL1/server`
+. Install the server by calling the command `ipa-server-install`. This will start an interactive installation modus which requires the basic information about the IPA server. The following uses *tower.local* as base domain
+
+----
+Do you want to configure integrated DNS (BIND)? [no]:
+Server host name [node01.tower.local]:
+Please confirm the domain name [tower.local]:
+Please provide a realm name [TOWER.LOCAL]:
+
+Directory Manager password: <enter password>
+Password (confirm): <enter password>
+
+IPA admin password: <enter password>
+Password (confirm): <enter password>
+
+Do you want to configure chrony with NTP server or pool address? [no]:
+
+Continue to configure the system with these values? [no]: yes
+----
+
+Once all information have been provided the installation/configuration process starts. This will take a while... 
+
+CAUTION: Be sure that the hostname, here *node01.tower.local*, is resolvable, at least from the Tower/Controller node and the node you are accessing the FreeIPA UI. You can use your local _hosts_ file or a real domain name for that. 
+
+== Login to IPA server via Command Line
+
+. For user admin use: `kinit admin` 
+
+== Create a Binduser (BindDN)
+
+The Binduser (or BindDN) will be used by the Controller to authenticate the Controller against the LDAP server. 
+
+. Create the actual user
++
+[source,bash]
+----
+ipa user-add --first=”BindUser” --last=”None” --password binduser
+----
++
+Output: 
++
+[source,bash]
+----
+Password:
+Enter Password again to verify:
+------------------
+Added user "binduser"
+------------------
+  User login: binduser
+  First name: ”BindUser”
+  Last name: ”None”
+  Full name: ”BindUser” ”None”
+  Display name: ”BindUser” ”None”
+  Initials: ””
+  Home directory: /home/binduser
+  GECOS: ”BindUser” ”None”
+  Login shell: /bin/sh
+  Principal name: binduser@TOWER.LOCAL
+  Principal alias: binduser@TOWER.LOCAL
+  User password expiration: 20211015133112Z
+  Email address: binduser@tower.local
+  UID: 1573400003
+  GID: 1573400003
+  Password: True
+  Member of groups: ipausers
+  Kerberos keys available: True
+----
+
+. Assign the new user to the admin group
++
+[source,bash]
+----
+ipa group-add-member admins --users=binduser
+----
++
+Output: 
+[source,bash]
+----
+  Group Name: admins
+  Description: Account administrators group
+  GID: 1573400000
+  Member users: admin, binduser
+-----------------------------------
+Number of members added 1
+-----------------------------------
+----
+
+. Create a 2nd User to test the authentication later 
+[source,bash]
+----
+ipa user-add --first=”User” --last=”Name” --password user1
+----
+
+== Enable LDAP Auth in Automation Controller
+
+. Login to Automation Controller ad go to "Settings > LDAP Settings > Default"
+
+. add a new connection: 
+.. *LDAP Service URI*: `ldap://node01.tower.local:389`
+.. *LDAP Bind Password*: `<password of user binduser>``
+.. *LDAP Group Type*: `MemberDNGroupType`
+.. *LDAP Bind DN*: `uid=binduser,cn=users,cn=accounts,dc=tower,dc=local`
+
+.. *LDAP User Search*:
++
+[source,json]
+----
+[
+    "cn=users,cn=accounts,dc=tower,dc=local",
+    "SCOPE_SUBTREE",
+    "(uid=%(user)s)"
+]
+----
+
+.. *LDAP Group Search*:
++
+[source,bash]
+----
+[
+    "cn=groups,cn=accounts,dc=tower,dc=local",
+    "SCOPE_SUBTREE",
+    "(objectClass=posixgroup)" 
+]
+----
+
+The configuration should look like the following image: 
+
+.Automation Controller LDAP Authentication
+image::ControllerLDAPAuth.png[Automation Controller LDAP Authentication]
+
+== Verify Login with user1 
+You can now test the login using *user1*. If it does not work, check the following files for errors: 
+
+*Tower Node*: /var/log/tower/tower.log
+
+*IPA Node*: /var/log/dirsrv/slapd-TOWER-LOCAL/access
+
+WARNING: The login should work, but since the user1 is not assigned to any Team/Organization inside the Automation Controller, no privileges are granted. The user can do nothing. 
+
+== Automatically assign permissions 
+
+2 roles can be automatically assigned to authenticated users: 
+
+. Super User 
+. Auditor 
+
+To test this, 2 groups will be created in the LDAP server and a new user will be assigned to one of the groups. 
+
+. Create the group for super users: `ipa group-add tower_administrators`
+. Create the group for auditors: `ipa group-add tower_auditors`
+. Create a new user: `ipa user-add --first=”User” --last=”Name” --password user2`
+. Assign the user to one the the groups: `ipa group-add-member tower_administrators --users=user2`
+. Modify the Controller LDAP configuration and set *LDAP User Flags by Group*. This will assing any member of _tower_administrators_ to _is_superuser_ for example. 
++
+[source,json]
+----
+{
+  "is_superuser": [
+    "cn=tower_administrators,cn=groups,cn=accounts,dc=tower,dc=local"
+  ],
+  "is_system_auditor": [
+    "cn=tower_auditors,cn=groups,cn=accounts,dc=tower,dc=local"
+  ]
+}
+----
+
+Test the authentication and authorization with the *user2*. This user should now gain super admin permissions. 
+
+== Allow Users From Specific Groups Only
+
+Not all LDAP users shall be able to authenticate. Only users, which are member of a specific group, shall be able to authenticate. 
+
+. Create a 3rd user: `ipa user-add --first=”User” --last=”Name” --password user3`
+. Modify the LDAP Configuration in Automation Controller and set *LDAP Require Groups*: 
++
+[source,bash]
+----
+"cn=towerusers,cn=groups,cn=accounts,dc=tower,dc=local"
+----
+
+. Add the group _toweruser_: `ipa group-add towerusers`
+. Assign the user *user3* to that group: `ipa group-add-member towerusers --users=user3`
+
+At this state only *user3* will be able to login. In order to allow the other users as well, all must be assigned to the group *towerusers* 
+
+[source,bash]
+----
+ipa group-add-member towerusers --users=user3
+ipa group-add-member towerusers --users=user1
+----
+
+
+== Additional Configuration 
+It is possible to automatically map users to Controller Organization. I did not fully test this, but the following is an example: 
+
+[source.json]
+----
+  {
+      "LDAP Organization": {
+          "admins": "cn=engineering_admins,ou=groups,dc=example,dc=com",
+          "remove_admins": false,
+          "users": [
+              "cn=engineering,ou=groups,dc=example,dc=com",
+              "cn=sales,ou=groups,dc=example,dc=com",
+              "cn=it,ou=groups,dc=example,dc=com"
+          ],
+          "remove_users": false
+      },
+      "LDAP Organization 2": {
+          "admins": [
+              "cn=Administrators,cn=Builtin,dc=example,dc=com"
+          ],
+          "remove_admins": false,
+          "users": true,
+          "remove_users": false
+      }
+  }
+----
