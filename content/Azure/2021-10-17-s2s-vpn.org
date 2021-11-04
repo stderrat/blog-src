@@ -2,7 +2,7 @@
 #+author: Toni Schmidbauer
 #+lastmod: [2021-10-16 Sat 16:40]
 #+categories[]: Azure ARO OpenShift
-#+draft: true
+#+draft: false
 #+variable: value
 #+date: 2021-10-16
 #+imagesdir: Azure/images/
