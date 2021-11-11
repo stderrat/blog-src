@@ -47,8 +47,19 @@ the ARO cluster.
 
 ** Creating the private Azure Red Hat OpenShift cluster
 
+ 1) Register required resource providers
+
+    #+begin_src
+az provider register -n Microsoft.RedHatOpenShift --wait
+az provider register -n Microsoft.Compute --wait
+az provider register -n Microsoft.Storage --wait
+az provider register -n Microsoft.Authorization --wait
+    #+end_src
+
+
   1) First we are going to set some environment variable. Those
      variables are used in the upcoming commands:
+
      #+begin_src sh
 export RESOURCEGROUP=aro-rg
 export CLUSTER="aro1"
@@ -59,6 +70,7 @@ export HETZNER_VM_NETWORKS="10.0.0.0/24 192.168.122.0/24 172.16.100.0/24"
      #+end_src
 
   2) Disable subnet private endpoint policies
+
      #+begin_src sh
 az network vnet subnet update \
 --name master-subnet \
@@ -67,7 +79,13 @@ az network vnet subnet update \
 --disable-private-link-service-network-policies true
      #+end_src
 
-  3) Create the cluster
+  3) Create a private DNS zone for our cluster
+
+     #+begin_src sh
+az network private-dns zone create -n private2.tntinfra.net -g aro-rg
+     #+end_src
+
+  4) Create the cluster
 
      #+begin_src sh
 az aro create \
@@ -77,12 +95,50 @@ az aro create \
   --master-subnet master-subnet \
   --worker-subnet worker-subnet \
   --apiserver-visibility Private \
-  --ingress-visibility Private
-  # --domain foo.example.com # [OPTIONAL] custom domain
+  --ingress-visibility Private \
+  --domain private.tntinfra.net
   # --pull-secret @pull-secret.txt # [OPTIONAL]
      #+end_src
 
-  4) List cluster credentials after successfull setup
+  5) After sucessful cluster creating add DNS entry for the API and Ingress
+
+     Query the Azure API for the API server IP and the ingress IP addresses:
+
+     #+begin_src
+az aro show -n aro1 -g aro-rg --query '{api:apiserverProfile.ip, ingress:ingressProfiles[0].ip}'
+     #+end_src
+
+     Example output
+
+     #+begin_src
+Api            Ingress
+-------------  ---------------
+192.168.129.4  192.168.130.254
+     #+end_src
+
+     Add entries to Azure private DNS
+
+     #+begin_src sh
+az network private-dns record-set a add-record -g aro-rg -z private.tntinfra.net -a "192.168.129.4" -n api
+az network private-dns record-set a add-record -g aro-rg -z private.tntinfra.net -a "192.168.130.254" -n "*.apps"
+     #+end_src
+
+     List entries to verify configuration
+
+     #+begin_src sh
+az network private-dns record-set a list -g aro-rg -z private.tntinfra.net
+     #+end_src
+
+     Output:
+
+     #+begin_src sh
+Name    ResourceGroup    Ttl    Type    AutoRegistered    Metadata
+------  ---------------  -----  ------  ----------------  ----------
+api     aro-rg           3600   A       False
+*.apps  aro-rg           3600   A       False
+     #+end_src
+
+  5) List cluster credentials after successfull setup
 
     #+begin_src sh
 az aro list-credentials \
@@ -90,7 +146,7 @@ az aro list-credentials \
   --resource-group $RESOURCEGROUP
    #+end_src
 
-  5) Get the console URL
+  6) Get the console URL
 
      #+begin_src sh
 az aro show \
