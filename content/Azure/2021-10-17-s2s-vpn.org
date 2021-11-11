@@ -1,4 +1,4 @@
-#+title: Stumbling into Azure: Building a site-to-site VPN tunnel for testing
+#+title: Stumbling into Azure Part I: Building a site-to-site VPN tunnel for testing
 #+author: Toni Schmidbauer
 #+lastmod: [2021-10-16 Sat 16:40]
 #+categories[]: Azure ARO OpenShift
@@ -60,6 +60,7 @@ export MASTER_SUBNET="192.168.129.0/24"
 export WORKER_SUBNET="192.168.130.0/24"
 export HETZNER_VM_NETWORKS="10.0.0.0/24 192.168.122.0/24 172.16.100.0/24"
      #+end_src
+
   2) Nexte create a VNET resource holding our sub networks:
      #+begin_src sh
 az network vnet create \
@@ -67,6 +68,7 @@ az network vnet create \
    --name aro-vnet \
    --address-prefixes 192.168.128.0/18
   #+end_src
+
   3) Create the  ~GatewaySubnet~ subnet
      #+begin_src sh
 az network vnet subnet create \
@@ -75,6 +77,7 @@ az network vnet subnet create \
 --name GatewaySubnet \
 --address-prefixes $GATEWAY_SUBNET
 #+end_src
+
   4) Create the master subnet
      #+begin_src sh
 az network vnet subnet create \
@@ -84,6 +87,7 @@ az network vnet subnet create \
   --address-prefixes $MASTER_SUBNET \
   --service-endpoints Microsoft.ContainerRegistry
      #+end_src
+
   5) Create the worker subnet
      #+begin_src sh
 az network vnet subnet create \
@@ -93,6 +97,7 @@ az network vnet subnet create \
   --address-prefixes $WORKER_SUBNET \
   --service-endpoints Microsoft.ContainerRegistry
      #+end_src
+
   6) Create a ~public IP~ resource
      #+begin_src sh
 az network public-ip create \
@@ -100,6 +105,7 @@ az network public-ip create \
    --resource-group $RESOURCEGROUP \
    --allocation-method Dynamic
      #+end_src
+
   7) Create a ~local-gateway~ resource
      #+begin_src sh
 az network local-gateway create \
@@ -108,6 +114,7 @@ az network local-gateway create \
    --local-address-prefixes $HETZNER_VM_NETWORKS \
    --gateway-ip-address 95.217.42.98
      #+end_src
+
   8) Create a ~vnet-gateway~ resource (takes around 30 minutes)
      #+begin_src sh
 az network vnet-gateway create \
@@ -120,6 +127,7 @@ az network vnet-gateway create \
    --sku Basic \
    --no-wait
      #+end_src
+
   9) Define a ~vpn-connection~
      #+begin_src sh
 az network vpn-connection create \
