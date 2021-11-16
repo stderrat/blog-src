@@ -10,7 +10,7 @@
 
 So we want to play with ARO (Azure Red Hat OpenShift) private
 clusters. A private cluster is *not* reachable from the internet
-(suprise) and is only reachable via a VPN tunnel from other networks.
+(surprise) and is only reachable via a VPN tunnel from other networks.
 
 This blog post describes how we created a site-to-site VPN between a
 Hetzner dedicated server running multiple VM's via libvirt and Azure.
@@ -26,7 +26,7 @@ cluster.
   #+attr_latex: :width 100px
   [[file:/Azure/images/azure_network_setup.png]]
 
-  On the righthand side can see the resources required for our lab:
+  On the right hand side can see the resources required for our lab:
 
   - a virtual network (vnet 192.168.128.0/19). This vnet will be split
     into 3 separate subnets
@@ -61,7 +61,7 @@ export WORKER_SUBNET="192.168.130.0/24"
 export HETZNER_VM_NETWORKS="10.0.0.0/24 192.168.122.0/24 172.16.100.0/24"
      #+end_src
 
-  2) Nexte create a VNET resource holding our sub networks:
+  2) Next create a VNET resource holding our sub networks:
      #+begin_src sh
 az network vnet create \
    --resource-group $RESOURCEGROUP \
@@ -157,7 +157,7 @@ iptables -I LIBVIRT_PRT 2 -t nat -d 192.168.130.0/24 -j RETURN
 iptables -I ts-postrouting 1 -t nat -d 192.168.129.0/24 -j RETURN
 iptables -I ts-postrouting 1 -t nat -d 192.168.130.0/24 -j RETURN
    #+end_src
-* Libreswan setup on Centos Stream
+* Libreswan setup on CentOS Stream
 
   1) Install the Libreswan packages
      #+begin_src h
@@ -242,10 +242,10 @@ ipsec status
 
     IPsec specifies properties of connections via [[https://en.wikipedia.org/wiki/IPsec#Security_association][security
     associations (SA)]]. The parent SA is describes the IKEv2
-    connections, the child sa is the ESP (encapsulated security
+    connections, the child SA is the ESP (encapsulated security
     payload) connection.
 
-    Check IPsec tranformation policies
+    Check IPsec transformation policies
 
     #+begin_src sh
 ip xfrm policy

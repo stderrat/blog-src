@@ -22,7 +22,7 @@ the ARO cluster.
   #+attr_latex: :width 100px
   [[file:/Azure/images/azure_network_setup_with_aro.png]]
 
-  On the righthand side can see the resources required for our lab:
+  On the right hand side can see the resources required for our lab:
 
   - a virtual network (vnet 192.168.128.0/19). This vnet will be split
     into 3 separate subnets
@@ -100,7 +100,7 @@ az aro create \
   # --pull-secret @pull-secret.txt # [OPTIONAL]
      #+end_src
 
-  5) After sucessful cluster creating add DNS entry for the API and Ingress
+  5) After successful cluster creating add DNS entry for the API and Ingress
 
      Query the Azure API for the API server IP and the ingress IP addresses:
 
@@ -138,7 +138,7 @@ api     aro-rg           3600   A       False
 *.apps  aro-rg           3600   A       False
      #+end_src
 
-  5) List cluster credentials after successfull setup
+  5) List cluster credentials after successful setup
 
     #+begin_src sh
 az aro list-credentials \
@@ -164,13 +164,13 @@ az aro show \
 dig @192.168.129.7 console-openshift-console.apps.xm7rdz4r.westeurope.aroapp.io
   #+end_src
 
-  curl to internal api (works)
+  use _curl_ to access the internal API and see if it works:
 
   #+begin_src
 curl -kv https://192.168.129.4:6443
   #+end_src
 
-* Additonal Resources
+* Additional Resources
   - [[https://blog.notnot.ninja/2020/09/19/azure-site-to-site-vpn/][Build an Azure site-to-site VPN for DevTest]]
   - [[https://docs.microsoft.com/en-us/azure/vpn-gateway/vpn-gateway-howto-site-to-site-resource-manager-cli][Create a virtual network with a Site-to-Site VPN connection using CLI]]
   - [[https://libreswan.org/wiki/FAQ#Why_is_it_recommended_to_disable_rp_filter_in_.2Fproc.2Fsys.2Fnet_.3F][Libreswan: Disable rp_filter for IPsec]]
