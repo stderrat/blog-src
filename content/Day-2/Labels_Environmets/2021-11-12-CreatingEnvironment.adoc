@@ -321,6 +321,7 @@ oc new-project bookinfo
 [source,bash]
 ----
 oc annotate namespace bookinfo environment=worker-dev
+oc annotate namespace bookinfo openshift.io/node-selector: environment=worker-test
 
 oc label namespace bookinfo environment=worker-dev 
 ----
@@ -329,7 +330,7 @@ oc label namespace bookinfo environment=worker-dev
 +
 [source,bash]
 ----
-apply -f https://raw.githubusercontent.com/istio/istio/release-1.11/samples/bookinfo/platform/kube/bookinfo.yaml 
+oc apply -f https://raw.githubusercontent.com/istio/istio/release-1.11/samples/bookinfo/platform/kube/bookinfo.yaml 
 ----
 
 This will start the application on `worker-dev`` nodes only, because the annotation in the namespace was created accordingly.
