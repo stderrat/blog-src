@@ -47,6 +47,8 @@ Create the following objects in OpenShift. This fill create:
 . A 2nd ClusterRoleBinding, which gives our ServiceAccount the permission to start privileged containers. This is required to start a debug pod on a control plane node. 
 . A CronJob which performs the backup ... see Callouts for inline explanations. 
 
+NOTE: I had no time to put this into a Helm chart or similar, but it would be good to do so, to have some variable management in place. 
+
 [source,yaml]
 ----
 kind: Namespace
