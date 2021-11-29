@@ -383,7 +383,7 @@ metadata:
 spec:
   domain: worker-dev.<yourdomain> <1>
   endpointPublishingStrategy:
-    type: NodePortService
+    type: HostNetwork
   httpErrorCodePages:
     name: ''
   namespaceSelector:
@@ -405,7 +405,7 @@ metadata:
 spec:
   domain: worker-test.<yourdomain>
   endpointPublishingStrategy:
-    type: NodePortService
+    type: HostNetwork
   httpErrorCodePages:
     name: ''
   namespaceSelector:
