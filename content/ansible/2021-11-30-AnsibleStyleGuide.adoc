@@ -1,0 +1,1161 @@
+---
+title: "Ansible Style Guide"
+description: "Howto write and debug Ansible playbooks"
+date: "2021-11-30"
+doctype: book
+
+author: Thomas Jungbauer
+type: post
+draft: false
+categories:
+   - Ansible
+tags: ["Ansible", "Controller", "Automation Controller", "Style", "StyleGuide", "Best Practices", "Playbook", "Role"]
+
+aliases: [
+	 "/posts-output/2021-11-30-AnsibleStyleGuide/",
+]
+---
+
+// Asciidoc Parameters
+// toc is set here since I like unnumbered tocs more
+:imagesdir: /ansible/images/
+:icons: font
+:toc:
+
+You should always follow the https://docs.ansible.com/ansible/latest/user_guide/playbooks_best_practices.html[Best Practices^] and https://ansible-lint.readthedocs.io/en/latest/[Ansible Lint^] rules defined by the Ansible documentation when developing playbooks.
+
+Although very basic, the https://docs.ansible.com/ansible/latest/user_guide/playbooks_best_practices.html[Best Practices^] document gives a few guidelines to be able to carry out well-structured playbooks and roles, it contains recommendations that evolve with the project, so it is recommended to review it regularly. It is advisable to review the organization of content in Ansible.
+
+The https://ansible-lint.readthedocs.io/en/latest/[Ansible Lint^] documentation shows us through this tool the syntax rules that will be checked in the testing of roles and playbooks, the rules that will be checked are indicated in this document in their respective section.
+
+<!--more--> 
+
+
+WARNING: This style guide is meant as a base of playbook development. It is not the ultimate truth. Always verify and apply appropriate company rules. There are many additional references available, such as: https://github.com/whitecloud/ansible-styleguide or https://github.com/redhat-cop/automation-good-practices 
+
+== General Recommendations
+
+- Treat your Ansible content like code: Any playbook, role, inventory or collection should be versionized using Git or a similar tool. 
+- Iterate: start with basic playbook and refactor later
+- Use multiple Git repositories: on per role/collection, separate inventory from other repositories
+- Use human-meaningful names in inventory files
+- group hosts in inventory files
+- use a consistent <<Directory Structure>> 
+
+== Optimize Playbook Execution
+
+. Disable facts gathering if it is not required. 
+.. Try not to use: `ansible_facts[‘hostname’]` (or ‘nodename’)
+.. Try to use `inventory_hostname` and `inventory_hostname_short` instead
+.. It is possible to selectively gather facts (`gather_subnet`)
+.. Consider caching facts
+
+. Increase Parallelism
+.. Ansible runs 1st task on every host, then 2nd task on every host …
+.. Use “forks” (default is 5) to control how many connections can be active (load will increase, try first with conservative values)
+.. While testing forks analize <<Enable CPU and Memory Profiling>>
+
+. If you use the module "copy" for large files: do not use “copy” module. Use “synchronize” module instead (based on rsync)
+
+. Use lists when ever a modules support it (i.e. yum) 
+Instead of 
+
+[source,yaml]
+----
+tasks:
+ - name: Ensure the packages are installed
+   yum:
+     name: "{{ item }}"
+     state: present
+   loop:
+     - httpd
+     - mod_ssl
+     - httpd-tools
+     - mariadb-server
+     - mariadb
+     - php
+     - php-mysqlnd
+----
+
+use 
+[source,yaml]
+----
+tasks:
+ - name: Ensure the packages are installed
+   yum:
+     state: present
+     name:
+       - httpd
+       - mod_ssl
+       - httpd-tools
+       - mariadb-server
+       - mariadb
+       - php
+       - php-mysqlnd
+----
+
+[start=5]
+. Optimize SSH Connections
+.. in _ansible.cfg_ set
+... ControlMaster
+... ControlPersist
+... PreferredAuthentications
+
+. Enabling *Pipelining*
+.. Not enabled by default
+.. reduces number of SSH operations
+.. requires to disable *requiertty* in sudo options
+
+---
+
+== Name Tasks and Plays
+
+Every task or play should be explicitly named in a way that the purpose is easily understood and can be referred to if the playbook has to be restarted from a certain task.
+
+For example the following is hard to read and debug: 
+
+[source,bash]
+----
+PLAY [localhost] 
+********************************
+
+TASK [include_vars] 
+********************************
+ok: [localhost]
+
+TASK [yum] 
+********************************
+ok: [localhost]
+----
+
+While with naming it is easier to follow what is happening: 
+
+[source,bash]
+----
+PLAY [Create a new virtual machine] 
+********************************
+
+TASK [Include vmware-credentials] 
+********************************
+ok: [localhost]
+
+TASK [Install required packages with yum] 
+********************************
+ok: [localhost]
+----
+
+[source,yaml]
+----
+# bad
+# set another variable
+- set_fact:
+    my_second_var: "{{ my_var }}"
+----
+
+[source,yaml]
+----
+# good
+- name: set another variable
+  set_fact:
+    my_second_var: "{{ my_var }}"
+----
+
+[.big]*Reason* +
+Better understanding what is currently happening in a play and better possibility to debug. 
+
+---
+
+== Variables in Task Names 
+
+Include as much information as necessary to explain the purpose of a task. Make usage of variables inside a task name to create dynamic output messages.
+
+[source,yaml]
+----
+#bad
+- name: 'Change status'
+  service:
+    enabled: true
+    name: 'httpd'
+    state: '{{ state }}'
+  become: true
+----
+
+[source,yaml]
+----
+#bad
+- name: 'Change status of httpd to {{ state }}'
+  service:
+    enabled: true
+    name: 'httpd'
+    state: '{{ state }}'
+  become: true
+----
+
+[.big]*Reason* + 
+This will help to easily understand log outputs of playbooks. 
+
+--- 
+== Omitting Unnecessary Information 
+
+While name tasks in a playbook, *do not* include the name of the role which is currently executed, since Ansible will do this automatically. 
+
+[.big]*Reason* +
+Avoiding the same output twice on the console will prevent confusions. 
+
+---
+
+== Names
+
+All the newly created Ansible roles should follow the name convention using dashes if necessary:
+`[company]-[action]-[function/technology]`
+
+[source,yaml]
+----
+# bad
+lvm
+----
+
+[source,yaml]
+----
+# good
+mycompany-setup-lvm
+----
+
+[.big]*Reason* +
+If using roles from Ansible Galaxy, it will keep consistency about which roles are created internally.
+
+---
+
+== Use Modules instead of command or shell
+
+Before using the `command` or `shell` module, verify if there is already a module available which can avoid the usage of raw shell command. 
+
+[source,yaml]
+----
+# bad
+- name: install httpd
+  tasks: 
+    - command: "yum install httpd"
+----
+
+[source,yaml]
+----
+# good
+- name: install packages
+  tasks:
+    - name: 'install httpd'
+      yum: 
+        name: 'httpd'
+        state: 'present'
+----
+
+[.big]*Reason* +
+While raw command could be seen as a security risk in general, another reason to avoid them is the loss of immutability of the ansible playbooks or roles. Ansible cannot verify if a command has been already executed before or not and will therefore execute it every time the playbook is running.
+
+---
+
+== Documenting a Task/Play
+
+Every playbook, role or task should start with a documentation _why_ this code has been written and what it does and should include an example usage if applicable. The comment should be followed by `---`` with no blank lines around it, to indicate the actual start of the yaml definition
+
+[source,yaml]
+----
+#bad
+- name: 'Change httpd status'
+  service:
+    enabled: true
+    name: 'httpd'
+    state: '{{ state }}'
+  become: true
+----
+
+[source,yaml]
+----
+#good
+# Example usage: ansible-playbook -e state=started playbook.yml
+# This playbook changes the state of the httpd daemon
+
+---
+
+- name: 'Change httpd status'
+  service:
+    enabled: true
+    name: 'httpd'
+    state: '{{ state }}'
+  become: true
+----
+
+[.big]*Reason* +
+This common programmatic practice helps to quickly understand the purpose and usage of a playbook or role. 
+
+[.big]*Lint rule* +
+Yamllint https://yamllint.readthedocs.io/en/stable/rules.html#module-yamllint.rules.document_start[document-start rule^]
+
+
+---
+
+== End a File
+
+Files should be ended with a newline. 
+
+[.big]*Reason* +
+This is common Unix best practice which avoids any prompt misalignment when printing files in a terminal.
+
+[.big]*Lint rule* +
+Yamllint https://yamllint.readthedocs.io/en/stable/rules.html#module-yamllint.rules.new_line_at_end_of_file[new-line-at-end-of-file rule^]
+
+---
+
+== Quotes
+
+Strings should be quoted, while quotes for booleans (e.g. true/false) or integers (i.g. 42) should be avoided. 
+
+Do *NOT* quote:
+
+- hosts: targets (e.g. hosts: databases rather than hosts: ‘databases’)
+- include_tasks: and include_roles: target file names
+- task and role names
+- registered variables
+- number values
+- boolean values
+
+NOTE: It is possible to use single or double quotes. In this document single quotes are used, as it seems to be more common. Double quotes are often seen in European countries, especially German speaking countries. The most important thing is to stick to one style.
+
+[source,yaml]
+----
+# bad
+- name: 'start robot named my-robot'
+  service:
+    name: my-robot
+    state: started
+    enabled: true
+  become: true
+----
+
+[source,yaml]
+----
+# good
+- name: 'start robot named my-robot'
+  service:
+    name: 'my-robot'
+    state: 'started'
+    enabled: true
+  become: true
+
+# double quotes w/ nested single quotes
+- name: 'start all robots'
+  service:
+    name: '{{ item["robot_name"] }}'
+    state: 'started'
+    enabled: true
+  with_items: '{{ robots }}'
+  become: true
+
+# double quotes to escape characters
+- name 'print some text on two lines'
+  debug:
+    msg: "This text is on\ntwo lines"
+
+# folded scalar style
+- name: 'robot infos'
+  debug:
+    msg: >
+      Robot {{ item['robot_name'] }} is {{ item['status'] }} and in {{ item['az'] }}
+      availability zone with a {{ item['curiosity_quotient'] }} curiosity quotient.
+  with_items: robots
+
+# folded scalar when the string has nested quotes already
+- name: 'print some text'
+  debug:
+    msg: >
+      "I haven't the slightest idea," said the Hatter.
+
+# do not quote booleans/numbers
+- name: 'download google homepage'
+  get_url:
+    dest: '/tmp'
+    timeout: 60
+    url: 'https://google.com'
+    validate_certs: true
+
+# variables example 1
+- name: 'set a variable'
+  set_fact:
+    my_var: 'test'
+
+# variables example 2
+- name: 'print my_var'
+  debug:
+    var: my_var
+  when: ansible_os_family == 'Darwin'
+
+# variables example 3
+- name: 'set another variable'
+  set_fact:
+    my_second_var: '{{ my_var }}'
+----
+
+[.big]*Lint rule* +
+Yamllint https://yamllint.readthedocs.io/en/stable/rules.html#module-yamllint.rules.quoted_strings[quoted-strings rule^]
+
+---
+
+== Sudo
+
+Use the new become syntax when designating that a task needs to be run with sudo privileges
+
+[source,yaml]
+----
+#bad
+- name: 'template client.json to /etc/sensu/conf.d/'
+  template:
+    dest: '/etc/sensu/conf.d/client.json'
+    src: 'client.json.j2'
+  sudo: true
+----
+
+[source,yaml]
+----
+# good
+- name: 'template client.json to /etc/sensu/conf.d/'
+  template:
+    dest: '/etc/sensu/conf.d/client.json'
+    src: 'client.json.j2'
+  become: true
+----
+
+[.big]*Reason* +
+Using sudo was deprecated at https://docs.ansible.com/ansible/latest/user_guide/become.html[Ansible version 1.9.1]
+
+[.big]*Lint rule* +
+Ansible-lint https://docs.ansible.com/ansible-lint/rules/default_rules.html[E103 rule^]
+
+
+---
+
+== Hosts Declarations
+
+Host sections be defined in such a way that it follows this general order:
+
+. host declaration
+. host options in alphabetical order
+. pre_tasks
+. roles
+. tasks
+ 
+[source,yaml]
+----
+# example
+- hosts: 'webservers'
+  remote_user: 'centos'
+  vars:
+    tomcat_state: 'started'
+  pre_tasks:
+    - name: 'set the timezone to America/Boise'
+      lineinfile:
+        dest: '/etc/environment'
+        line: 'TZ=America/Boise'
+        state: 'present'
+      become: true
+  roles:
+    - { role: 'tomcat', tags: 'tomcat' }
+  tasks:
+    - name: 'start the tomcat service'
+      service:
+        name: 'tomcat'
+        state: '{{ tomcat_state }}'
+----
+
+[.big]*Reason* +
+A global definition about the order of these items, will create an easy and consistent human readable code. 
+
+---
+
+== Tasks Declarations
+
+A task should be defined in such a way that it follows this general order:
+
+. task name
+. tags
+. task map declaration (e.g. service:)
+. task parameters in alphabetical order (remember to always use multi-line map syntax)
+. loop operators (e.g. with_items)
+. task options in alphabetical order (e.g. become, ignore_errors, register)
+
+[source,yaml]
+----
+# example
+- name: 'create some ec2 instances'
+  tags: 'ec2'
+  ec2:
+    assign_public_ip: true
+    image: 'ami-c7d092f7'
+    instance_tags:
+      Name: '{{ item }}'
+    key_name: 'my_key'
+  with_items: '{{ instance_names }}'
+  ignore_errors: true
+  register: ec2_output
+  when: ansible_os_family == 'Darwin'
+----
+
+[.big]*Reason* +
+A global definition about the order of these items, will create an easy and consistent human readable code. 
+
+---
+
+== Include Declaration
+
+For include statements, make sure to quote filenames and only use blank lines between include statements if they are multi-line (e.g. they have tags).
+
+[source,yaml]
+----
+# bad
+- include: other_file.yml
+
+- include: 'second_file.yml'
+
+- include: third_file.yml tags=third
+----
+
+[source,yaml]
+----
+# good
+
+- include: 'other_file.yml'
+- include: 'second_file.yml'
+
+- include: 'third_file.yml'
+  tags: 'third'
+----
+
+[.big]*Reason* +
+Using such syntax, will create an easy and consistent human readable code. 
+ 
+---
+
+== Booleans
+
+Use true/false instead of yes/no (or 1/0). 
+
+[source,yaml]
+----
+# bad
+- name: 'start httpd'
+  service:
+    name: 'httpd'
+    state: 'restarted'
+    enabled: 1
+  become: 'yes'
+----
+
+[source,yaml]
+----
+# good
+- name: 'start httpd'
+  service:
+    name: 'httpd'
+    state: 'restarted'
+    enabled: true
+  become: true
+----
+
+[.big]*Reason* +
+Ansible can read boolean values in many different ways, like: True/False, true/false, yes/no, 1/0. It makes sense to stick to one option, which is then equally used in any playbook or role. It is recommended to use true/false since Java and Javascript are using the same values for boolean values. 
+
+[.big]*Lint rule* +
+Yamllint https://yamllint.readthedocs.io/en/stable/rules.html#module-yamllint.rules.truthy[truthy rule^]
+
+Required config: `truthy: {allowed-values: ["true", "false"]}``
+
+---
+
+== Key Value Pairs
+
+Only one space should be used after the colon, when defining key/value pairs. 
+
+[source,yaml]
+----
+# bad
+- name : 'start httpd'
+  service:
+    name    : 'httpd'
+    state   : 'restarted'
+    enabled : true
+  become : true
+----
+
+[source,yaml]
+----
+# good
+- name: 'start httpd'
+  service:
+    name: 'httpd'
+    state: 'restarted'
+    enabled: true
+  become: true
+----
+
+[.big]*Reason* +
+It increases human readability and reduces changeset collisions for version control.
+
+[.big]*Lint rule* +
+Yamllint https://yamllint.readthedocs.io/en/stable/rules.html#module-yamllint.rules.colons[colons rule^]
+
+Required config: `colons: {max-spaces-before: 0, max-spaces-after: 1}`
+
+---
+
+== Using Map Syntax
+
+*Always use the map syntax* for better readability.
+
+[source,yaml]
+----
+# bad
+- name: 'create conf.d directory'
+  file: 'path=/etc/httpd/conf.d/ state=directory mode=0755 owner=httpd group=httpd'
+  become: true
+  
+- name: 'copy mod_ssl.conf to /etc/httpd/conf.d'
+  copy: 'dest=/etc/httpd/conf.d/ src=mod_ssl.conf'
+  become: true
+----
+
+[source,yaml]
+----
+# good
+- name: 'create conf.d directory'
+  file:
+    group: 'httpd'
+    mode: '0755'
+    owner: 'httpd'
+    path: '/etc/httpd/conf.d'
+    state: 'directory'
+  become: true
+  
+- name: 'copy mod_ssl.conf to /etc/httpd/conf.d'
+  copy:
+    dest: '/etc/httpd/conf.d/'
+    src: 'mod_ssl.conf'
+  become: true
+----
+
+[.big]*Reason* +
+It increases human readability and reduces changeset collisions for version control.
+
+---
+
+== Spacing
+
+You should have blank lines between two host blocks, between two task blocks, and between host and include blocks. When indenting, you should use 2 spaces to represent sub-maps, and multi-line maps should start with a `-`. For a more in-depth example of how spacing (and other things) please take a look at the example below
+
+[source,yaml]
+----
+# Example: ansible-playbook --ask-become-pass --ask-vault-pass style.yml
+#
+# This is a sample Ansible script to showcase all of our style decisions.
+# Pay close attention to things like spacing, where we use quotes, etc.
+# The only thing you can ignore is where comments are, except this first comment:
+# It's generally a good idea to include some good information like sample usage
+# at the beginning of your file, so that someone can run head on the script
+# to see what they should do.
+#
+# A good rule of thumb on quoting is to quote anything that represents a value
+# that does not represent either a primitive type, or something within the
+# playbook; e.g. do not quote integers, booleans, variable names, boolean logic
+# Variable names still need to be quoted when they are module parameters for 
+# Ansible to properly resolve them.
+# You should also always have single quotes around the outer string, and 
+# double quotes on the inside.
+# If for some reason this is not possible or it would require escaping quotes 
+# (which you should avoid if you can), use the scalar string operator (shown
+# in this playbook).
+#
+# Directory structure style:
+# Your directory structure should match the structure described by the Ansible
+# developers: http://docs.ansible.com/ansible/playbooks_best_practices.html
+#
+# ---
+# 
+# - include: 'role_name.yml'
+#   become: true # only if every task in the role requires super user
+#
+# The self-named yml file contains all of the actual role tasks.
+#
+# Header comments are followed by blank line, then --- to signify start of YAML,
+# then another blank line, then the script.
+
+---
+
+- hosts: 'localhost'
+  tasks:
+    - name: 'fail if someone tries to run this'
+      fail:
+        msg: 'this playbook was not meant to actually be ran. just inspect the source!'
+
+- include: 'first_include.yml' # quote filenames
+- include: 'second_include.yml' # no blank line needed between includes without tags
+
+- include: 'third_include.yml' # includes with tags should have blank lines between
+  tags: 'third_include'
+
+- include: 'fourth_include.yml'
+  tags: 'fourth_include'
+
+- hosts: 'tag_environment_samplefruit'
+  remote_user: 'centos' # options in alphabetical order
+  vars:
+    sample_str: 'dood' # use snake_case for variable names
+    sample_bool: true # do not quote booleans or integers
+    sample_int: 42
+  vars_files:
+    - 'group_vars/secrets.yml'
+  pre_tasks: # then pre_tasks, roles, tasks
+    - name: 'this runs a command that involves both single and double quotes'
+      command: >
+        echo "I can't even"
+      args:
+        chdir: '/tmp'
+
+    - name: 'this command just involves double quotes'
+      command: 'echo "Hey man"'
+  roles:
+    - { role: 'sample_role', tags: 'sample_role' } # use this format for role listing
+  tasks:
+    - name: 'get list of directory permissions in /tmp'
+      command: 'ls -l /tmp'
+      register: tmp_listing # do not quote variable names when registering
+
+    # A task should be defined in the following order:
+    # name
+    # tags
+    # module
+    # module arguments, alphabetical
+    # loop operator (e.g. with_items, with_fileglob)
+    # other options, alphabetical (e.g. become, ignore_errors, when)
+
+    - name: 'a more complicated task to show where everything goes: touch all items from /tmp'
+      tags: 'debug' # tags go immediately after name
+      file:
+        path: '{{ item }}' # use path for single file actions, dest/src for multi file actions
+        state: 'touch' # arguments go in alphabetical order
+      with_items: tmp_listing.stdout_lines # loop things go immediately after module
+      # the rest of the task options are in alphabetical order
+      become: true # try to keep become only on the tasks that need it. If every task in a host uses become, then move it up to the host options
+      ignore_errors: true
+      when: ansible_os_family == 'Darwin' and tmp_listing.stdout_lines | length > 1
+
+    - name: 'some modules can have maps in their maps (woah man)'
+      ec2:
+        assign_public_ip: true
+        group: ['wca_ssh', 'wca_tomcat'] 
+        image: 'ami-c7d092f7'
+        instance_tags:
+          Name: 'instance'
+          service_tomcat: ''
+        key_name: 'ops'
+
+- hosts: 'tag_environment_secondfruit'
+  tasks:
+    - name: 'this task has multiple tags'
+      tags: ['tagme', 'tagmetoo']
+      set_fact:
+        mr_fact: 'w'
+
+    - name: 'perform an action'
+      action: ec2_facts
+      delegate_to: 'localhost'
+
+# newline at end of file
+----
+
+[.big]*Reason* +
+This produces nice looking code that is easy to read.
+
+[.big]*Lint rule* +
+Yamllint https://yamllint.readthedocs.io/en/stable/rules.html#module-yamllint.rules.empty_lines[empty-lines rule^]
+
+---
+
+== Variable Names
+
+Names of variables should be as expressive as possible. https://en.wikipedia.org/wiki/Snake_case[*snake_case^]* for names will help to make the code human readable. The prefix should contain the name of the role.  
+
+[source,yaml]
+----
+# bad
+- name: 'set some facts'
+  set_fact:
+    myBoolean: true
+    int: 20
+    MY_STRING: 'test'
+----
+
+[source,yaml]
+----
+# good
+- name: 'set some facts'
+  set_fact:
+    rolename_my_boolean: true
+    rolename_my_int: 20
+    rolename_my_string: 'test'
+----
+
+[.big]*Reason* +
+Ansible uses snake_case for module names so it makes sense to extend this convention to variable names. Perfixing the variable with the role name, makes it immediately obvious where it is used. 
+
+---
+
+== Jinja Variables
+
+Use spaces around Jinja variable names to increase readability.
+
+[source,yaml]
+----
+# bad
+- name: set some facts
+  set_fact:
+    my_new_var: "{{my_old_var}}"
+----
+
+[source,yaml]
+----
+# good
+- name: set some facts
+  set_fact:
+    my_new_var: "{{ my_old_var }}"
+----
+
+[.big]*Reason* +
+A proper definition for how to create Jinja variables produces consistent and easily readable code.
+
+[.big]*Lint rule* +
+Ansible-lint https://ansible-lint.readthedocs.io/en/latest/default_rules.html#variables-should-have-spaces-before-and-after-var-name[E206 rule^]
+
+
+---
+
+== Comparing
+
+Do not compare to literal True/False. +
+Use `when: var` rather than `when: var == True` (or conversely `when: not var`). 
+
+Do not compare it to empty strings. +
+Use `when: var` rather than `when: var != ""` (or conversely `when: not var` rather than `when: var == ""`)
+
+[source,yaml]
+----
+# bad
+- name: validate required variables
+  fail:
+    msg: "No value specified for '{{ item }}'"
+  when: (vars[item] is undefined) or (vars[item] is defined and vars[item] | trim == "")
+ 
+  with_items: "{{ appd_required_variables }}"
+
+- name: Create an user and add to the global group
+  include_tasks: user.yml
+  when:
+  - username is defined
+  - username != ""
+----
+
+[source,yaml]
+----
+# good
+- name: Validate required variables
+  fail:
+    msg: "No value specified for '{{ item }}'"
+  when: (vars[item] is undefined) or (vars[item] is defined and not vars[item] | trim == "")
+  with_items: "{{ appd_required_variables }}"
+
+- name: Create an user and add to the global group
+  include_tasks: user.yml
+  when:
+  - username is defined
+  - username
+----
+
+[.big]*Reason* +
+Avoid code complexity using quotes and standardize the way literals and empty strings are used
+
+[.big]*Lint rule* +
+Ansible-lint https://ansible-lint.readthedocs.io/en/latest/default_rules.html#don-t-compare-to-literal-true-false[E601 rule^]
+
+---
+
+== Delegation
+
+Do not use local_action, use delegate_to: localhost
+
+[source,yaml]
+----
+# bad
+- name: Send summary mail
+  local_action:
+    module: mail
+    subject: "Summary Mail"
+    to: "{{ mail_recipient }}"
+    body: "{{ mail_body }}"
+  run_once: true
+----
+
+[source,yaml]
+----
+# good
+- name: Send summary mail
+  mail:
+    subject: "Summary Mail"
+    to: "{{ mail_recipient }}"
+    body: "{{ mail_body }}"
+  delegate_to: localhost
+  run_once: true
+----
+
+[.big]*Reason* +
+Avoid complexity, standardization, flexibility and code readability. The module and its parameters are easy to read and can be delegated even to a third party server.
+
+[.big]*Lint rule* +
+Ansible-lint https://ansible-lint.readthedocs.io/en/latest/default_rules.html#do-not-use-local-action-use-delegate-to-localhost[E504 rule^]
+
+---
+
+== Playbook File Extension
+
+All Ansible Yaml files should have a .yml extension (and NOT .YML, .yaml etc).
+
+[source,yaml]
+----
+# bad
+~/tasks.yaml
+----
+
+[source,yaml]
+----
+# good
+~/tasks.yml
+----
+
+[.big]*Reason* +
+Ansible tooling (like ansible-galaxy init) creates files with a .yml extension. Also, the Ansible documentation website references files with a .yml extension several times. Because of this, it is normal in the Ansible community to use a .yml extension for all Ansible YAML files.
+
+[.big]*Lint rule* +
+Ansible-lint https://ansible-lint.readthedocs.io/en/latest/default_rules.html#use-yml-or-yaml-playbook-extension[E205 rule^]
+
+---
+
+== Template File Extension
+
+All Ansible Template files should have a .j2 extension.
+
+[source,yaml]
+----
+# bad
+~/template.conf
+----
+
+[source,yaml]
+----
+# good
+~/template.conf.j2
+----
+
+[.big]*Reason* +
+Ansible Template files will usually have the .j2 extension, which denotes the Jinja2 templating engine used.
+
+---
+
+== Vaults
+
+All Ansible Vault files should have a .vault extension (and NOT .yml, .YML, .yaml etc).
+
+[source,yaml]
+----
+# bad
+~/secrets.yml
+----
+
+[source,yaml]
+----
+# good
+~/secrets.vault
+----
+
+[.big]*Reason* +
+It is easier to control unencrypted files automatically for the specific .vault extension.
+
+---
+
+
+== Debug and Comments
+
+Do not overuse debug and comments in final code as much as possible. Use task and role names to explain what the task or role does. Use the verbose option under ansible for debugging purposes. If debug is used, assign a verbosity option. This will display the message only on certain debugging levels.
+
+[source,yaml]
+----
+# bad
+- name: print my_var
+  debug:
+    var: my_var
+  when: ansible_os_family == "Darwin"
+----
+
+[source,yaml]
+----
+# good
+- name: print my_var
+  debug:
+    var: my_var
+    verbosity: 2
+  when: ansible_os_family == "Darwin"
+----
+
+[.big]*Reason* +
+It will keep clean code and consistency avoiding extra debug and comments. Extra debug will spend extra time when running the playbook or role.
+
+---
+
+== Use Modules copy or templates instead of linefile or blockfile
+
+Instead of using the modules _linefile_ and _blockfile_, which manage changes inside a file, it should be tried to use the modules `copy` or `template` instead, which will manage the whole file. For better future proof template should be preferred over copy. 
+
+[.big]*Reason* + 
+When using linefile/blockfile only a single line or a part of a file is managed. It is not easy to remember which part exactly is managed and which is not. Using the template module the whole file is managed by Ansible and there is no confusion about different parts of a file. 
+Moreover, regular expressions can be avoided, which are often used using linefile. 
+
+---
+
+== Use Module synchronize Instead of copy for Large Files
+
+Copying large files takes significantly longer than syncing it. The `synchronize` modules which are based on rsync can increase the time moving large files from one node to another (or even on the same node).
+
+== Do not Show Sensitive Data in Ansible Output 
+
+When using the template module and there are passwords or other sensitive data in the file, use the `no_log` option to hide this information.
+
+[.big]*Reason* + 
+For obvious reasons the output of sensitive data on the screen (and logfile) should be prohibited. 
+
+---
+
+== Use Block-Module
+
+Block can help to organize the code and can enable rollbacks. 
+
+[source,yaml]
+----
+- block:
+    copy:
+      src: critical.conf
+      dest: /etc/critical/crit.conf
+    service:
+      name: critical
+      state: restarted
+  rescue:
+   command: shutdown -h now
+----
+
+[.big]*Reason* +
+Using blocks groups critical tasks together and allows better management when a single task of this block fails. 
+
+---
+
+== Enable CPU and Memory Profiling 
+
+Enabling profiling is extremely useful when testing forks or to analyse memory and cpu consumption in general. It will present a summary of used CPU/memory for the whole play and per task. 
+
+To enable it:
+
+. Create a new *control group* - which is required for CPU and memory profiling
++
+[source,bash]
+----
+cgcreate -a root:root -t root:root -g cpuacct,memory,pids:ansible_profile
+----
+
+. Configure _ansible.cfg_
++
+[source,ini]
+----
+callback_whitelist=cgroup_perf_recap
+[callback_cgroup_perf_recap]
+control_group=ansible_profile
+----
+
+. Execute the playbook using _cgexec_
++
+[source,bash]
+----
+cgexec -g cpuacct,memory,pids:ansible_profile ansible-playbook x.yaml
+----
+
+. Analyse the usage
++
+[source,bash]
+----
+Memory Execution Maximum: 11146.29MB
+cpu Execution Maximum: 112.08%
+pids Execution Maximum: 35.00
+
+memory:
+lab : creating network (b42e9945-0dc7-20b1-09d1-00000000000a): 11097.35MB …..
+----
+
+---
+
+== Enable Task and Role Profiling
+
+The following can be enabled as well, to help debugging playbooks and roles: 
+
+[source,ini]
+----
+    [defaults]
+    callback_whitelist = profile_tasks, profile_role, timer
+----
+
+Timer: duration of playbook execution (activated by default)
+profile_tasks/role: displays execution time per tasks/role
+
+This will generate an output like the following: 
+
+image::profiling.png[Profiling]
+
+---
+
+== Directory Structure
+
+A consistent directory structure is important to easily understand all playbooks and roles which are written. Ansible knows many different folder structures, any can be used. However, it is important to stick to one structure. 
+
+The following is an example. Not all folders are usually used and working with collections will change such structure a little bit. 
+
+[source,bash]
+----
+.
+├── ansible.cfg
+├── ansible_modules
+├── group_vars
+│   ├── webservers
+│   └── all
+├── hosts
+│   ├── webserver01
+│   └── webserver02
+├── host_vars
+├── modules
+├── playbooks
+│   └── ansible-cmdb.yml
+└── roles
+    ├── requirements.yml
+    ├── galaxy
+        └── dev-sec.ssh-hardening
+            └── auditd
+        ├── files
+        │   ├── auditd.conf
+        │   ├── audit.yml
+        ├── handlers
+        │   └── main.yml
+        ├── meta
+        │   └── main.yml
+        └── tasks
+            └── main.yml
+----
