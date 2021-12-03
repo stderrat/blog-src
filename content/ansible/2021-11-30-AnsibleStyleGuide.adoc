@@ -182,7 +182,7 @@ Include as much information as necessary to explain the purpose of a task. Make 
 
 [source,yaml]
 ----
-#bad
+#good
 - name: 'Change status of httpd to {{ state }}'
   service:
     enabled: true
