@@ -140,9 +140,6 @@ az network vpn-connection create \
      #+end_src
 
 
-* IPsec basics
-
-  A few basic points in regards to
 * Required iptables (nf tables) hacks for libvirt
 
 ** Skip NAT rules if the destination network is in Azure and the client network deploy via libvirt
