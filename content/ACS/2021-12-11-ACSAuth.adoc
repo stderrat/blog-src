@@ -161,7 +161,7 @@ and log into the Administration Interface.
 
 . Extract the admin password for Keycloak
 +
-The secret name is build from "credential"<keacloak-instance-name>
+The secret name is build from "credential"<keycloak-instance-name>
 +
 [source,bash]
 ----
@@ -186,7 +186,7 @@ NOTE: Of course you can create or use any other Client.
 
 
 . Get the *Issuer URL*  from your realm. This is typically your: +
-https://<KEACLOAK_URL>/auth/realms/<REALM_NAME>
+https://<KEYCLOAK_URL>/auth/realms/<REALM_NAME>
 +
 For Example:
 https://keycloak-single-sign-on.apps.cluster-29t8z.29t8z.sandbox677.opentlc.com/auth/realms/basic
