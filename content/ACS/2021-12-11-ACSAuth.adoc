@@ -23,13 +23,13 @@ aliases: [
 :icons: font
 :toc:
 
-Red Hat Advanced Cluster Security (RHACS) Central is installed with one administrator user by default. Typically, customers request an integration with existing Identity Provider(s) (IDP). RHACS offers different options for such integration. In this article 2 IDPs will be configured as an example. First OpenShift Auth (which is available since RHACS v3.67) and second Red Hat Single Sign On (RHSSO) based on Keycloak
+Red Hat Advanced Cluster Security (RHACS) Central is installed with one administrator user by default. Typically, customers request an integration with existing Identity Provider(s) (IDP). RHACS offers different options for such integration. In this article 2 IDPs will be configured as an example. First OpenShift Auth and second Red Hat Single Sign On (RHSSO) based on Keycloak
 
 <!--more--> 
 
 == Prerequisites
 . OpenShift 4 Cluster
-. Advanced Cluster Security v3.66 (v3.67 if you would like to test OpenShift Auth)
+. Advanced Cluster Security v3.66+
 . Red Hat SSO Operator installed 
  
 WARNING: While RHSSO will be installed during this article, only default and example values are used. These are by no means examples for a production system.
