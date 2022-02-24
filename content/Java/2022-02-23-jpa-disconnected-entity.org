@@ -152,7 +152,32 @@ So looking at the _Speaker_ entity before calling _persist()_ revealed the follo
 
 [[file:/Java/images/speaker_object_debugger.png]]
 
-So after a little bit of internet search magic a detached entity means that
+After playing around with _EntityManager_ and calling _merge()_ on the
+speaker object, the new _Speaker_ returned by calling
+_entitymanager.merge()_ looks like this in the debugger:
+
+[[file:/Java/images/speaker_object_entitymanager_debugger.png]]
+
+Notice that in the first debugger screenshot showing the _Speaker_
+object passed into _create()_ the Id is 0 and all the internal
+Hibernate fields are set to null. So this seem to be an indicator that
+this _Speaker_ object is currently not attached to an _EntityManager_.
+
+On the other side _newSpeaker_ is an Id of 1 and some those special
+Hibernate fields starting with $$ have a value assigned.
+
+And the Id already assigned to the original _Speaker_ object,
+deserialized form the JSON we passed via Swagger is actually the
+reason for the beautiful exception above.
+
+* Explanation
+
+
+
+
+
+So after a little bit of internet search magic a detached entity means
+that
 
 -
 
