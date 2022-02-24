@@ -1,4 +1,4 @@
-#+title: Adventures in Java Land: JPA a disconnected entities
+#+title: Adventures in Java Land: JPA disconnected entities
 #+author: Toni Schmidbauer
 #+lastmod: [2021-03-04 Thu 12:37]
 #+categories[]: Java
@@ -9,15 +9,15 @@
 
 * Prefix
 
-An old man tries to refresh his Java skills and takes [[https://www.redhat.com/en/services/training/red-hat-cloud-native-microservices-development-quarkus-do378][DO378]]. He fails
-spectacularly but learns a lot on the way.
+An old man tries to refresh his Java skills and does [[https://www.redhat.com/en/services/training/red-hat-cloud-native-microservices-development-quarkus-do378][DO378]]. He fails
+spectacularly at the first real example but learns a lot on the way.
 
 * The exception
 
 There is this basic example where you build a minimal REST API for
 storing speaker data in a database. Quarkus makes this quite easy. You
 just have to define your database connection properties in
-_resources/application.properties_ and off you go developing your Java
+~resources/application.properties~ and off you go developing your Java
 Quarkus REST service:
 
 #+begin_src ini
@@ -53,19 +53,23 @@ public class Speaker extends PanacheEntity {
 }
 #+end_src
 
-We define an Entity _Speaker_ which extends the [[https://github.com/quarkusio/quarkus/blob/main/extensions/panache/hibernate-orm-panache/runtime/src/main/java/io/quarkus/hibernate/orm/panache/PanacheEntity.java][_PanacheEntity_]]
-class. [[https://quarkus.io/guides/hibernate-orm-panache][Panache]] is a thin wrapper around [[https://hibernate.org/][Hibernate]] providing a few
-convince feature. For example the base class _PanacheEntity_ defines a
-autoincrement _Id_ column for us. This inherited _Id_ column of
+We define an entity ~Speaker~ which extends the [[https://github.com/quarkusio/quarkus/blob/main/extensions/panache/hibernate-orm-panache/runtime/src/main/java/io/quarkus/hibernate/orm/panache/PanacheEntity.java][~PanacheEntity~]]
+class. [[https://quarkus.io/guides/hibernate-orm-panache][Panache]] is a thin wrapper around [[https://hibernate.org/][Hibernate]] providing convince
+features. For example the base class ~PanacheEntity~ defines a
+autoincrement ~Id~ column for us. This inherited ~Id~_ column is of
 importance for understanding the problem ahead of us.
 
-So next you define your _SpeakerService_ class which uses the
+So next you define your ~SpeakerService~ class which uses the
 entity. Once again I will skip the imports and any code not relevant
 for understanding the problem:
 
 #+begin_src java
+// imports omitted
+
 @ApplicationScoped
 public class SpeakerService {
+
+    // other code omitted
 
     public Speaker create(Speaker speaker) {
         speaker.persist();
@@ -74,11 +78,11 @@ public class SpeakerService {
 
 #+end_src
 
-We focus on the _create_ method here becuase the call to
-_speaker.persist()_ was the reason for all the headache.
+We focus on the ~create~ method here because the call to
+~speaker.persist()~ was the reason for all the headache.
 
 But we are still in coding mode and last but not least we define our
-_SpeakerResource_ class, again everything not relevant for
+~SpeakerResource~ class, again everything not relevant for
 understanding the problem was removed:
 
 #+begin_src java
@@ -90,6 +94,8 @@ public class SpeakerResource {
     @Inject
     SpeakerService service;
 
+    // other code omitted
+
     @POST
     @Transactional
     public Speaker create(Speaker newSpeaker) {
@@ -99,22 +105,22 @@ public class SpeakerResource {
 }
 #+end_src
 
-Root path for our _SpeakerResource_ is _/speaker_. We inject the
-_SpeakerService_ and define a method for creating a _Speaker_. We
-would like to be able to send _@Post_ requests to this endpoint, [[https://javaee.github.io/jsonb-spec/][Jsonb]]
+Root path for our ~SpeakerResource~ is _/speaker_. We inject the
+~SpeakerService~ and define a method ~create()~ for creating a ~Speaker~. We
+would like to be able to send ~@Post~ requests to this endpoint, [[https://javaee.github.io/jsonb-spec/][Jsonb]]
 or[[https://github.com/FasterXML/jackson][ Jackson]] whatever we currently prever, will deserialize the Json
-body in a _Speaker_ for us.
+body in a ~Speaker~ for us.
 
-Spendid, time to switch from coding mode to testing.
+Splendid, time to switch from coding mode to testing.
 
-We launch that Quarkus application in devloper mode
+We launch that Quarkus application in developer mode
 
 #+begin_src sh
 mvn quarkus:dev
 #+end_src
 
 Quarkus is so friendly and provides a swagger-ui in dev mode for testing
-our endpoint. Super, duper lets call the _create_ endpoint via Swagger:
+our endpoint. Super, duper lets call the ~create()~ endpoint via Swagger:
 
 [[file:/Java/images/swagger_post_500.png]]
 
@@ -128,104 +134,102 @@ What? Detached entity what does this mean and why?
 
 * Enlightenment
 
-Behind the scences Panache / Hibernate uses a so called EntityManager
+Behind the scenes Panache / Hibernate uses a so called EntityManager
 for managing entities. An Entity basically has the following states:
 
-- NEW: The entity object was just created and is not persistet to the database
-- MANAGED: After call to _entitymanager.persist()_ or in our case
-  _newSpeaker.persist()_ the entity is stored in the database and in
-  the _managed_ state.
+- NEW: The entity object was just created and is not persisted to the database
+- MANAGED: After call to ~entitymanager.persist()~ or in our case
+  ~newSpeaker.persist()~ the entity is stored in the database and in
+  the ~managed~ state.
 - REMOVED: The entity is removed from the database. And finally
-- DETACHED: The Entity was detached from the EntityManager, e.g. by calling _entitymanager.detach()_ or _entitymanager.close()_.
+- DETACHED: The Entity was detached from the EntityManager, e.g. by calling ~entitymanager.detach()~ or ~entitymanager.close()~.
 
-Ok, cool but why the hell is our _Speaker_ entity in the detached
+Ok, cool but why the hell is our ~Speaker~ entity in the _DETACHED_
 state? It was just created and never saved to the database before!
 
 After checking the database (was empty), playing around with injecting
 the EntityManager into the service and explicitly calling
-_entitymanger.merge()_ which returns a new entity in the managed state
+~entitymanger.merge()~ which returns a new entity in the managed state
 (worked, but why is this not used in the example?), I finally started
 my Java debugger of choice (IntellJ, but use whatever fit's your
 needs. I'm to old for IDE vs Editor and Editor vs Editor wars).
 
-So looking at the _Speaker_ entity before calling _persist()_ revealed the following:
+So looking at the ~Speaker~ entity before calling ~persist()~ revealed the following:
 
 [[file:/Java/images/speaker_object_debugger.png]]
 
-After playing around with _EntityManager_ and calling _merge()_ on the
-speaker object, the new _Speaker_ returned by calling
-_entitymanager.merge()_ looks like this in the debugger:
+The ~Speaker~ object passed into ~create()~ has an _Id_ of 0 and all
+the internal Hibernate fields are set to null. So this seems to
+indicate that this ~Speaker~ object is currently not attached to an
+~EntityManager~. This might explain the *DETACHED* state.
+
+I started playing around with ~EntityManager~ and calling ~merge()~ on the
+speaker object. The code looked like this:
+
+#+begin_src java
+@ApplicationScoped
+public class SpeakerService {
+
+    @Inject
+    EntityManager em;
+
+    // lots of code skipped
+
+    public Speaker create(Speaker speaker) {
+        var newSpeaker = em.merge(speaker);
+        newSpeaker.persist();
+        return speaker;
+    }
+#+end_src
+
+Looking at the ~newSpeaker~ object returned by calling ~entitymanager.merge()~
+in the debugger revealed the following:
 
 [[file:/Java/images/speaker_object_entitymanager_debugger.png]]
 
-Notice that in the first debugger screenshot showing the _Speaker_
-object passed into _create()_ the Id is 0 and all the internal
-Hibernate fields are set to null. So this seem to be an indicator that
-this _Speaker_ object is currently not attached to an _EntityManager_.
+~newSpeaker~ has an Id of 1 and some those special Hibernate fields
+starting with $$ have a value assigned. So for me this indicates that
+the object is now managed by an ~EntityManager~ and in the *MANAGED*
+state.
 
-On the other side _newSpeaker_ is an Id of 1 and some those special
-Hibernate fields starting with $$ have a value assigned.
-
-And the Id already assigned to the original _Speaker_ object,
-deserialized form the JSON we passed via Swagger is actually the
-reason for the beautiful exception above.
+And the ~Id~, already assigned to the original ~Speaker~ object,
+de-serialized form JSON is actually the reason for the beautiful
+exception above.
 
 * Explanation
 
-
-
-
-
-So after a little bit of internet search magic a detached entity means
-that
-
--
-
-{{% notice note %}}
-this is a notice
-{{% /notice %}}
-
-NOTE: test
-
-: this is a text
-
-
-#+begin_src java
-bla
-#+end_src
-
-| :note: bla |
-|------------|
-
-#+begin_src java :results output
-  public class Main { <1>
-      public static void main(String[] args) {
-          System.out.print("hello, world");
-      }
-  }
-#+end_src
-<1> test
-
-#+begin_src emacs-lisp
-(message "Hello world")
-#+end_src
-
-{{% notice warning %}}
-Warning
-{{% /notice %}}
-
-{{% notice note %}}
-Note
-{{% /notice %}}
-
-{{% notice caution %}}
-Caution
-{{% /notice %}}
-
-{{% notice tip %}}
-Tip
-{{% /notice %}}
+So after a little bit of internet search magic I found an explanation for the exception:
 
 {{% notice important %}}
-Important
+
+If an ~Id~ is already assigned to an entity object, Hibernate assumes
+that this is an entity in the *DETACHED* state (if the _Id_ is
+auto-generated). For an entity to be persisted in the Database it has
+to be transferred in the *MANAGED* state by calling
+~entitymanager.merge()~
+
+For more information see the [[https://docs.jboss.org/hibernate/orm/current/userguide/html_single/Hibernate_User_Guide.html#pc][Hibernate documentation]].
+
 {{% /notice %}}
+
+We can only call ~persist()~ if the object is in the transient state,
+to quote the [[https://docs.jboss.org/hibernate/orm/current/userguide/html_single/Hibernate_User_Guide.html#pc][Hibernate documentation]]:
+
+_transient_: the entity has just been instantiated and is not associated
+with a persistence context. It has no persistent representation in the
+database and *typically no identifier value has been assigned (unless
+the assigned generator was used)*.
+
+_detached_: *the entity has an associated identifier* but is no longer
+associated with a persistence context (usually because the persistence
+context was closed or the instance was evicted from the context)
+
+Just removing the ~Id~ from the POST request will solve the issue and
+the example started to work.
+
+So maybe this is basic stuff, but it took me quite a few hours to
+understand what was going on.
+
+Maybe this is also a bad example. Should one expose the ~Id~ if it is
+auto generated and only used internally? Or the code just needs to
+handle that case... But this needs me more learning about API design.
