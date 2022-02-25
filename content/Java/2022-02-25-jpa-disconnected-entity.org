@@ -7,8 +7,6 @@
 #+date: 2022-02-25
 #+list[]: value_1 value_2 value_3
 
-* Prefix
-
 An old man tries to refresh his Java skills and does [[https://www.redhat.com/en/services/training/red-hat-cloud-native-microservices-development-quarkus-do378][DO378]]. He fails
 spectacularly at the first real example but learns a lot on the way.
 
