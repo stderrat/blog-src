@@ -2,7 +2,7 @@
 #+author: Toni Schmidbauer
 #+lastmod: [2021-03-04 Thu 12:37]
 #+categories[]: Java
-#+draft: true
+#+draft: false
 #+variable: value
 #+date: 2021-08-27
 #+list[]: value_1 value_2 value_3
@@ -56,7 +56,7 @@ public class Speaker extends PanacheEntity {
 We define an entity ~Speaker~ which extends the [[https://github.com/quarkusio/quarkus/blob/main/extensions/panache/hibernate-orm-panache/runtime/src/main/java/io/quarkus/hibernate/orm/panache/PanacheEntity.java][~PanacheEntity~]]
 class. [[https://quarkus.io/guides/hibernate-orm-panache][Panache]] is a thin wrapper around [[https://hibernate.org/][Hibernate]] providing convince
 features. For example the base class ~PanacheEntity~ defines a
-autoincrement ~Id~ column for us. This inherited ~Id~_ column is of
+autoincrement ~Id~ column for us. This inherited ~Id~ column is of
 importance for understanding the problem ahead of us.
 
 So next you define your ~SpeakerService~ class which uses the
@@ -86,6 +86,8 @@ But we are still in coding mode and last but not least we define our
 understanding the problem was removed:
 
 #+begin_src java
+// import statements omitted
+
 @Path("/speaker")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
@@ -105,11 +107,11 @@ public class SpeakerResource {
 }
 #+end_src
 
-Root path for our ~SpeakerResource~ is _/speaker_. We inject the
+The root path for our ~SpeakerResource~ is _/speaker_. We inject the
 ~SpeakerService~ and define a method ~create()~ for creating a ~Speaker~. We
-would like to be able to send ~@Post~ requests to this endpoint, [[https://javaee.github.io/jsonb-spec/][Jsonb]]
-or[[https://github.com/FasterXML/jackson][ Jackson]] whatever we currently prever, will deserialize the Json
-body in a ~Speaker~ for us.
+would like to be able to send ~@Post~ requests to this endpoint and [[https://javaee.github.io/jsonb-spec/][Jsonb]]
+or[[https://github.com/FasterXML/jackson][ Jackson,]] whichever we currently prefer, will deserialize the JSON
+body in a ~Speaker~ object for us.
 
 Splendid, time to switch from coding mode to testing.
 
@@ -120,9 +122,12 @@ mvn quarkus:dev
 #+end_src
 
 Quarkus is so friendly and provides a swagger-ui in dev mode for testing
-our endpoint. Super, duper lets call the ~create()~ endpoint via Swagger:
+our endpoint. Super duper lets call the ~create()~ endpoint via Swagger:
 
 [[file:/Java/images/swagger_post_500.png]]
+
+Because we are lazy we accept the default Swagger provides for us and
+just click _Execute_.
 
 BOOM, 500 internal server error. And a beautiful Java exception:
 
@@ -134,25 +139,28 @@ What? Detached entity what does this mean and why?
 
 * Enlightenment
 
-Behind the scenes Panache / Hibernate uses a so called EntityManager
-for managing entities. An Entity basically has the following states:
+Behind the scenes [[https://hibernate.org][Hibernate]] uses a so called EntityManager for
+managing entities. An Entity can be in the following states when
+managed by Hibernate:
 
 - NEW: The entity object was just created and is not persisted to the database
-- MANAGED: After call to ~entitymanager.persist()~ or in our case
-  ~newSpeaker.persist()~ the entity is stored in the database and in
-  the ~managed~ state.
+- MANAGED: The entity is managed by a running Session and all changes
+  to the entity will be propagated to the database. After call to
+  ~entitymanager.persist()~ or in our case ~newSpeaker.persist()~ the
+  entity is stored in the database and in the ~managed~ state.
 - REMOVED: The entity is removed from the database. And finally
-- DETACHED: The Entity was detached from the EntityManager, e.g. by calling ~entitymanager.detach()~ or ~entitymanager.close()~.
+- DETACHED: The Entity was detached from the EntityManager, e.g. by
+  calling ~entitymanager.detach()~ or ~entitymanager.close()~.
+
+See [[https://www.baeldung.com/hibernate-entity-lifecycle][this]] blog for a way better explanation what is going on with
+entity states.
 
 Ok, cool but why the hell is our ~Speaker~ entity in the _DETACHED_
 state? It was just created and never saved to the database before!
 
-After checking the database (was empty), playing around with injecting
-the EntityManager into the service and explicitly calling
-~entitymanger.merge()~ which returns a new entity in the managed state
-(worked, but why is this not used in the example?), I finally started
-my Java debugger of choice (IntellJ, but use whatever fit's your
-needs. I'm to old for IDE vs Editor and Editor vs Editor wars).
+After checking the database (was empty), I started my Java debugger of
+choice (IntellJ, but use whatever fit's your needs. I'm to old for IDE
+vs Editor and Editor vs Editor wars).
 
 So looking at the ~Speaker~ entity before calling ~persist()~ revealed the following:
 
@@ -161,7 +169,7 @@ So looking at the ~Speaker~ entity before calling ~persist()~ revealed the follo
 The ~Speaker~ object passed into ~create()~ has an _Id_ of 0 and all
 the internal Hibernate fields are set to null. So this seems to
 indicate that this ~Speaker~ object is currently not attached to an
-~EntityManager~. This might explain the *DETACHED* state.
+~EntityManager~ session. This might explain the *DETACHED* state.
 
 I started playing around with ~EntityManager~ and calling ~merge()~ on the
 speaker object. The code looked like this:
@@ -187,10 +195,10 @@ in the debugger revealed the following:
 
 [[file:/Java/images/speaker_object_entitymanager_debugger.png]]
 
-~newSpeaker~ has an Id of 1 and some those special Hibernate fields
-starting with $$ have a value assigned. So for me this indicates that
-the object is now managed by an ~EntityManager~ and in the *MANAGED*
-state.
+~newSpeaker~ has an Id of 1 (hm, why no 0?) and some those special
+Hibernate fields starting with $$ have a value assigned. So for me
+this indicates that the object is now managed by an ~EntityManager~
+session and in the *MANAGED* state.
 
 And the ~Id~, already assigned to the original ~Speaker~ object,
 de-serialized form JSON is actually the reason for the beautiful
@@ -198,13 +206,14 @@ exception above.
 
 * Explanation
 
-So after a little bit of internet search magic I found an explanation for the exception:
+So after a little bit of internet search magic I found an explanation
+for the exception:
 
 {{% notice important %}}
 
 If an ~Id~ is already assigned to an entity object, Hibernate assumes
 that this is an entity in the *DETACHED* state (if the _Id_ is
-auto-generated). For an entity to be persisted in the Database it has
+auto-generated). For an entity to be persisted to the database it has
 to be transferred in the *MANAGED* state by calling
 ~entitymanager.merge()~
 
@@ -220,12 +229,22 @@ with a persistence context. It has no persistent representation in the
 database and *typically no identifier value has been assigned (unless
 the assigned generator was used)*.
 
+And reading on we also get explanation for the detached state:
+
 _detached_: *the entity has an associated identifier* but is no longer
 associated with a persistence context (usually because the persistence
 context was closed or the instance was evicted from the context)
 
 Just removing the ~Id~ from the POST request will solve the issue and
 the example started to work.
+
+This is also why the ~Id~ column is different in the ~Speaker~ object
+(deserialized from JSON) and ~newSpeaker~ object (create by calling
+~entitymanager.merge()~). The ~Speaker~ _Id_ got passed in from JSON,
+and has nothing to do with the auto generated primary key _Id_ within
+our database. After calling ~entitymanager.merge()~ the entity is
+actually associated with a database session and the _Id_ is
+auto generated.
 
 So maybe this is basic stuff, but it took me quite a few hours to
 understand what was going on.
