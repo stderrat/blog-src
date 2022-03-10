@@ -58,6 +58,7 @@ metadata:
   annotations:
     openshift.io/description: Openshift Backup Automation Tool
     openshift.io/display-name: Backup ETCD Automation
+    openshift.io/node-selector: ''
 spec: {}
 --- 
 kind: PersistentVolumeClaim
