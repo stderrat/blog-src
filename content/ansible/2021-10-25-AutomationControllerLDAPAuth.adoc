@@ -1,6 +1,6 @@
 ---
-title: "Automation Controller ad LDAP Authentication"
-description: "Enable LDAP authentication and create an example LDAP server"
+title: "Automation Controller and LDAP Authentication"
+description: "Enable LDAP authentication and create and example LDAP server"
 date: "2021-10-25"
 doctype: book
 
