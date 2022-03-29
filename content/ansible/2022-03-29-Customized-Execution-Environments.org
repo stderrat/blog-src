@@ -1,0 +1,15 @@
+#+title: Creating customized execution environments
+#+author: Toni Schmidbauer
+#+lastmod: [2022-03-29 Tue 08:47]
+#+categories[]: Ansible
+#+draft: true
+#+variable: value
+#+date: 2022-03-29
+#+list[]: value_1 value_2 value_3
+
+There's plenty of documentation on the interweb on how to build a
+customized Ansible Execution Environment. But what if you want to
+customize the build process and the execution environment. This is the
+workflow we've used to implemented everything based on GitLab CI.
+
+* Basics
