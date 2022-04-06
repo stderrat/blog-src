@@ -7,9 +7,27 @@
 #+date: 2022-03-29
 #+list[]: value_1 value_2 value_3
 
-There's plenty of documentation on the interweb on how to build a
-customized Ansible Execution Environment. But what if you want to
-customize the build process and the execution environment. This is the
-workflow we've used to implemented everything based on GitLab CI.
+There's plenty of documentation on the interweb (#TODO# add links) on
+how to build a customized Ansible Execution Environment. But what if
+you want to customize the build process and the execution
+environment. This is the workflow we've used to implemented everything
+based on GitLab CI.
+
+* Use Case
+
+Building customized execution environments is easy with
+_ansible-builder_. But what if you need to customize the builder image
+itself, for example you need to access content that requires TLS
+encryption with custom certificates.
+
+Or if you are in an air-gapped environment and need to only use
+internal images, pull just once into a on-site registry?
 
 * Basics
+
+The following images are required:
+
+- A customized _ansible-builder_ image used to create a new execution
+  environment.
+- A base image for all our customized execution environments
+- The final execution environment based on the base image mentioned
