@@ -2,7 +2,7 @@
 #+author: Toni Schmidbauer
 #+lastmod: [2022-04-22 Fr 09:00]
 #+categories[]: OpenShift
-#+draft: true
+#+draft: false
 #+variable: value
 #+date: 2022-04-22
 #+list[]: value_1 value_2 value_3
@@ -26,7 +26,7 @@ S3 buckets. Currently the following sources, or backing stores are supported:
 - AWS S3
 - Azure Blob
 - Google Cloud Storage
-- Any other S3 compatible storage
+- Any other S3 compatible storage, for example
   - Ceph
   - Minio
 
@@ -53,7 +53,7 @@ namespace buckets. For example these type of buckets allow you to
 write directly to AWS S3 and retrieve Objects via Noobaa. Or it could
 be used to migrate buckets from one cloud provider to another.
 
-Noobaa also as support for triggering JavaScript based function when
+Noobaa also has support for triggering JavaScript based function when
 
 - creating new objects
 - reading existing objects
@@ -147,7 +147,7 @@ we are able to confirm that our stores were created successfully.
 After creating the backend stores we are able to create Buckets and define the
 layout of backends.
 
-There are two ways on how to create buckets, either directly via the Noobaa UI,
+There are two ways how to create buckets, either directly via the Noobaa UI,
 or using Kubernetes (K8s) objects.
 
 We will focus on using K8s objects in this post.
@@ -156,15 +156,16 @@ We will focus on using K8s objects in this post.
 
 The Noobaa operator provides the following Custom Resource Definitions:
 
-- BackingStore: we already created BackingStores in the Resources
+- ~BackingStore~: we already created ~BackingStores~ in the Resources
   section
-- BucketClass: a bucket class defines the layout of our bucket
+- ~BucketClass~: a bucket class defines the layout of our bucket
   (single, mirrored or tiered)
-- StorageClass: a standard K8s StorageClass referencing the BucketClass
-- ObjectBucketClaim: A OBC or ObjectBucketClaim creates the bucket for
-  us in Noobaa. Additionally the Noobaa operator creates a ConfigMap
-  and a Secret with the same name as the Bucket, storing access details (ConfigMap) and
-  credentials (Secret) for accessing the bucket.
+- ~StorageClass~: a standard K8s ~StorageClass~ referencing the ~BucketClass~
+- ~ObjectBucketClaim~: A OBC or ~ObjectBucketClaim~ creates the bucket
+  for us in Noobaa. Additionally the Noobaa operator creates a
+  ~ConfigMap~ and a ~Secret~ with the same name as the Bucket, storing
+  access details (~ConfigMap~) and credentials (~Secret~) for accessing
+  the bucket.
 
 ** BucketClass
 
@@ -188,8 +189,19 @@ spec:
       placement: Mirror
 #+end_src
 
+So we are defining a ~BucketClass~ _aws-mirrored-bucket-class_ that
+has the following placement policy:
+
+- A single tier with one backing store
+- The backing store uses two AWS buckets
+  - aws-eu-north
+  - aws-eu-west
+- The placement policy is mirror, so all objects uploaded to buckets
+  using this ~BucketClass~ will be mirrored between _aws-eu-north_ and
+  _aws-eu-west_.
+
 A ~BucketClass~ could have multiple tiers, moving cold data
-tranparently to a lower tier, but let's keep this simple.
+transparently to a lower tier, but let's keep this simple.
 
 ** StorageClass
 
@@ -208,21 +220,27 @@ parameters:
 provisioner: openshift-storage.noobaa.io/obc
 reclaimPolicy: Delete
 volumeBindingMode: Immediate
-
 #+end_src
+
+This ~StorageClass~ uses our ~BucketClass~ _aws-mirrored-bucket-class_
+as a backend. All buckets created leveraging this ~StorageClass~ will
+mirror data between _aws-eu-north_ and _aws-eu-west_ (see the previous
+chapter).
 
 ** ObjectBucketClaim
 
 Finally we are able to create ~ObjectBucketClaims~ for projects
-requiring object storage.
+requiring object storage. An ~ObjectBucketClaim~ is similar to an
+~PersistentVolumeClaim~. Every time a claim is created the Noobaa
+operator will create a corresponding S3 bucket for us.
 
-Let's start testing by creating a new OpenShift project
+Let's start testing this out by creating a new OpenShift project
 
 #+begin_src sh
 oc new-project obc-test
 #+end_src
 
-Now we define a ~ObjectBucketClaim~ to create a new bucket for our appliation:
+Now we define a ~ObjectBucketClaim~ to create a new bucket for our application:
 
 #+begin_src yaml
 apiVersion: objectbucket.io/v1alpha1
@@ -235,6 +253,12 @@ spec:
   generateBucketName: aws-mirrored
   storageClassName: aws-mirrored-openshift-storage.noobaa.io
 #+end_src
+
+We use the ~StorageClass~ created in the previous step. This will create
+
+- a S3 Bucket in the requested ~StorageClass~
+- a ~ConfigMap~ storing access information
+- a ~Secret~ storing credentials for accessing the S3 Bucket
 
 For testing we will upload some data via [[https://s3tools.org/s3cmd][_s3cmd_]] and use a pod to monitor
 data within the bucket.
@@ -254,9 +278,8 @@ host_bucket = %(bucket).s3-openshift-storage.apps.ocp.aws.tntinfra.net
 Of course you must change _host-base_ according to your cluster
 name. It's a route in the _openshift-storage_ namespace:
 
-
 #+begin_src sh
-oc get route -n openshift-storage
+oc get route -n openshift-storage s3 -o jsonpath='{.spec.host}'
 #+end_src
 
 You can extract the access and secret key from the
@@ -266,7 +289,9 @@ K8s secret via:
 oc extract secret/aws-mirrored-claim --to=-
 #+end_src
 
-We've called it _noobaa-s3.cfg_, so we can list all available buckets via:
+Copy the access key and the secret key to the s3 command config file
+(we've called our config _noobaa-s3.cfg_). Now we can list all
+available buckets via:
 
 #+begin_src sh
 $ s3cmd ls -c noobaa-s3.cfg
@@ -280,6 +305,17 @@ $ s3cmd -c noobaa-s3.cfg put simple-aws-mirrored-obc.yaml s3://aws-mirrored-c108
 upload: 'simple-aws-mirrored-obc.yaml' -> 's3://aws-mirrored-c1087a17-5c84-4c62-9f36-29081a6cf5a4/simple-aws-mirrored-obc.yaml'  [1 of 1]
  226 of 226   100% in    0s   638.18 B/s  done
 #+end_src
+
+We can also list available files via
+
+#+begin_src sh
+s3cmd -c noobaa-s3.cfg ls s3://aws-mirrored-c1087a17-5c84-4c62-9f36-29081a6cf5a4
+2022-04-22 13:57          226  s3://aws-mirrored-c1087a17-5c84-4c62-9f36-29081a6cf5a4/simple-aws-mirrored-obc.yaml
+#+end_src
+
+Our we could use a ~Pod~ to list available files from within
+OpenShift. Note how we use the ~ConfigMap~ and the ~Secret~ the Noobaa
+operater created for us, when we created the ~ObjectBucketClaim~:
 
 #+begin_src yaml
 apiVersion: batch/v1
@@ -327,10 +363,7 @@ spec:
       restartPolicy: Never
 #+end_src
 
-* Replicating Buckets
+That's all for now. If time allows we are going to write a follow up blog post on
 
-*TBD*
-
-* Functions
-
-*TBD*
+- Replicating Buckets and
+- Functions
