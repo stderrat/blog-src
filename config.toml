@@ -1,7 +1,7 @@
 baseURL = "https://blog.stderr.at/"
 languageCode = "en-us"
 title = "TechBlog about OpenShift/Ansible/Satellite and much more"
-theme = "hugo-theme-learn"
+theme = ["hugo-theme-learn"]
 enableGitInfo = true
 copyright = "Toni Schmidbauer & Thomas Jungbauer"
 enableRobotsTXT = true
@@ -59,3 +59,20 @@ weight = 2
 name = "<i class='fab fa-redhat'></i> Red Hat"
 url = "https://www.redhat.com"
 weight = 30
+
+# new since hugo 0.9x
+staticDir = ['themes/hugo-theme-learn/static', 'static']
+# we need to allow asciidoc
+[security]
+  enableInlineShortcodes = false
+  [security.exec]
+    allow = ['^dart-sass-embedded$', '^go$', '^npx$', '^postcss$', '^asciidoctor$']
+    osEnv = ['(?i)^(PATH|PATHEXT|APPDATA|TMP|TEMP|TERM)$']
+
+  [security.funcs]
+    getenv = ['^HUGO_']
+
+  [security.http]
+    methods = ['(?i)GET|POST']
+    urls = ['.*']
+######
