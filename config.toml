@@ -56,6 +56,11 @@ url = "/categories"
 weight = 2
 
 [[menu.shortcuts]]
+name = "<i class='fas fa-book'></i> Helm Charts"
+url = "https://charts.stderr.at/"
+weight = 3
+
+[[menu.shortcuts]]
 name = "<i class='fab fa-redhat'></i> Red Hat"
 url = "https://www.redhat.com"
 weight = 30
