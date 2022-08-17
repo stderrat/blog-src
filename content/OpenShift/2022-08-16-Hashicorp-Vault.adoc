@@ -3,7 +3,6 @@ title: "Secrets Management - Vault on OpenShift"
 description: "Secrets Management with HashiCorp Vault"
 date: "2022-08-16"
 doctype: book
-draft: true
 
 author: Thomas Jungbauer
 type: post
