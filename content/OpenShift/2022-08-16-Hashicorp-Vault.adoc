@@ -22,7 +22,7 @@ aliases: [
 
 Sensitive information in OpenShift or Kubernetes is stored as a so-called Secret. The management of these Secrets is one of the most important questions, 
 when it comes to OpenShift. Secrets in Kubernetes are encoded in base64. This is *not* an encryption format. 
-Even if etcd is encrypted at rest, everybody can decode a given base64 string. 
+Even if etcd is encrypted at rest, everybody can decode a given base64 string which is stored in the Secret. 
 
 For example: The string `Thomas` encoded as base64 is `VGhvbWFzCg==`. This is simply a masked plain text and it is not secure to share these values, especially not on Git. 
 To make your CI/CD pipelines or Gitops process secure, you need to think of a secure way to manage your Secrets. Thus, your Secret objects must be encrypted somehow. HashiCorp Vault is one option to achieve this requirement. 
@@ -72,7 +72,7 @@ server:
       enabled: true
 ----
 
-This will tell HashiCorp Vault the environment we are going to install is (OpenShift), enables high availability with 3 replicas and enables RAFT. 
+This will tell HashiCorp Vault the environment we are going to install is (OpenShift), enables high availability with 3 replicas and enables RAFT (see below for some introduction). 
 
 Finally, let us deploy HashiCorp Vault into the namespace *vault* using the values file we have created in the previous step:
 
@@ -94,7 +94,7 @@ vault-2                                 0/1     Running   0          36s
 vault-agent-injector-74c848f67b-sq4dq   1/1     Running   0          37s
 ----
 
-*  vault agent injector: detecting application with annotations that require vault agent which will get injected 
+*  vault agent injector: detecting applications with annotations that require vault agent which will get injected 
 *  vault-0: vault server 
 
 The vault servers remain in *not-ready* state until Vault has been unsealed by you. 
@@ -140,7 +140,7 @@ The following command will initialize Vault for further usage:
 oc exec -ti -n vault vault-0 -- vault operator init -format=json > unseal.json
 ----
 
-This will create the file *unseal.json* locally on your machine. *Keep this file secure* 
+This will create the file *unseal.json* locally on your machine. *Keep this file secure* It contains by default 5 key shards and the root token you will need to unseal Vault and authenticate as root. 
 
 CAUTION: Keep this file secure, it contains keys to unseal Vault and the root_token to authenticate against. 
 
@@ -282,7 +282,7 @@ As you can see Vault-0 is the leader while the other two members are followers.
 There are multiple ways how an application can interact with Vault. One example is to use Tokens. This is quite easy but has the disadvantage that it does require additional steps of managing the life cycle of such token, moreover they might be shared, which is not what we want. 
 
 HashiCorp Vault supports different authentication methods. One of which is the *Kubernetes Auth Method* that must be enabled before we can use. 
-The Kubernetes Auth Method makes use of JWTs that are bound to a Service Account. When we tell Vault that a Service Account is fine to authenticate, then a Deployment using this account is able to authenticate and
+The Kubernetes Auth Method makes use of Jason Web Tokens (JWT)s that are bound to a Service Account. When we tell Vault that a Service Account is fine to authenticate, then a Deployment using this account is able to authenticate and
 request Secrets. 
 
 Vault has a plugin ecosystem, which allows to enable certain plugins. To enable *Kubernetes Auth Method* use the following process:
@@ -355,7 +355,7 @@ sys/                system       system_e34a76c3       system endpoints used for
 ----
 <1> Enabled KV secrets engine using the path *expense/static/*
 
-Now let put a secret into our store. We will store our super-secure MySQL password into *expense/static/mysql*
+Now lets put a secret into our store. We will store our super-secure MySQL password into *expense/static/mysql*
 
 [source,bash]
 ----
