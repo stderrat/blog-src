@@ -19,7 +19,7 @@ aliases: [
 ] 
 ---
 
-:imagesdir: /OpenShift/images/
+:imagesdir: /Quay/images/
 :icons: font
 :toc:
 
