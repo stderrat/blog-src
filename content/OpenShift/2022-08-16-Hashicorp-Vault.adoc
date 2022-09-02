@@ -16,7 +16,7 @@ aliases: [
 ] 
 ---
 
-:imagesdir: /Day-2/images/
+:imagesdir: /OpenShit/images/
 :icons: font
 :toc:
 
