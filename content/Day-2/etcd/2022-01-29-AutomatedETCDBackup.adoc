@@ -1,7 +1,7 @@
 --- 
 title: "Automated ETCD Backup"
 description: "Create ETCD backups using cronjobs"
-date: "2021-01-29"
+date: "2022-01-29"
 doctype: book
 
 author: Thomas Jungbauer
