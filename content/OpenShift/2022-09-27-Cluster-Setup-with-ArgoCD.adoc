@@ -78,9 +78,7 @@ CAUTION: OpenShift-GitOps will be deployed with cluster-admin privileges, since 
 
 The following shows the output of the command: 
 
-.Click me to expand
-[%collapsible]
-====
+{{% expand %}}
 ....
 ❯ ./init_GitOps.sh
 
@@ -188,7 +186,7 @@ Press 1, 2, 3
 3) None
 #?
 ....
-====
+{{% /expand %}}
 
 == Logging into Argo CD
 
