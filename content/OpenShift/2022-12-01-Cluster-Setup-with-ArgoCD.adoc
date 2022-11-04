@@ -1,7 +1,7 @@
 --- 
 title: "OpenShift Cluster Setup with Argo CD"
 description: "Openshift 4.x - Using OpenShift and GitOps to deploy cluster configuration"
-date: "2022-09-27"
+date: "2022-12-01"
 doctype: book
 
 author: Thomas Jungbauer & Toni Schmidbauer
