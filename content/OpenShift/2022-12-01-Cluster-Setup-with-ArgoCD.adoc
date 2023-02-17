@@ -24,29 +24,27 @@ aliases: [
 
 „_If it is not in GitOps, it does not exist_“ - is a mantra I hear quite often and also try to practice at customers. The idea is to have Git as the only source of truth on what happens inside the environment. That said, https://openpracticelibrary.com/practice/everything-as-code/[Everything as Code] is a practice that treats every aspect of the system as a code. Storing this code in Git provides a shared understanding, traceability and repeatability of changes. 
 
-While there are many articles about how to get GitOps into the deployment process of applications, this one rather sets the focus on the cluster configurations and tasks system administrator usually have to do. 
+While there are many articles about how to get GitOps into the deployment process of applications, this one rather sets the focus on the cluster configurations and tasks system administrators usually have to do. 
 
 <!--more--> 
 
-NOTE: Also check out the article http://localhost:1313/openshift/2020-08-06-argocd/[GitOps Argo CD]
+NOTE: Also check out the article https://blog.stderr.at/openshift/2020-08-06-argocd/[GitOps Argo CD]
 
 == Prerequisites 
 
-It all begins with an OpenShift cluster. Such cluster must be installed and while we will not discuss a bootstrap of the whole cluster … yes it is possible to even automate the cluster deployment using Advanced Cluster Management for example, we will simply assume the one cluster is up and running. 
+It all begins with an OpenShift cluster. Such a cluster must be installed and while we will not discuss a bootstrap of the whole cluster … yes it is possible to even automate the cluster deployment using Advanced Cluster Management as an example, we will simply assume that one cluster is up and running. 
 
-For our setup an OpenShift cluster 4.11 is deployed and we will use the repository https://github.com/tjungbauer/openshift-cluster-bootstrap[OpenShift Cluster Bootstrap] to deploy our configuration onto this cluster. This repository shall act as the source of truth for any configuration. Any cluster configuration shall go into that.  
+For our setup, an OpenShift cluster 4.11 is deployed and we will use the repository https://github.com/tjungbauer/openshift-cluster-bootstrap[OpenShift Cluster Bootstrap] to deploy our configuration onto this cluster. This repository shall act as the source of truth for any configuration. Any cluster configuration shall go into that.  
 
 Everything in this repository above is based on Helm, which must be available on your local machine. 
 
-NOTE: The openshift-bootstrap repository heavily used the Helm Repository found at https://charts.stderr.at/ 
+NOTE: The openshift-bootstrap repository heavily uses the Helm Repository found at https://charts.stderr.at/ 
 
 == Deploy OpenShift-GitOps 
 
-First thing we need to do is to deploy https://docs.openshift.com/container-platform/4.11/cicd/gitops/gitops-release-notes.html[OpenShift-GitOps], that is based on the https://argo-cd.readthedocs.io/en/stable/[Argo CD] project. OpenShift-GitOps comes as an operator and is available to all OpenShift customers. The operator will deploy and configure Argo CD and provides several custom resources to configure Argo CD Applications or ApplicationSets for example. 
+The first thing we need to do is to deploy https://docs.openshift.com/container-platform/4.11/cicd/gitops/gitops-release-notes.html[OpenShift-GitOps], which is based on the https://argo-cd.readthedocs.io/en/stable/[Argo CD] project. OpenShift-GitOps comes as an operator and is available to all OpenShift customers. The operator will deploy and configure Argo CD and provides several custom resources to configure Argo CD Applications or ApplicationSets for example. 
 
 To automate the operator deployment the following shell script can be used: https://github.com/tjungbauer/openshift-cluster-bootstrap/blob/main/init_GitOps.sh[init_GitOps.sh]. 
-
-NOTE: This script is able to not only deploy the operator itself, but can also deploy the Secret Management solutions „Sealed Secrets“ or „HashiCorp Vault“
 
 . Clone the repository to your local machine
 +
@@ -62,19 +60,21 @@ git clone https://github.com/tjungbauer/openshift-cluster-bootstrap.git
 ./init_GitOps.sh
 ----
 
-This will guide you through a menu, asking if GitOps shall be deployed or not or to skip directly to the deployment of Sealed Secrets or Hashicorp Vault. 
+The script will deploy the operator and configure the Argo CD instance. In addition, it will create the so-called *Application of Applications*, which acts as an umbrella Application, that automatically creates all other Argo CD Application(Sets). 
+
+NOTE: This Shell script is the only script that is executed manually. It installs and configures Argo CD. Any other operation on the cluster must then be done using GitOps processes. 
 
 *What will this script do?*
 
-I will not de-assabmle the script line by line, but in general the following will happen: 
+I will not de-assemble the script line by line, but in general, the following will happen: 
 
 . Adding repository https://charts.stderr.at/ and install the Chart https://github.com/tjungbauer/helm-charts/tree/main/charts/openshift-gitops[openshift-gitops]
 +
-CAUTION: OpenShift-GitOps will be deployed with cluster-admin privileges, since we want to manage the whole cluster configuration. This Argo CD instance should not be used for application deployment. For that, deploy additional instances of GitOps. 
+CAUTION: OpenShift-GitOps will be deployed with cluster-admin privileges since we want to manage the whole cluster configuration. This Argo CD instance should not be used for application deployment. For that, deploy additional instances of GitOps. 
 
 . Waiting for Deployments to become ready
 
-. Deploy the *Application of Applications* that is responsible to automatically deploy a set of Applications or ApplicationSets (see <<The Argo CD Object Manager Application>>)
+. Deploy the *Application of Applications* that is responsible for automatically deploy a set of Applications or ApplicationSets (see <<The Argo CD Object Manager Application>>)
 
 The following shows the output of the command: 
 
@@ -82,13 +82,6 @@ The following shows the output of the command:
 ....
 ❯ ./init_GitOps.sh
 
-Do you wish to continue and install GitOps?
-
-Press 1 or 2
-1) Yes
-2) No
-3) Skip
-#? 1
 Starting Deployment
 
 Deploying OpenShift GitOps Operator
@@ -178,20 +171,13 @@ STATUS: deployed
 REVISION: 2
 TEST SUITE: None
 
-Please select one of the supported Secrets Manager.
-
-Press 1, 2, 3
-1) Sealed-Secrets
-2) Hashicorp-Vault
-3) None
-#?
 ....
 {{% /expand %}}
 
 == Logging into Argo CD
 
-At this point we have GitOps and the "*App of Apps*" deployed and, optionally, a secret management solution. 
-Argo CD comes with a WebUI and a command line tool. The latter must installed on your local environment. In this article we will use the WebUI. 
+At this point we have GitOps and the "*App of Apps*" deployed.
+Argo CD comes with a WebUI and a command line tool. The latter must installed on your local environment. In this article, we will use the WebUI. 
 
 Since Argo CD, by default, looks up for the OpenShift group "cluster-admins" to authenticate a user with Argo CD-Administrator privileges and since this group does not yet exist, we need to lookup the initial Administrator password: 
 
@@ -202,7 +188,7 @@ oc extract secret/openshift-gitops-cluster -n openshift-gitops --to=-
 <your webUI password>
 ----
 
-To reach the WebUI use the applications menu of the top right corner in Openshift. 
+To access the WebUI use the applications menu of the top right corner in Openshift. 
 
 .Argo CD: WebUI Link
 image::argocd2/argocd-link.png?width=340px[WebUI Link]
@@ -229,19 +215,20 @@ NOTE: The App-of-Apps is the only Argo CD Application (at this moment) that has 
 The current Applications or ApplicationSets that come with the bootstrap repository are for example: 
 
 * Deployment of Advanced Cluster Security (RHACS)
+* Deployment of Advanced Cluster Management (RHACM)
 * Deployment of basic cluster configuration (i.e. etcd encryption, some UI tweaks ...)
 * Deployment of Compliance Operator
 * and many more. 
 
 Check our the deployed Argo CD objects or the openshift-cluster-bootstrap repository.
 
-=== Interlude: What is the different between Application and ApplicationSets?
+=== Interlude: What is the difference between Application and ApplicationSets?
 
 Applications and ApplicationSets are both Custom Resource Definitions that are installed when OpenShift-Gitops (or Argo CD) is installed. 
 
-Applications are the classical way to configure GitOps. However, the main challenge here is that it can only be used to deploy configurations or applications to one target cluster. This limitation is resolved using ApplicationSets by creating multiple Applications out of an ApplicationSet definition. Therefore, it is now possible to deploy the same configuration on multiple clusters. 
+Applications are the classic way to configure GitOps. However, the main challenge here is that it can only be used to deploy configurations or applications to one target cluster. This limitation is resolved using ApplicationSets by creating multiple Applications out of an ApplicationSet definition. Therefore, it is now possible to deploy the same configuration on multiple clusters. 
 
-In the used Git repository I am using both ways but mainly ApplicationSets. 
+In the used Git repository I am using both options, but mainly ApplicationSets. 
 
 Further information can be found at: https://argo-cd.readthedocs.io/en/stable/user-guide/application-set/ 
 
@@ -249,7 +236,7 @@ Further information can be found at: https://argo-cd.readthedocs.io/en/stable/us
 
 The object manager application of Argo CD is monitoring the following path: https://github.com/tjungbauer/openshift-cluster-bootstrap/tree/main/clusters/argocd-object-manager 
 
-It is a Helm Chart that is using the subchart *helper-argocd* found at https://charts.stderr.at/. However, any configuration should be done in the *values.yaml* file of the main Chart. 
+It is a Helm Chart that is using the Subchart *helper-argocd* found at https://charts.stderr.at/. However, any configuration should be done in the *values.yaml* file of the main Chart. 
 
 ==== Basic values
 At the top of the values.yaml file some basic variables are defined. All of them are anchors for the values-file, defining the OpenShift clusters and the Git repository URL.
@@ -270,20 +257,20 @@ repobranch: &branch main
 <2> Another cluster, here called "prod"
 <3> The URL and the branch to the Git repository 
 
-If you would like to add additional clusters, simply define the URL and the name. The &-value (i.e. &prodcluster) is later used in the file to reference to the value, so we only have to define the value once instead of multiple times. 
+If you would like to add additional clusters, simply define the URL and the name. The &-value (i.e. &prodcluster) is later used inside the file to refer to the value, so we only have to define the value once instead of multiple times. 
 
 ==== Adding ApplicationSets
-ApplicationSets are used to deploy the same configuration on multiple clusters. Typical example would be to enabled etcd encryption. This is usually done on all clusters, and not only on specific ones. 
+*ApplicationSets* are used to deploy the same configuration on multiple clusters. Typical, example would be to enable etcd encryption. This is usually done on all clusters, and not only on specific ones. 
 
-To define a list of target clusters, ApplicationSets are using so called generators and while there are multiple types, two are currently supported by the Helm Chart: 
+To define a list of target clusters, ApplicationSets are using so-called generators and while there are multiple types, two are currently supported by the Helm Chart: 
 
 * List generator
 * Cluster generator
 
+NOTE: Technically, the ApplicationSet creates unique Applications for each defined target cluster.
+
 ==== Example 1
 The following example creates an ApplicationSet that is valid for *ALL* clusters:
-
-NOTE: Technically, the ApplicationSet creates unique Applications for each defined target cluster.
 
 [source,yaml]
 ----
@@ -297,7 +284,8 @@ helper-argocd: <1>
       labels:
         category: cluster-configuration <4>
       path: clusters/all/clusterconfig/ <5>
-      per_cluster_helm_values: true <6>
+      helm:
+        per_cluster_helm_values: true <6>
       generatorclusters: [] <7>
   #    repourl: "" # Optional <8>
   #    targetrevision: "" # Optional <9>
@@ -339,7 +327,8 @@ helper-argocd: <1>
       generatorlist: <6>
         - clustername: *mgmtclustername
           clusterurl: *mgmtcluster
-      autosync_enabled: false <7>
+     syncPolicy:
+       autosync_enabled: false <7>
 ----
 <1> Bypassing the values to the subchart "helper-argocd"
 <2> Name of the application that will be created. To make it unique in Argo CD the name of the cluster will be added as prefix. For example *in-cluster-generic-clusterconfig* (Underscores will be transformed to dashes)
@@ -361,6 +350,7 @@ helper-argocd: <1>
     in-cluster-init-rhacs: <2>
       enabled: true
       server: *mgmtcluster <3>
+      namespace: {}
       project: default
       description: "Initialize Red Hat Advanced Cluster Security and deploy Central and SecuredCluster"
       labels:
@@ -378,3 +368,32 @@ helper-argocd: <1>
 
 .Argo CD: Application
 image::argocd2/argocd-app-ex.png?width=340px[Application]
+
+== Secrets
+when it comes to GitOps and Kubernetes, Secret Management will become a topic sooner or later. It is *NOT safe* to store Secrets as plain text in Git. Instead, some encryption must be some. 
+
+The are basically two ways to handle them:
+
+. Encrypt the secret and store it in Git (i.e. Sealed Secrets) 
+. Create a reference to the secret stored in an external Secret Management System (i.e. Vault) and only keep this reference in Git. 
+
+Both have their advantages. I nice blog article about the options was created by 2 colleagues of mine: https://cloud.redhat.com/blog/a-guide-to-secrets-management-with-gitops-and-kubernetes[A Guide to Secrets Management with GitOps and Kubernetes]
+
+I am currently using Sealed Secrets to encrypt my sensitive information. These objects are stored in Git and cannot be decrypted unless I share my key. 
+
+So the very first application that I synchronize is always (*always*) the Sealed Secret application. I then just install my very own key and can decrypt all my very secure data in the cluster. 
+
+== Summary 
+
+With all this in place, many Argo CD Applications are created but not synchronized. (I do not automatically sync since I use this Bootstrap repository to create Demo-Environments and not everything is needed for every Demo)
+
+>IMG><<<
+.Argo CD: Applications
+image::argocd2/argocd-apps.png?width=340px[Argo CD Applications]
+
+You can now use these Applications to configure your clusters. Out of the box, several possibilities are available. For example,: 
+
+* Fully install and configure Compliance Operator: Here the Operator is deployed and set up to perform CIS Benchmark checks on the cluster
+* Or enable ETCD encryption
+
+and many more. 

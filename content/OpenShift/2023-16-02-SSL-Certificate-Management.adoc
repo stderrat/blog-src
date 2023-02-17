@@ -1,0 +1,420 @@
+--- 
+title: "SSL Certificate Management for OpenShift on AWS"
+description: "Using cert-manager to automatically issue new certificates"
+date: "2023-02-16"
+doctype: book
+
+author: Thomas Jungbauer
+type: post
+draft: false
+categories:
+   - OpenShift
+   - Day-2
+tags: ["oc", "OpenShift", "OCP", "SSL", "Certificates", "Cert Manager"] 
+
+aliases: [ 
+	 "/posts-output/2023-02-16-ssl-certificate-manager/",
+] 
+---
+
+:imagesdir: /OpenShift/images/
+:icons: font
+:toc:
+
+Finally, after a long time on my backlog, I had some time to look into the *Cert-Manager Operator* and use this Operator to automatically issue new SSL certificates. 
+This article shall show step-by-step how to create a certificate request and use this certificate for a Route and access a service via your Browser.
+I will focus on the technical part, using a given domain on AWS Route53. 
+
+<!--more--> 
+
+== Introduction
+
+After a new OpenShift Cluster has been deployed, self-signed certificates are used to access the Routes (for example the console) and the API. Typically, an application is exposed to the world using the schema _<app-name>-<namespace-name>.apps.<clusterdomain>_.
+
+We will try to create a certificate for a specific application with a custom domain name and for the cluster domains: *.apps.clusterdomain and api.clusterdomain.
+
+The domain is already available and delegated to AWS Route53. As certificate authority, I am using https://letsencrypt.org/[Let's Encrypt]. 
+
+We will install 2 operators:
+
+. *Cert Manager*: to issue new certificates.
+. *Cert Utils Operator*: injects the certificate into a Route object.
+
+NOTE: The *Cert Utils Operator* can provide additional information for a certificate and monitors the expiration date. Here we mainly use it to automatically inject Route objects by defining specific annotations.
+
+== Prerequisites 
+
+. OpenShift cluster with a user that has privileges to install Operators.
+. A domain hosted for example at Route 53
+. Credentials for your Cloud Provider (AWS)
+
+== Deploy an Example Application
+
+Let's use the super complex demo application *bookimport*. 
+
+[source,bash]
+....
+oc new-project bookimport
+oc apply -f https://raw.githubusercontent.com/tjungbauer/book-import/master-no-pre-post/book-import/deployment.yaml -n bookimport
+oc apply -f https://raw.githubusercontent.com/tjungbauer/book-import/master-no-pre-post/book-import/service.yaml -n bookimport
+oc expose service book-import -n bookimport
+oc get route -n bookimport
+....
+
+The last command will print you an URL which, copied into the browser, will open our application: 
+
+.Application Book Import using HTTP
+image::cert-manager/bookimport.png?width=480px[Bookimport]
+
+As you can see in the address line the connection is not secured (_Nicht sicher_ in German) and my domain is **.apps.ocp.aws.ispworld.at*
+
+== Configure an AWS user for accessing Route 53
+
+On AWS I have currently 2 Zones, the public *aws.ispworld.at* and a private zone, created by the OpenShift Installer. 
+
+.Domain Zones
+image::cert-manager/hostedzones.png?width=340px[DomainZones]
+
+Before you can manage your domains a user with appropriate privileges must be created. 
+
+Store the following in the file `policy.json`. This will allow a user to perform DNS Upgrades.
+
+[source,json]
+....
+{
+   "Version": "2012-10-17",
+   "Statement": [
+       {
+           "Effect": "Allow",
+           "Action": "route53:GetChange",
+           "Resource": "arn:aws:route53:::change/*"
+       },
+       {
+           "Effect": "Allow",
+           "Action": [
+               "route53:ChangeResourceRecordSets",
+               "route53:ListResourceRecordSets"
+           ],
+           "Resource": "arn:aws:route53:::hostedzone/*"
+       },
+       {
+           "Effect": "Allow",
+           "Action": [
+               "route53:ListHostedZones",
+               "route53:ListResourceRecordSets",
+               "route53:ListHostedZonesByName"
+           ],
+           "Resource": "*"
+       }
+   ]
+}
+....
+
+Apply the new policy to AWS and store the ARN into a variable:
+
+[source,bash]
+....
+aws iam create-policy --policy-name AllowDNSUpdates --policy-document  file://policy.json
+export POLICY_ARN=$(aws iam list-policies --query 'Policies[?PolicyName==`AllowDNSUpdates`].Arn' --output text)
+....
+
+Create the user `route53-openshift` and assign the policy to that user:
+
+[source,bash]
+....
+aws iam create-user --user-name route53-openshift
+aws iam attach-user-policy --policy-arn $POLICY_ARN --user-name route53-openshift 
+....
+
+Finally, create the access key and store the *AccessKeyId* and the *SecretAccessKey* for later use: 
+
+[source,json]
+....
+aws iam create-access-key --user-name route53-openshift --output json
+
+{
+    "AccessKey": {
+        "UserName": "route53-openshift",
+        "AccessKeyId": "XXXXXXXXXXXXXX",
+        "Status": "Active",
+        "SecretAccessKey": "XXXXXXXXXXXXXXXXXXX",
+        "CreateDate": "2023-02-15T12:34:06+00:00"
+    }
+}
+....
+
+== Installing Operators to OpenShift
+
+We will install 2 Operators to our cluster:
+
+. cert-manager Operator for Red Hat OpenShift
+. Cert Utils Operator
+
+Simply search both on OLM and install them keeping the default values. 
+
+NOTE: The Cert Utils Operator is a *Community* Operator.
+
+.Operators
+image::cert-manager/operators.png?width=480px[Operators]
+
+This will install the Cert-Manager into the namespace *openshift-cert-manager* 
+
+== Configure the Cert-Manager Operator
+
+Before we can issue a certificate, we need to create a secret with our AWS SecretAccessKey (see above):
+
+[source,bash]
+....
+oc create secret generic prod-route53-credentials-secret --from-literal secret-access-key="XXXXXXXXXXXXXXXXXXX" -n openshift-cert-manager
+....
+
+
+As next step, we create a *ClusterIssuer* that will be available cluster-wide using *Let's Encrypt* as certificate authority: 
+
+CAUTION: The connection to Let's Encrypt is using the *productive* API. If you would like to use the staging environment instead, change the server URL to https://acme-staging-v02.api.letsencrypt.org/directory
+
+[source,yaml]
+....
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    email: your@email.com <1>
+    preferredChain: ''
+    privateKeySecretRef:
+      name: letsencrypt-account-key
+    server: 'https://acme-v02.api.letsencrypt.org/directory'
+    solvers:
+      - dns01:
+          route53:
+            accessKeyID: XXXXXXXXXXXXXX <2>
+            region: eu-central-1 <3>
+            secretAccessKeySecretRef:
+              key: secret-access-key
+              name: prod-route53-credentials-secret <4>
+        selector:
+          dnsZones:
+            - your-domain <5>
+....
+<1> Change your email address
+<2> Use the *AccessKeyId* created above
+<3> Using AWS you need to define a region
+<4> The name of the secret created during the step before
+<5> Your *public* domain, for example aws.ispworld.at. 
+
+Once created the *ClusterIssuer* should switch to the status "Ready"
+
+[source,bash]
+....
+oc describe clusterissuer letsencrypt-prod
+
+Status:
+...
+  Conditions:
+    Last Transition Time:  2023-02-16T13:54:49Z
+    Message:               The ACME account was registered with the ACME server
+    Observed Generation:   1
+    Reason:                ACMEAccountRegistered
+    Status:                True
+    Type:                  Ready
+....
+
+== OPTIONAL: When using private Domains or Firewalls
+
+As you can see in one of the images above, I have two domains: 
+
+. aws.ispworld.at
+. ocp.aws.ispworld.at
+
+The first one is marked as *public*, that means everybody can resolve names. The second one is set to *private* and only define VPCs (in this case the cluster itself) can resolve hostnames. 
+
+In case of the following error: 
+....
+E0216 15:27:29.513080 1 controller.go:163] cert-manager/challenges "msg"="re-queuing item due to error processing" "error"="failed to determine Route 53 hosted zone ID: zone not found in Route 53 for domain _acme-challenge.bookimport.apps.ocp.aws.ispworld.at." "key"="bookimport/bookimport-cert-jbmh6-2173685137-2399596362"
+....
+
+Add the following into *ClusterManager*
+
+[source,yaml]
+....
+oc edit CertManager.operator.openshift.io/cluster
+
+  unsupportedConfigOverrides:
+    controller:
+      args:
+      - --v=2
+      - --cluster-resource-namespace=$(POD_NAMESPACE)
+      - --leader-election-namespace=kube-system
+      - --dns01-recursive-nameservers-only
+      - --dns01-recursive-nameservers=ns-362.awsdns-45.com:53,ns-930.awsdns-52.net:53 <1>
+....
+<1> List of nameserver the PUBLIC domain is hosted on.
+
+The Operator will then try to resolve the names using the specified nameserver only.
+
+== Issue a new certificate
+
+At this step, we can create a Certificate: 
+
+[source,yaml]
+....
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+ name: bookimport-cert <1>
+ namespace: bookimport <2>
+spec:
+ dnsNames:
+   - bookimport.apps.ocp.aws.ispworld.at <3>
+ issuerRef:
+   kind: ClusterIssuer
+   name: letsencrypt-prod <4>
+ secretName: bookimport.apps.ocp.aws.ispworld.at-certificate <5>
+....
+<1> Name of the certificate objects
+<2> Application namespace
+<3> List of domain names
+<4> Issuer that shall be used
+<5> Name of the Secret that will be created and hold the certificate information
+
+== Create a Route
+
+After a while the certificate will be *Ready*:
+
+[source,bash]
+....
+oc get certificate/bookimport-cert -n bookimport
+
+NAME              READY   SECRET                                            AGE
+bookimport-cert   True    bookimport.apps.ocp.aws.ispworld.at-certificate   87m
+....
+
+Now we can create a Route object to configure the IngressController. The important part here is the annotation, which will tell the Cert Utils Operator to automatically inject the certificate. 
+
+[source,yaml]
+....
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: bookimport-tls
+  namespace: bookimport
+  annotations:
+    cert-utils-operator.redhat-cop.io/certs-from-secret: bookimport.apps.ocp.aws.ispworld.at-certificate <1>
+spec:
+  host: bookimport.apps.ocp.aws.ispworld.at <2>
+  to:
+    kind: Service
+    name: book-import
+    weight: 100
+  tls:
+    termination: edge
+  port:
+    targetPort: web
+  wildcardPolicy: None 
+....
+<1> Annotation that points to the Secret which stored the certificate. The values of this Secret will be automatically injected into this Route object. 
+<2> The hostname for our Route
+
+As you can see, the Browser will show no warning when opening the URL.
+
+.Book Import using HTTPS
+image::cert-manager/bookimport-tls.png?width=480px[BookimportTLS]
+
+
+== Cluster Default Certificates 
+
+During a cluster deployment, OpenShift will create self-signed certificates for its API and for the default IngressController *.apps.clusterdomain. 
+
+Usually, we want to change them as well. So why not use the Cert-Manager to issue the appropriate certificates? 
+
+=== Default IngressController
+
+For the default IngressController I create a certificate request with 2 domain names: the wildcard and the base domain (just to be sure, actually the wildcard should be enough)
+
+[source,yaml]
+....
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: router-certificate
+  namespace: openshift-ingress <1>
+spec:
+  dnsNames:
+   - apps.ocp.aws.ispworld.at <2>
+   - '*.apps.ocp.aws.ispworld.at'
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-prod
+  secretName: router-certificate <3>
+....
+<1> The default IngressController runs in the namespace *openshift-ingress*
+<2> List of domains
+<3> Name of the Secret that will be created once the Certificate has been approved.
+
+After a while, the certificate request should be *Ready* again. In the namespace _openshift-ingress_ a Secret will be available with the name _router-certificate_ 
+
+=== API 
+
+For the API URL we do the same. This time it is stored in the namepsace *openshift-config*
+
+[source,yaml]
+....
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: api-certificate
+  namespace: openshift-config
+spec:
+  dnsNames:
+   - api.ocp.aws.ispworld.at
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-prod
+  secretName: api-certificate
+....
+
+NOTE: It is possible to create one certificate with all required Domainnames. Just be sure that the Secret is available in the appropriate Namespace. 
+
+=== Patching API Server and IngressController
+
+As a final step we need to patch the IngressController and the API server so they will use the correct Secrets with the officially signed certificates.
+
+[source,bash]
+....
+# IngressController
+oc patch ingresscontroller default -n openshift-ingress-operator --type=merge --patch='{"spec": { "defaultCertificate": { "name": "router-certificate" }}}'
+
+# API Server
+oc patch apiserver cluster --type=merge -p '{"spec":{"servingCerts": {"namedCertificates": [{"names": ["api.ocp.aws.ispworld.at"], "servingCertificate": {"name": "api-certificate"}}]}}}' <1>
+....
+<1> Be sure to use the correct URL for the API
+
+This will restart a bunch of services. Once everything is up and running again (your can watch using the command `watch oc get co`), the correct certificate will be shown in the browser:
+
+.UI
+image::cert-manager/console-cert.png?width=340px[UI]
+
+or via curl:
+
+[source,bash]
+....
+curl -v https://api.ocp.aws.ispworld.at:6443
+
+* Connected to api.ocp.aws.ispworld.at (13.52.208.31) port 6443 
+[...]
+* Server certificate:
+*  subject: CN=api.ocp.aws.ispworld.at
+*  start date: Feb 16 15:11:36 2023 GMT
+*  expire date: May 17 15:11:35 2023 GMT
+*  subjectAltName: host "api.ocp.aws.ispworld.at" matched cert's "api.ocp.aws.ispworld.at"
+*  issuer: C=US; O=Let's Encrypt; CN=R3
+*  SSL certificate verify ok.
+....
+
+== Summary
+
+Now with these steps, it is possible to issue new Certificates. Of course, there I many more options to configure a certificate. I encourage everybody to read the official documentation of the https://cert-manager.io/docs/[Cert Manager].
+
+Especially, if you are interested in the whole certificate https://cert-manager.io/docs/concepts/certificate/#certificate-lifecycle[Certificate Lifecycle]
