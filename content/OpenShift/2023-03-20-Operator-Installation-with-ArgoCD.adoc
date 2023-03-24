@@ -39,9 +39,7 @@ Everything should be seen as a code. Everything should be possible to be deploye
 When it comes to OpenShift, Red Hat supports Argo CD using the Operator *openshift-gitops*. This gives you everything you need to deploy an Argo CD instance. The only thing you need to take care of is a Git repository, no matter if it is GitHub, Gitlab, Bitbucket etc. 
 
 == The Problem
-Storing everything in Git provides you with an easy way to configure your cluster.
-
-However, sometimes Kubernetes objects depend on each other. This is especially true when you would like to install and configure Operators, where the configuration, based on a Customer Resource Definition (CRD), can only happen after the Operator has been installed and is ready. 
+Sometimes Kubernetes objects depend on each other. This is especially true when you would like to install and configure Operators, where the configuration, based on a Customer Resource Definition (CRD), can only happen after the Operator has been installed and is ready. 
 
 Why is that? Well, when you want to deploy an Operator, you will store a “Subscription object” in Git. Argo CD will take this object and applies it to the cluster. However, for an Operator, the creation of the Subscription object is just the first step. A lot of other steps are required until the Operator gets ready. Unfortunately, Argo CD cannot verify if the installation is successful. All it sees is that the Subscription object has been created and then it immediately tries to deploy the CRD. The CRD which is not yet available on the system because the Operator is still installing it.
 
@@ -78,7 +76,7 @@ In Argo CD everything is correctly synchronized, and the Operator and its config
 
 NOTE: If you are new to the compliance operator, I recommend the following article: https://blog.stderr.at/compliance/2021/07/compliance-operator/[Compliance Operator]
 
-I use this approach for every Operator that I would like to install and configure at the same time. For example, I do the same for Advanced Cluster Security or Management where I use the Job to verify if everything is ready before I let Argo CD continue.
+I use this approach for every Operator that I would like to install and configure at the same time. For example, I do the same for Advanced Cluster Security or Advanced Cluster Management where I use the Job to verify if everything is ready before I let Argo CD continue.
 
 NOTE: More information about Sync Waves and Hooks can be found in the official Argo CD documentation: https://argo-cd.readthedocs.io/en/stable/user-guide/sync-waves/[Sync Phases and Waves]
 
