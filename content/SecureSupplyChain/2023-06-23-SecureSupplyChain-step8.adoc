@@ -1,0 +1,273 @@
+--- 
+title: "Step 8 - Updating Kubernetes Manifests"
+description: "Step 8 Secure Supply Chain"
+date: "2023-06-28"
+doctype: book
+
+author: Thomas Jungbauer
+type: post
+categories:
+   - OpenShift
+   - Tekton
+   - CICD
+   - Pipelines
+tags: ["OCP", "Tekton", "OpenShift", "Pipleines", "CI/CD", "Supply Chain"] 
+
+aliases: [ 
+	 "/openshift/securesupplychain/step8",
+] 
+---
+
+:imagesdir: /SecureSupplyChain/images/
+:icons: font
+:toc:
+
+With the finalization of the build process and the security checks during this phase, it is now time to update the Kubernetes manifests and provide the new tag for the created image. 
+I have forked (and cleaned up) another repository that will store all yaml specifications that are required for OpenShift. You can find this repository at: https://github.com/tjungbauer/securing-software-supply-chain/tree/main/application/globex[Kubernetes Manifests^]
+
+<!--more--> 
+
+== Goals
+
+The goals of this step are:
+
+* Update the manifest in Git with the new image tag
+
+== Preparing the Pipeline
+
+. Let's create the Task object that will take care of the update. 
++
+The Task will use git commands to update the manifests accordingly. 
++
+[source,yaml]
+----
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: update-manifest
+  namespace: ci
+spec:
+  description: >-
+    This task updates the manifest for the current application to point to the
+    image tag created with the short commit.
+  params: <1>
+    - description: Used to tag the built image.
+      name: image
+      type: string
+    - default: main
+      description: Target branch to push to
+      name: target-branch
+      type: string
+    - default: Tekton Pipeline
+      description: Git user name for performing the push operation.
+      name: git_user_name
+      type: string
+    - default: tekton@tekton.com
+      description: Git user email for performing the push operation.
+      name: git_user_email
+      type: string
+    - description: File in which the image configuration is stored.
+      name: configuration_file
+      type: string
+    - description: Repo in which the image configuration is stored.
+      name: repository
+      type: string
+  steps: <2>
+    - image: 'alpine/git:latest'
+      name: git
+      resources: {}
+      script: >
+        #!/usr/bin/env sh
+
+        set -eux
+        
+        # Setting up the git config.
+        
+        git config --global user.email "$(params.git_user_email)"
+        
+        git config --global user.name "$(params.git_user_name)"
+
+        # Checkout target branch to avoid the detached HEAD state
+        TMPDIR=$(mktemp -d)
+
+        cd $TMPDIR
+        
+        git clone $(params.repository)
+        
+        cd securing-software-supply-chain
+        
+        git checkout $(params.target-branch)
+
+        # Set to the short commit value passed as parameter.
+        # Notice the enclosing " to keep it as a string in the resulting YAML.
+        
+        IMAGE=\"$(params.image)\"
+
+        sed -i "s#\(.*value:\s*\).*#\1 ${IMAGE}#" $(params.configuration_file)
+
+        git add $(params.configuration_file)
+        
+        git commit -m "Automatically updated manifest to point to image tag
+        
+        $IMAGE"
+        
+        git push origin $(params.target-branch)
+----
+<1> Required default parameters.
+<2> Script to clone and push the update to Git.
+
+. To the Pipeline we have to add the following section
++
+[source,yaml]
+----
+spec:
+  params: <1>
+    - name: MANIFEST_FILE
+      type: string
+    - name: MANIFEST_FILE_PROD
+      type: string
+    - name: MANIFEST_REPO
+      type: string
+    - name: MANIFEST_REPO_NAME
+      type: string
+    - name: MANIFEST_GIT_REF
+      type: string
+    ...
+  tasks:
+  ...
+    - name: update-dev-manifest
+      params:
+        - name: image
+          value: '$(params.IMAGE_REPO):$(params.IMAGE_TAG)'
+        - name: configuration_file
+          value: $(params.MANIFEST_FILE)
+        - name: repository
+          value: $(params.MANIFEST_REPO)
+        - name: git_user_name
+          value: $(params.COMMIT_AUTHOR)
+      runAfter: <2>
+        - acs-image-check
+        - acs-image-scan
+        - generate-sbom
+      taskRef:
+        kind: Task
+        name: update-manifest
+----
+<1> Parameters that define the settings for the manifest repository
+<2> This time we are running after these three tasks
+
+. Update the TriggerBinding **globex-ui**
++
+[source,yaml]
+----
+    - name: manifestRepo
+      value: git@github.com:tjungbauer/securing-software-supply-chain.git <1>
+    - name: manifestRepoRef
+      value: main
+    - name: manifestFile <2>
+      value: application/globex/overlays/dev/kustomization.yaml
+    - name: manifestFileProd <3>
+      value: application/globex/overlays/prod/kustomization.yaml
+    - name: manifestRepoName
+      value: tjungbauer/securing-software-supply-chain
+----
+<1> The SSH url to GitHub
+<2> The overlay that will be used for the DEV environment
+<3> The overlay that will be used for the PROD environment
+
+. Update the TriggerTemplate and add:
++
+[source,yaml]
+----
+spec:
+  params:
+    - description: The file to update to point to newly built image
+      name: manifestFile
+    - description: The file to update to point to newly built image in prod
+      name: manifestFileProd
+    - description: The repo to update to point to newly built image
+      name: manifestRepo
+    - description: The reference to the repo
+      name: manifestRepoRef
+    - description: The full name of the repo
+      name: manifestRepoName
+...
+  resourcetemplates:
+  ...
+      spec:
+        params:
+          - name: MANIFEST_FILE
+            value: $(tt.params.manifestFile)
+          - name: MANIFEST_FILE_PROD
+            value: $(tt.params.manifestFileProd)
+          - name: MANIFEST_REPO
+            value: $(tt.params.manifestRepo)
+          - name: MANIFEST_GIT_REF
+            value: $(tt.params.manifestRepoRef)
+          - name: MANIFEST_REPO_NAME
+            value: $(tt.params.manifestRepoName)
+      ...
+----
+
+== Git SSH Key
+
+To be able to do changes in Git, which is using SSH keys to authenticate, we need to specify a Secret that knows the SSH private key and Github's host keys.
+
+Be sure that to create an SSH key (for example using ssh-keygen) and that GitHub knows about this key. You can add your key at ``"Account > Settings > SSH and GPG keys"``.
+
+Run the following command to get the host keys of GitHub:
+
+[source,bash]
+----
+ssh-keyscan -t rsa github.com
+
+# github.com:22 SSH-2.0-babeld-2ff5bbdf
+github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=
+----
+
+Finally, we need to create a Secret with the following content:
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  annotations:
+    tekton.dev/git-0: github.com <1>
+  name: git-ssh-key
+  namespace: ci
+type: kubernetes.io/ssh-auth
+data:
+  ssh-privatekey: <BASE64 PRIVAT SSH KEY > <2>
+  known_hosts: < base64 of Githubs hostkey> <3>
+----
+<1> This annotation defines for which host Tekton will inject the Secret. 
+<2> A base64 decoded string of your PRIVATE ssh key.
+<3> A base64 decoded string of the host keys
+
+Update the **pipeline** ServiceAccount and add the new Secret: 
+
+[source,yaml]
+----
+secrets:
+...
+  - name: git-ssh-key
+----
+
+== Execute the Pipeline
+
+Time to trigger the Pipeline, which now looks like: 
+
+.Pipeline Details
+image::step8-pipeline.png[Pipeline Details]
+
+The new Task will automatically push the new image tag to the Kubernetes manifests Git repository. From there it can later be used to roll out the new version. 
+
+In Git you can track the changes:
+
+.Git Commit
+image::step8-git_commit.png[Git Commit]
+
+== Summary
+
+We have now updated the Kubernetes manifests with the new image tag. In the next steps, we will verify these manifests (linting) and then try to deploy the new image on the DEV environment. 

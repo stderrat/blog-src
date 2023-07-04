@@ -1,0 +1,196 @@
+--- 
+title: "Step 11 - ACS Deployment Check"
+description: "Step 11 Secure Supply Chain"
+date: "2023-06-27"
+doctype: book
+
+author: Thomas Jungbauer
+type: post
+categories:
+   - OpenShift
+   - Tekton
+   - CICD
+   - Pipelines
+tags: ["OCP", "Tekton", "OpenShift", "Pipleines", "CI/CD", "Supply Chain", "ACS"] 
+
+aliases: [ 
+	 "/openshift/securesupplychain/step11",
+] 
+---
+
+:imagesdir: /SecureSupplyChain/images/
+:icons: font
+:toc:
+
+After the Pipeline prepared the new image for DEV it should be checked against ACS for policy compliance. This ensures that the deployment manifest adheres to policy requirements. The command line tool **roxctl** will be leveraged to perform this task.
+
+<!--more--> 
+
+== Goals
+
+The goals of this step are:
+
+* Create a Task that performs a deployment check using roxctl
+
+== Create the Task
+
+Create the following Task object. This Task is a bit more complex, since we want to verify the Deployment, we first need to build the Kustomize files which would create a big yaml file and will store it into the output folder (all.yaml). Then we use https://github.com/looztra/kubesplit[kubesplit^] to split this huge file into different smaller ones. Finally, the roxctl step will search for a file called **deployment--globex-ui.yml** and performs the security checks (verify if any security policy is violated in ACS) against this file.
+
+[source,yaml]
+----
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: acs-deploy-check
+  namespace: ci
+spec:
+  description: >-
+    Policy check a deployment with StackRox/RHACS This tasks allows you to check
+    a deployment against build-time policies and apply enforcement to fail
+    builds. It's a companion to the stackrox-image-scan task, which returns full
+    vulnerability scan results for an image.
+  params:
+    - description: |
+        Secret containing the address:port tuple for StackRox Central)
+        (example - rox.stackrox.io:443)
+      name: rox_central_endpoint
+      type: string
+    - description: Secret containing the StackRox API token with CI permissions
+      name: rox_api_token
+      type: string
+    - default: 'https://default-git-url.git'
+      name: gitRepositoryUrl
+      type: string
+    - default: main
+      name: gitRepositoryRevision
+      type: string
+    - default: 'true'
+      name: verbose
+      type: string
+    - default: 'false'
+      description: |
+        When set to `"true"`, skip verifying the TLS certs of the Central
+        endpoint.  Defaults to `"false"`.
+      name: insecure-skip-tls-verify
+      type: string
+  results:
+    - description: Output of `roxctl deployment check`
+      name: check_output
+      type: string
+  steps:
+    - image: quay.io/wpernath/kustomize-ubi
+      name: kustomize-build
+      resources: {}
+      script: | <1>
+        #!/usr/bin/env sh
+
+        set -eu -o pipefail
+
+        cd /workspace/repository/application/globex/overlays/dev
+
+        mkdir -p /workspace/repository/input
+
+        mkdir -p /workspace/repository/output
+
+        kustomize build . --output /workspace/repository/input/all.yaml
+      workingDir: /workspace/repository
+    - image: looztra/kubesplit <2>
+      name: kustomize-split
+      resources: {}
+      script: >
+        #!/usr/bin/env sh
+
+        set -eu -o pipefail
+
+        kubesplit -i /workspace/repository/input/all.yaml -o
+        /workspace/repository/output
+      workingDir: /workspace/repository
+    - env:
+        - name: ROX_API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: rox_api_token
+              name: $(params.rox_api_token)
+        - name: ROX_CENTRAL_ENDPOINT
+          valueFrom:
+            secretKeyRef:
+              key: rox_central_endpoint
+              name: $(params.rox_central_endpoint)
+      image: 'registry.access.redhat.com/ubi8:8.7-1026'
+      name: rox-deploy-scan <3>
+      resources: {}
+      script: |
+        #!/usr/bin/env bash
+
+        set +x
+
+        cd /workspace/repository/output
+
+        curl -s -k -L -H "Authorization: Bearer $ROX_API_TOKEN" \
+          "https://$ROX_CENTRAL_ENDPOINT/api/cli/download/roxctl-linux" \
+          --output ./roxctl  \
+          > /dev/null
+
+        chmod +x ./roxctl  > /dev/null
+
+        DEPLOYMENT_FILE=$(ls -1a | grep *deployment--globex-ui.yml)
+
+        ./roxctl deployment check \
+         $( [ "$(params.insecure-skip-tls-verify)" = "true" ] && \
+         echo -n "--insecure-skip-tls-verify") \
+         -e "$ROX_CENTRAL_ENDPOINT" --file "$DEPLOYMENT_FILE"
+      workingDir: /workspace/repository
+  workspaces:
+    - name: repository
+----
+<1> Build Kustomize and store the output into /workspace/repository/input/all.yaml.
+<2> Split the huge yaml file into separate ones and store them into /workspace/repository/output.
+<3> Search for the file deployment--globex-ui.yml and perform a **roxctl deployment check**.
+
+
+== Update the Pipeline
+
+The Pipeline object must be extended with another Task:
+
+[source,yaml]
+----
+    - name: acs-deploy-check
+      params:
+        - name: rox_central_endpoint <1>
+          value: stackrox-endpoint
+        - name: rox_api_token
+          value: stackrox-secret
+        - name: insecure-skip-tls-verify
+          value: 'true'
+      runAfter: <2>
+        - yaml-lint
+        - kube-score
+        - kube-linter
+      taskRef:
+        kind: Task
+        name: acs-deploy-check
+      workspaces:
+        - name: repository
+          workspace: shared-data-manifests <3>
+----
+<1> The parameters required for ACS.
+<2> This task runs after the linting tasks.
+<3> The workspace, where the manifests have been pulled.
+
+
+== Execute the Pipeline
+
+Again, we trigger our pipeline by simply updating the README.md of our source code. 
+
+The ACS check will verify if any security policies, that are valid for Deployment-states, are violated. 
+
+My test returned the following result. 
+
+.Pipeline Details
+image::step11-results.png[Pipeline Details]
+
+However, since the policies are configured to "inform only", the PipelineRun will finish successfully. 
+
+== Summary
+
+All ACS checks have been done now. The deployment does not violate any security policy that is configured in ACS ... or to be more exact: It does not violate enforced policy, thus the Task will end successfully.

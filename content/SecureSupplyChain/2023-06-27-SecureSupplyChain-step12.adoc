@@ -1,0 +1,172 @@
+--- 
+title: "Step 12 - Verify TLog Signature"
+description: "Step 12 Secure Supply Chain"
+date: "2023-06-27"
+doctype: book
+
+author: Thomas Jungbauer
+type: post
+categories:
+   - OpenShift
+   - Tekton
+   - CICD
+   - Pipelines
+tags: ["OCP", "Tekton", "OpenShift", "Pipleines", "CI/CD", "Supply Chain", "Rekor"] 
+
+aliases: [ 
+	 "/openshift/securesupplychain/step12",
+] 
+---
+
+:imagesdir: /SecureSupplyChain/images/
+:icons: font
+:toc:
+
+Since the image has been deployed on DEV now, we need to prepare everything for production. Before we start, we need to confirm that the whole signing process has been passed and that our signature has been applied correctly. With CoSign we signed our image and used Rekor to create a transparency log. We will use this log to confirm that the image was signed. 
+
+<!--more--> 
+
+== Goals
+
+The goals of this step are:
+
+* Verify if the image has been signed using Rekor transparency log.
+
+== CoSign public key
+
+Before we start, we need a secret in the Namespace **ci** that provides the PUBLIC key of CoSign. This key was generated in a previous link:/securesupplychain/2023-06-20-securesupplychain-step5/#_cosign_signing_the_image[Step 5 - CoSign - Signing the Image]
+
+
+[source,yaml]
+----
+kind: Secret
+apiVersion: v1
+metadata:
+  name: cosign-secret <1>
+  namespace: ci
+data:
+  cosign.pub: >-
+    <base64 CoSign PUBLIC key>
+type: Opaque
+----
+<1> base64 decoded PUBLIC key of CoSign
+
+== Create the Task
+
+The following task will use several steps to fetch and parse the transparency log, that has been created. The different tasks are using images from **Redhat-gpte**. The command line tool **rekor-cli** will be used to verify the entries in the log.
+
+[source,yaml]
+----
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: rekor-verify
+  namespace: ci
+spec:
+  params:
+    - default: image-registry-secret <1>
+      name: registrySecret
+      type: string
+    - default: cosign-secret <2>
+      name: cosignSecret
+      type: string
+    - default: >-
+        quay.io/placeholder/test:latest
+      name: image
+      type: string
+  steps:
+    - env:
+        - name: REGISTRY_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: .dockerconfigjson
+              name: $(params.registrySecret)
+        - name: COSIGN_PUBLIC_KEY
+          valueFrom:
+            secretKeyRef:
+              key: cosign.pub
+              name: $(params.cosignSecret)
+      image: quay.io/redhat-gpte/cosign
+      name: cosign-verify-image
+      resources: {}
+      script: > 
+        echo "${REGISTRY_SECRET}" > /home/cosign/.docker/config.json
+
+        echo "${COSIGN_PUBLIC_KEY}" > /workspace/cosign.pub
+
+        cosign verify --key /workspace/cosign.pub $(params.image) --output-file
+        /workspace/cosign.verify
+    - image: quay.io/redhat-gpte/jq
+      name: extract-signature-details
+      resources: {}
+      script: >
+        cat /workspace/cosign.verify | jq --raw-output '.[0] | .critical |
+        .image | .["docker-manifest-digest"]' > /workspace/cosign.sha
+    - image: quay.io/redhat-gpte/rekor-cli
+      name: rekor-search-sha
+      resources: {}
+      script: >
+        rekor-cli search --sha $(cat /workspace/cosign.sha) --format json >
+        /workspace/rekor.search
+    - image: quay.io/redhat-gpte/jq
+      name: rekor-extract-uuid
+      resources: {}
+      script: >
+        cat /workspace/rekor.search | jq '.UUIDs[0]' | sed 's/\"//g' >
+        /workspace/rekor.uuid
+    - image: quay.io/redhat-gpte/rekor-cli
+      name: rekor-get-with-uuid
+      resources: {}
+      script: >
+        rekor-cli get --uuid $(cat /workspace/rekor.uuid) --format json >
+        /workspace/rekor.get
+    - image: quay.io/redhat-gpte/jq
+      name: verify-attestation
+      resources: {}
+      script: |
+        cat /workspace/rekor.get | jq -r .Attestation
+----
+<1> Registry pull secret.
+<2> CoSign public key.
+
+== Update the Pipeline
+
+The Pipeline object must be extended with another Task:
+
+[source,yaml]
+----
+    - name: verify-tlog-signature
+      params: <1>
+        - name: registrySecret <2>
+          value: tjungbau-secure-supply-chain-demo-pull-secret
+        - name: cosignSecret <3>
+          value: cosign-secret
+        - name: image
+          value: '$(params.IMAGE_REPO):$(params.IMAGE_TAG)'
+      runAfter: <4>
+        - yaml-lint
+        - kube-score
+        - kube-linter
+      taskRef:
+        kind: Task
+        name: rekor-verify
+----
+<1> The parameters required for this task.
+<2> Pull secret for quay.io, which was created during step 5.
+<3> CoSign public key.
+<4> This task runs after the linting tasks.
+
+== Execute the Pipeline
+
+Triggering the pipeline will now check the signature of an image. 
+
+The logs should show something like this: 
+
+.Rekor Image Signature Verification
+image::step12-signature_verification.png[Rekor Image Signature Verification]
+
+As you can see: The image has been signed correctly and the transparency logs can be parsed. 
+
+== Summary
+
+Finally, everything has been verified and we can bring everything into production. The final two steps will create a new branch in the Git manifest repository and a pull request that can be manually merged.

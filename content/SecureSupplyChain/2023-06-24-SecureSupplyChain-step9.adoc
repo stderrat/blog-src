@@ -1,0 +1,345 @@
+--- 
+title: "Step 9 - Linting Kubernetes Manifests"
+description: "Step 9 Secure Supply Chain"
+date: "2023-06-28"
+doctype: book
+
+author: Thomas Jungbauer
+type: post
+categories:
+   - OpenShift
+   - Tekton
+   - CICD
+   - Pipelines
+tags: ["OCP", "Tekton", "OpenShift", "Pipleines", "CI/CD", "Supply Chain", "Linting"] 
+
+aliases: [ 
+	 "/openshift/securesupplychain/step9",
+] 
+---
+
+:imagesdir: /SecureSupplyChain/images/
+:icons: font
+:toc:
+
+At this point we have checked our source code, verified that it has been signed and has no vulnerabilities, generated a SBOM and updated the Kubernetes manifests, that are responsible to deploy our application on OpenShift. As everything with OpenShift these Kubernetes objects are simple yaml files. In this step we will perform a linting on these files, to verify if they follow certain rules and best practices. 
+
+<!--more--> 
+
+== Goals
+
+The goals of this step are:
+
+* Clone the Kubernetes manifest into a workspace
+* Create Tasks that perform the linting
+* WARN when the manifests do not follow best practices (we will not let the Task fail here, because I would need to modify all manifests)
+
+== What is linting
+
+A **linter** is an analysis tool that verifies if your code has any errors, bugs or stylistic errors. SonarQube could be seen as such tool. We used it to scan our source code. For Kubernetes manifests we can use tools that check the yaml files against best practices or security. For example, it could notify you if you forgot to define resources or probes in your manifests.
+
+=== Tools
+In this step, I will use three linting tools. In no way, this means you need to use all three. I only use them for demonstration purposes. However, to lint your yaml files or Helm charts is a common practice you should consider. 
+
+For this demonstration I am leveraging:
+
+* https://docs.kubelinter.io/#/[KubeLinter^]
+* https://yamllint.readthedocs.io/en/stable/[Yamllint^]
+* https://kube-score.com/[Kube-score^]
+
+NOTE: In the end, you should choose the tool that fits best for you. 
+
+== Manifests
+
+The manifest we are going to use can be found at my GitHub repository: https://github.com/tjungbauer/securing-software-supply-chain[Securing Software Supply Chain^]. It is a fork and the original can be found https://github.com/redhat-gpte-devopsautomation/securing-software-supply-chain[here^].
+
+
+== Prepare Pipeline
+
+. Modify the TriggerTemplate and add a parameter **LINTING_INFORM_ONLY** that either sets the Tasks to inform or enforce (failing when linting does find issues). In addition, we define a new workspace, where we will download and store the Kubernetes manifests.
++
+
+[source,yaml]
+----
+spec:
+  params:
+...
+    - description: Only inform on linting errors (Log) but do not actually fail
+      name: lintingInformOnly <1>
+  resourcetemplates:
+...
+      spec:
+        params:
+...
+          - name: LINTING_INFORM_ONLY
+            value: $(tt.params.lintingInformOnly)
+... 
+       workspaces:
+...
+          - name: shared-data-manifests <2>
+            volumeClaimTemplate:
+              metadata:
+                creationTimestamp: null
+              spec:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 1Gi
+              status: {}
+----
+<1> New parameter to either inform only when linting is unsuccessful or to enforce that the Task will end with an error.
+<2> Workspace to download and store the yaml files. 
+
+. Update the TriggerBinding to set the values for the PipelineRun.
++
+
+[source,yaml]
+----
+spec:
+  params:
+...
+    - name: lintingInformOnly <1>
+      value: 'true'
+----
+<1> Set the parameter to 'true'
+
+. Update the Pipeline object. Here we will need to add the parameter and four Tasks (clone the Git Repo, KubeLinter, Yamllint and kube-score) as well as the workspace.
++
+
+[source,yaml]
+----
+spec:
+  params:
+...
+    - name: LINTING_INFORM_ONLY <1>
+      type: string
+...
+    - name: pull-manifests <2>
+      params:
+        - name: url
+          value: $(params.MANIFEST_REPO)
+        - name: revision
+          value: $(params.MANIFEST_GIT_REF)
+        - name: deleteExisting
+          value: 'true'
+      runAfter:
+        - update-dev-manifest <3>
+      taskRef:
+        kind: ClusterTask <4>
+        name: git-clone
+      workspaces: <5>
+        - name: output
+          workspace: shared-data-manifests
+    - name: kube-linter <6>
+      params:
+        - name: informLintingOnly <7>
+          value: $(params.LINTING_INFORM_ONLY)
+      runAfter:
+        - pull-manifests <8>
+      taskRef:
+        kind: Task
+        name: kube-linter
+      workspaces:
+        - name: repository
+          workspace: shared-data-manifests
+    - name: kube-score <9>
+      params:
+        - name: informLintingOnly
+          value: $(params.LINTING_INFORM_ONLY)
+      runAfter:
+        - pull-manifests <10>
+      taskRef:
+        kind: Task
+        name: kube-score
+      workspaces:
+        - name: repository <11>
+          workspace: shared-data-manifests
+    - name: yaml-lint <12>
+      params:
+        - name: informLintingOnly
+          value: $(params.LINTING_INFORM_ONLY)
+      runAfter:
+        - pull-manifests <13>
+      taskRef:
+        kind: Task
+        name: yaml-lint
+      workspaces:
+        - name: repository <14>
+          workspace: shared-data-manifests
+  workspaces:
+...
+    - name: shared-data-manifests
+----
+<1> New parameter assigned to the Pipeline.
+<2> Task to clone the repository to the workspace.
+<3> Will run after the Pipeline has updated the manifests with the new image.
+<4> Is a child of the ClusterTask git-clone.
+<5> The workspace to clone the repository. 
+<6> Task to execute KubeLinter.
+<7> Parameter to either enforce or inform only.
+<8> Will run after the repository has been cloned.
+<9> Task to execute kube-score.
+<10> Will run after the repository has been cloned.
+<11> Workspace where the cloned repository can be found.
+<12> Task to execute Yamllint.
+<13> Will run after the repository has been cloned.
+<14> Workspace where the cloned repository can be found.
+
+WARNING: Remember: It is not required to execute three different linter tools. It is only done as a showcase. I personally like KubeLinter. Choose whatever tool is suitable for you.
+
+. Create the different Task objects for the linter tools. Each Task will execute a linter program and provides its very own Log. 
+
+CAUTION: I have created the image **linter-image** that contains the three required binaries. It is available at Quay.io and its original Dockerfile can be found https://github.com/tjungbauer/linter-image[here^]. Use it at your own risk :).
+
+.. **KubeLinter** 
++
+[source,yaml]
+----
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: kube-linter
+  namespace: ci
+spec:
+  description: >-
+    Task to run KubeLinter and perform a linting of Kubernetes manifets.
+  params:
+    - default: 'false'
+      name: informLintingOnly
+      type: string
+  steps:
+    - image: 'quay.io/tjungbau/linter-image:v1.0.2'
+      name: kube-linter
+      resources: {}
+      script: >
+        #!/usr/bin/env bash
+
+        RC=0
+
+        kube-linter lint /workspace/repository/. --config "/workspace/repository/.kube-linter.yaml" <1>
+
+        if [ $? -gt 0 ]; then
+          RC=1
+        fi
+
+        # We actually do not fail but inform only
+
+        if [ "$(params.informLintingOnly)" = "true" ]; then
+          echo "Informing only, task will not fail. Actual return code was $RC"
+          exit 0;
+        fi
+
+        (exit $RC)
+      workingDir: /workspace/repository
+  workspaces:
+    - name: repository
+----
+<1> Execute kube-linter using the configuration stored in the repository.
+
+.. **kube-score** 
++
+[source,yaml]
+----
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: kube-score
+  namespace: ci
+spec:
+  description: >-
+    Task to run kube-score and perform a linting of Kubernetes manifets.
+  params:
+    - default: 'false'
+      name: informLintingOnly
+      type: string
+  steps:
+    - image: 'quay.io/tjungbau/linter-image:v1.0.2'
+      name: kube-linter
+      resources: {}
+      script: >
+        #!/usr/bin/env bash
+
+        RC=0
+
+        KUBESCORE_IGNORE_TESTS="${KUBESCORE_IGNORE_TESTS:-container-image-pull-policy,pod-networkpolicy}" <1>
+
+        for i in `find . -name '*.yaml' -type f`;  do kube-score score
+        --ignore-test ${KUBESCORE_IGNORE_TESTS} $i; let RC=RC+$?; done
+
+        if [ $? -gt 0 ]; then
+          RC=1
+        fi
+
+        # We actually do not fail but inform only
+        
+        if [ "$(params.informLintingOnly)" = "true" ]; then
+          echo "Informing only, task will not fail. Actual return code was $RC"
+          exit 0;
+        fi
+        
+        (exit $RC)
+      workingDir: /workspace/repository
+  workspaces:
+    - name: repository
+----
+<1> Disable checks for Network Policies or image Pull policy for kube-score.
+
+.. **Yammllint** 
++
+[source,yaml]
+----
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: yaml-lint
+  namespace: ci
+spec:
+  description: >-
+    Task to run yamllint and perform a linting of Kubernetes manifets.
+  params:
+    - default: 'false'
+      name: informLintingOnly
+      type: string
+  steps:
+    - image: 'quay.io/tjungbau/linter-image:v1.0.2'
+      name: yaml-lint
+      resources: {}
+      script: |
+        #!/usr/bin/env bash
+
+        for files in `find . -type f -name '*.yaml'`; do <1>
+          yamllint -c /workspace/repository/.yamllint.yaml ${files}; let var=var+$?
+        done
+        
+        # We actually do not fail but inform only
+        
+        if [ "$(params.informLintingOnly)" = "true" ]; then
+          echo "Informing only, task will not fail. Actual return code was $var"
+          exit 0;
+        fi
+        
+        (exit $var)
+      workingDir: /workspace/repository
+  workspaces:
+    - name: repository
+----
+<1> Execute kube-linter using the configuration stored in the repository.
+
+== Execute the Pipeline
+
+The Pipeline now looks like this: 
+
+.Pipeline Details
+image::step9-pipeline.png[Pipeline Details]
+
+Remember, you typically need only one linter tool, not three different ones. Since we inform only you will see some errors in the logs. For example, for kube-linter: 
+
+.Kube-Linter Results
+image::step9-kubelinter.png[Kube-Linter Results]
+
+== Summary
+
+Now, all our yaml manifests have been linted, with three different tools. And because we do not fail at this stage, we can continue. The next steps will be some deployment checks. 
+
+NOTE: Since everything is done using Argo CD and the manifests have been updated during the step "update-manifest", the changes will be most likely already deployed. Even if the linting-step comes later and might even fail. This is fine because we first deploy on a DEV environment. So, if linting fails, it will prohibit the rollout to production, while some application testing can still be done on DEV. 

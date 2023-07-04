@@ -1,0 +1,87 @@
+--- 
+title: "Introduction to a Secure Supply Chain"
+description: "Introduction to Secure Supply Chain"
+date: "2023-06-28"
+doctype: book
+
+author: Thomas Jungbauer
+type: post
+categories:
+   - OpenShift
+   - Tekton
+   - CICD
+   - Pipelines
+tags: ["OCP", "Tekton", "OpenShift", "Pipleines", "CI/CD", "Supply Chain"] 
+
+aliases: [ 
+	 "/openshift/securesupplychain/intro",
+] 
+---
+
+:imagesdir: /SecureSupplyChain/images/
+:icons: font
+:toc:
+
+The goal of the following ("short") series is to build a secure CI/CD pipeline step by step using OpenShift Pipelines (based on Tekton). 
+The whole build process shall pull and build an image, upload it to a development environment and subsequently update the production environment. 
+
+The main focus here is security. Several steps and tools shall help to build and deploy a **Secure Supply Chain**.
+
+The whole process is part of a Red Hat workshop which can present to your organization. I did some tweaks and created a step-by-step plan in order 
+to remember it ... since I am getting old :)  
+
+<!--more--> 
+
+== The Journey to Secure Supply Chain
+
+This series includes the following articles: 
+
+. link:/openshift/securesupplychain/step1/[Listen to Events]
+. link:/openshift/securesupplychain/step2/[Pipelines]
+. link:/openshift/securesupplychain/step3/[SonarQube]
+. link:/openshift/securesupplychain/step4/[Verify Git Commit]
+. link:/openshift/securesupplychain/step5/[Build and Sign Image]
+. link:/openshift/securesupplychain/step6/[Scanning with ACS]
+. link:/openshift/securesupplychain/step7/[Generating a SBOM]
+. link:/openshift/securesupplychain/step8/[Updating Kubernetes Manifests]
+. link:/openshift/securesupplychain/step9/[Linting Kubernetes Manifests]
+. link:/openshift/securesupplychain/step10/[The Example Application]
+. link:/openshift/securesupplychain/step11/[ACS Deployment Check]
+. link:/openshift/securesupplychain/step12/[Verify TLOG Signature]
+. link:/openshift/securesupplychain/step13/[Bring it to Production]
+
+
+
+== Prerequisites
+In order to develop our Secure Supply Chain, we need an **OpenShift 4 Cluster**. I am currently using OpenShift 4.13. 
+Moreover, the **OpenShift Pipelines** operator must be deployed. It is based on https://tekton.dev/[Tekton^] and provides a Kubernetes-native way to create CI/CD pipelines.
+
+The operator is deployed using the Operator Hub inside your cluster. Simply search for OpenShift Pipelines and install the operator using the default settings.
+
+.Install OpenShift Pipelines
+image::intro-install_Tekton_Operator.png?width=220px[OpenShift Pipelines]
+
+Finally, you will need a GitHub account to be able to fork some repositories.
+
+NOTE: Some steps in the pipeline are working tightly with GitHub, especially the very last one that is talking GitHub's API. However, any Git-system should work, and probably just minor changes will be required.
+
+Everything else will be installed during the different steps described in the upcoming articles, while we build and tweak our pipeline. 
+
+Remember, the big goal of our pipeline is NOT to simply pull, build and push our code, but to integrate certain security tools like code scanning, image scanning and linting. 
+Otherwise, it would be boring. 
+
+== Used Tools
+
+The following list of tools (or specifications) are used for our pipeline. They will be deployed when the appropriate step requires it. 
+
+* https://docs.openshift.com/acs/4.1/welcome/index.html[Advanced Cluster Security^]
+* https://docs.openshift.com/acs/4.1/cli/getting-started-cli.html[roxctl^]
+* https://www.sonarsource.com/products/sonarqube/[SonarQube^] 
+* https://www.redhat.com/en/technologies/cloud-computing/quay[Quay - quay.io as public registry^]
+* https://docs.sigstore.dev/cosign/overview/[CoSign^]
+* https://docs.sigstore.dev/rekor/overview/[Rekor^]
+* https://cyclonedx.org/capabilities/sbom/[Software Bill of Material (SBOM)^]
+* https://docs.kubelinter.io/#/[KubeLinter^]
+* https://kube-score.com/[KubeScore^]
+* https://github.com/adrienverge/yamllint[YamlLint^]
+* https://github.com/looztra/kubesplit[kubesplit^]

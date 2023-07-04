@@ -1,0 +1,259 @@
+--- 
+title: "Step 4 - Verify Git Commit"
+description: "Step 4 Secure Supply Chain"
+date: "2023-06-28"
+doctype: book
+
+author: Thomas Jungbauer
+type: post
+categories:
+   - OpenShift
+   - Tekton
+   - CICD
+   - Pipelines
+tags: ["OCP", "Tekton", "OpenShift", "Pipleines", "CI/CD", "Supply Chain"] 
+
+aliases: [ 
+	 "/openshift/securesupplychain/step4",
+] 
+---
+
+:imagesdir: /SecureSupplyChain/images/
+:icons: font
+:toc:
+
+Besides checking the source code quality, we should also verify if the commit into Git was done by someone/something we trust. It is a good practice to sign all commits to Git. You need to prepare your Git account and create trusted certificates. 
+
+<!--more--> 
+
+CAUTION: I will not describe how exactly you need to configure Git to sign your commit. Verify the following link to learn more about https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits[Signing Commits^]
+
+== Goals
+
+The goals of this step are:
+
+* Verify if the last commit has been signed
+
+== Prerequisites
+
+* Signing public key
+* Configured Git to verify your gpg signature
+
+When your commit is signed, Git will show that: 
+
+.Pipeline
+image::step4-signed-commit.png?width=420px[Pipeline]
+
+== Steps
+
+. Create the following Secret that contains your **PUBLIC** key. 
++
+
+[source,yaml]
+----
+kind: Secret
+apiVersion: v1
+metadata:
+  name: gpg-public-key
+  namespace: ci
+data:
+  public.key: >-
+    <Base64 PUBLIC GPG KEY> <1>
+type: Opaque
+----
+<1> Public key, containing BEGIN/END lines base64 encoded.
+
+
+. Create the following Task: 
++
+
+[source,yaml]
+----
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: verify-source-code-commit-signature
+  namespace: ci
+spec:
+  description: This task verifies the latest commit and signature against the gpg
+    public key
+  steps:
+  - computeResources: {}
+    image: alpine/git:latest
+    name: git-verify
+    script: |
+      set -x <1>
+
+      apk add gpg-agent
+      
+      gpg --import /workspace/secrets/public.key
+      
+      git config --global --add safe.directory /workspace/repository
+      
+      git verify-commit HEAD || (echo "Unable to verify commit at HEAD!" && exit 1)
+    workingDir: /workspace/repository
+  workspaces:
+  - name: repository
+  - name: secrets <2>
+----
+<1> The script to verify the signature of the commit,
+<2> The workspace that mounts the Secret containing the gpg key,
+
+. Modify the TriggerTemplate and add the following 3 lines
++
+
+[source,yaml]
+----
+        workspaces:
+...
+          - name: secrets
+            secret:
+              secretName: gpg-public-key <1>
+----
+<1> The name of the Secret where the public key can be found.
+
+. Update the pipeline to execute the task **verify-commit-signature**, which is running in parallel to the SonarQube scan. 
++
+
+[source,yaml]
+----
+    - name: verify-commit-signature
+      runAfter:
+        - pull-source-code <1>
+      taskRef:
+        kind: Task
+        name: verify-source-code-commit-signature <2>
+      workspaces: <3>
+        - name: repository
+          workspace: shared-data
+        - name: secrets
+          workspace: secrets
+  workspaces:
+    ...
+    - name: secrets <4>
+----
+<1> This task runs after **pull-source-code** but in parallels with the SonarQube task.
+<2> Task reference
+<3> Workspaces that are used in this Task
+<4> Additional workspace for the Pipeline
+
+
+The full pipeline objects now look like the following: 
+
+{{% expand %}}
+[source,yaml]
+----
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: secure-supply-chain
+  namespace: ci
+spec:
+  params:
+    - name: REPO_HOST
+      type: string
+    - name: COMMIT_SHA
+      type: string
+    - name: TLSVERIFY
+      type: string
+    - name: BUILD_EXTRA_ARGS
+      type: string
+    - name: IMAGE_REPO
+      type: string
+    - name: IMAGE_TAG
+      type: string
+    - name: GIT_REF
+      type: string
+    - name: COMMIT_DATE
+      type: string
+    - name: COMMIT_AUTHOR
+      type: string
+    - name: COMMIT_MESSAGE
+      type: string
+    - name: GIT_REPO
+      type: string
+    - name: SONARQUBE_HOST_URL
+      type: string
+    - name: SONARQUBE_PROJECT_KEY
+      type: string
+    - name: SONARQUBE_PROJECT_SECRET
+      type: string
+  tasks:
+    - name: pull-source-code
+      params:
+        - name: url
+          value: $(params.GIT_REPO)
+        - name: revision
+          value: $(params.GIT_REF)
+        - name: deleteExisting
+          value: 'true'
+      taskRef:
+        kind: ClusterTask
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: shared-data
+    - name: scan-source
+      params:
+        - name: sonarqubeHostUrl
+          value: $(params.SONARQUBE_HOST_URL)
+        - name: sonarqubeProjectKey
+          value: $(params.SONARQUBE_PROJECT_KEY)
+        - name: sonarqubeProjectSecret
+          value: $(params.SONARQUBE_PROJECT_SECRET)
+      runAfter:
+        - pull-source-code
+      taskRef:
+        kind: Task
+        name: scan-code
+      workspaces:
+        - name: repository
+          workspace: shared-data
+    - name: verify-commit-signature
+      runAfter:
+        - pull-source-code
+      taskRef:
+        kind: Task
+        name: verify-source-code-commit-signature
+      workspaces:
+        - name: repository
+          workspace: shared-data
+        - name: secrets
+          workspace: secrets
+  workspaces:
+    - name: shared-data
+    - name: secrets
+----
+{{% /expand %}}
+
+The status of the Pipeline now is: 
+
+.Pipeline
+image::step4-pipeline.png?width=600px[Pipeline]
+
+
+== Execute the Pipeline
+
+Let's update the **README.md** of our source code again to trigger another PipelineRun.
+
+Now the 3rd task will verify if the commit was signed. 
+
+.PipelineRun Details
+image::step4-PipelineRun_exec.png?width=600px[PipelineRun Details]
+
+In the logs of the Task, we can see that the commit was signed and could be verified.
+See: 
+[source]
+----
+...
+gpg: Good signature from "Thomas Jungbauer <tjungbau@redhat.com>"
+...
+----
+
+.Signature Verification
+image::step4-verify-signature.png?width=600px[Signature Verification]
+
+
+== Summary
+At this stage we have a Pipeline, that pulls our code, does a code analysis, and verifies if the commit has been signed. 
+The very next step is to build the image and push it into an Image Registry. 

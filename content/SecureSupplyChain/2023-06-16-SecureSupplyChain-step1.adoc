@@ -1,0 +1,324 @@
+--- 
+title: "Step 1 - Listen to Events"
+description: "Step 1 Secure Supply Chain"
+date: "2023-06-28"
+doctype: book
+
+author: Thomas Jungbauer
+type: post
+categories:
+   - OpenShift
+   - Tekton
+   - CICD
+   - Pipelines
+tags: ["OCP", "Tekton", "OpenShift", "Pipleines", "CI/CD", "Supply Chain"] 
+
+aliases: [ 
+	 "/openshift/securesupplychain/step1",
+] 
+---
+
+:imagesdir: /SecureSupplyChain/images/
+:icons: font
+:toc:
+
+In this first step, we will simply prepare our environment to be able to retrieve calls from Git. In Git we will fork a prepared source code into a repository and any time a developer pushes a new code into our repository a webhook will notify OpenShift Pipelines to start the pipeline. Like most pipelines, the first task to be executed is to fetch the source code so it can be used for the next steps. 
+The application I am going to use is called https://github.com/tjungbauer/globex-ui[globex-ui^] and is an example webUI build with Angular. 
+
+<!--more--> 
+
+== Goals
+
+The goals of this step are:
+
+* Create the **EventListener** and **Trigger-Settings** that will take care of notifications by GitHub.
+* Create a secret for GitHub authentication.
+* Fork a prepared source code and create a webhook inside Git.
+
+== Create the EventListener
+
+. The first thing we need to create is a Namespace that will be responsible for all our Pipeline-objects. In this example, it is called **ci**: 
++
+[source,bash]
+----
+oc new-project ci 
+----
+
+. Now we need to create the so-called **EventListener**. This requires the creation of several objects:
+
+.. Create a **TriggerBinding**: A TriggerBinding captures fields from an event and provides them as named parameters to the TriggerTemplate and subsequently to the PipelineRun. 
++
+We will create two TriggerBindings:
++
+** **globex-ui** - For the required settings of our example application
+** **github-push** - For the relevant parameters to push into git. These parameters will be provided by Git whenever Git is using the Webhook to inform OpenShift that a new push event happened. 
++
+Copy the following examples into your cluster. 
++
+WARNING: The list of parameters in these manifests will be extended throughout this series.
++
+
+[source,yaml]
+----
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: globex-ui
+  namespace: ci
+spec:
+  params:
+  - name: tlsVerify <1>
+    value: "false"
+  - name: gitRepoHost <2>
+    value: github.com
+----
+<1> Default values for verifying SSL is "false" (Since I do not have certificates in place)
+<2> The default value for the Git URL is github.com
++
+
+[source,yaml]
+----
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerBinding
+metadata:
+  name: github-push
+  namespace: ci
+spec:
+  params:
+    - name: gitrepositoryurl <1>
+      value: $(body.repository.clone_url)
+    - name: fullname
+      value: $(body.repository.full_name)
+    - name: io.openshift.build.commit.ref
+      value: $(extensions.ref)
+    - name: io.openshift.build.commit.id
+      value: $(body.head_commit.id)
+    - name: io.openshift.build.commit.date
+      value: $(body.head_commit.timestamp)
+    - name: io.openshift.build.commit.message
+      value: $(body.head_commit.message)
+    - name: io.openshift.build.commit.author
+      value: $(body.head_commit.author.name)
+----
+<1> Several parameters, coming from Git via the Webhook, for example the exact URL to the repository, the ID of the commit, the date of the commit etc. 
+
+.. Create a **TriggerTemplate**: A TriggerTemplate acts as a blueprint for PipelineRuns (or TaskRuns). The resources and parameters here will be used when our Pipeline is executed. It also defines the workspaces, that will be used by the pipeline. For now, we are using the space _shared-data_ where we will pull the source code for further checks. 
++
+
+[source,yaml]
+----
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerTemplate
+metadata:
+  name: app-globex-ui-template
+  namespace: ci
+spec:
+  params: <1>
+    - description: The git repository URL.
+      name: gitrepositoryurl
+    - description: The repository name for this PullRequest.
+      name: fullname
+    - description: The git branch for this PR.
+      name: io.openshift.build.commit.ref
+    - description: the specific commit SHA.
+      name: io.openshift.build.commit.id
+    - description: The date at which the commit was made
+      name: io.openshift.build.commit.date
+    - description: The commit message
+      name: io.openshift.build.commit.message
+    - description: The name of the github user handle that made the commit
+      name: io.openshift.build.commit.author
+    - description: The host name of the git repo
+      name: gitRepoHost
+    - description: Enable image repository TLS certification verification.
+      name: tlsVerify
+    - description: Extra parameters passed for the push command when pushing images.
+      name: build_extra_args
+    - description: Target image repository name
+      name: imageRepo
+  resourcetemplates: <2>
+    - apiVersion: tekton.dev/v1beta1
+      kind: PipelineRun
+      metadata:
+        generateName: secure-supply-chain- <3>
+      spec:
+        params: <4>
+          - name: REPO_HOST
+            value: $(tt.params.gitRepoHost)
+          - name: GIT_REPO
+            value: $(tt.params.gitrepositoryurl)
+          - name: TLSVERIFY
+            value: $(tt.params.tlsVerify)
+          - name: BUILD_EXTRA_ARGS
+            value: $(tt.params.build_extra_args)
+          - name: IMAGE_REPO
+            value: $(tt.params.imageRepo)
+          - name: IMAGE_TAG
+            value: >-
+              $(tt.params.io.openshift.build.commit.ref)-$(tt.params.io.openshift.build.commit.id)
+          - name: COMMIT_SHA
+            value: $(tt.params.io.openshift.build.commit.id)
+          - name: GIT_REF
+            value: $(tt.params.io.openshift.build.commit.ref)
+          - name: COMMIT_DATE
+            value: $(tt.params.io.openshift.build.commit.date)
+          - name: COMMIT_AUTHOR
+            value: $(tt.params.io.openshift.build.commit.author)
+          - name: COMMIT_MESSAGE
+            value: $(tt.params.io.openshift.build.commit.message)
+        pipelineRef: <5>
+          name: secure-supply-chain
+        serviceAccountName: pipeline <6>
+        workspaces: <7>
+          - name: shared-data
+            volumeClaimTemplate:
+              metadata:
+                creationTimestamp: null
+              spec:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 3Gi
+              status: {}
+----
+<1> List of parameters for this TriggerTemplate, that should be used further for the pipeline.
+<2> The resources we are going to use.
+<3> The name prefix of the generated PipelineRun
+<4> List of parameters that shall be provided to the pipeline
+<5> The reference to the pipeline that shall be executed. 
+<6> Name of the ServiceAccount that will execute the Pipeline. Per default, this is **pipeline** which is managed by the Operator.
+<7> The workspaces that will be used by the PipelineRun. Currently **shared-data** only.
+
+
+.. Create an **EventListener** that sets up a Service and listens for specific events and exposes a sink that receives incoming events, for example from a GitHub Webhook. It connects TriggerTemplate to a TriggerBinding. In this example, we create a Listener with 1 replica (that's enough for testing) and connect our two TriggerBindings. 
++
+We also refer to the secret **webhook-secret-globex-ui** which will hold the password for GitHub to authenticate. 
+We filter any push event coming from my Git repository **tjungbauer/globex-ui**
++
+
+[source,yaml]
+----
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: EventListener
+metadata:
+  name: globex-ui-event-listener
+  namespace: ci
+spec:
+  namespaceSelector: {}
+  resources:
+    kubernetesResource:
+      replicas: 1
+      spec:
+        template:
+          metadata:
+            creationTimestamp: null
+          spec:
+            containers: null
+  serviceAccountName: pipeline
+  triggers: <1>
+    - bindings:
+        - kind: TriggerBinding
+          ref: globex-ui
+        - kind: TriggerBinding
+          ref: github-push
+      interceptors:
+        - params:
+            - name: secretRef
+              value:
+                secretKey: webhook-secret-key
+                secretName: webhook-secret-globex-ui <2>
+          ref:
+            kind: ClusterInterceptor
+            name: github
+        - params:
+            - name: filter <3>
+              value: >-
+                (header.match('X-GitHub-Event', 'push') &&
+                body.repository.full_name == 'tjungbauer/globex-ui')
+            - name: overlays
+              value:
+                - expression: 'body.ref.split(''/'')[2]'
+                  key: ref
+          ref:
+            kind: ClusterInterceptor
+            name: cel
+      name: build-from-push-globex-ui
+      template: <4>
+        ref: app-globex-ui-template
+----
+<1> TriggerBindings that are used.
+<2> Reference to the secret.
+<3> A filter for push events and our repository name.
+<4> The TriggerTemplate that will be used.
+
+.. Now let us create a **Route** object to allow external traffic (from Git) to the EventListener.
++
+
+[source,yaml]
+----
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: el-event-listener
+  namespace: ci
+spec:
+  port:
+    targetPort: http-listener
+  to:
+    kind: Service
+    name: el-globex-ui-event-listener <1>
+    weight: 100
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None
+----
+<1> Service that will be automatically created when the EventListener has been created.
+
+.. And finally, we create a Secret to allow GitHub to authenticate. The name of the Secret is referenced inside the EventListener object. 
++
+
+[source,yaml]
+----
+kind: Secret
+apiVersion: v1
+metadata:
+  name: webhook-secret-globex-ui <1>
+  namespace: ci
+stringData:
+  webhook-secret-key: yoursecret <2>
+type: Opaque
+----
+<1> Name as referenced in the EventListener
+<2> Your super secure password
+
+== Prepare GitHub
+
+Now we have everything in place to prepare our source code in Git. All we need to do is to create a repository that holds our source code and a Webhook. 
+		
+. Fork the Source Code: https://github.com/redhat-gpte-devopsautomation/globex-ui 
++
+Why fork? I want to be able to update the files and trigger the Pipeline whenever I want to. My forked repository can be found at: https://github.com/tjungbauer/globex-ui 
+
+. Create a Webhook in GitHub. Go to __Settings > Webhooks__ and add a new Webhook using:
++
+.Create a new Webhook.
+image::step1-create_github_webhook.png?width=500px[Create a new Webhook.]
+
+.. The Route URL that was created.
+.. Content type: application/json.
+.. Your Password as used in the secret above.
+.. Enable or disable SSL verification, since I was too lazy to create a certificate at my demo cluster, I disabled it. 
+.. And select which events, shall be sent to the Listener. In our case, push events are just fine. 
+
+. After a few seconds GitHub should have validated the Webhook (reload the page eventually)
++
+
+.Verify Webhook
+image::step1-active_webhook.png[Verify Webhook]
+
+== Summary
+That's it, we now have a Git repository, that will send any push-event to the EventListener, which uses the Triggers to fill out any required parameters and starts the pipeline named: **secure-supply-chain**.
+
+This pipeline does not exist yet and will be created in the next step together with its first task to pull from the Git repository.

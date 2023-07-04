@@ -1,0 +1,431 @@
+--- 
+title: "Step 13 - Bring it to Production"
+description: "Step 13 Secure Supply Chain"
+date: "2023-06-27"
+doctype: book
+
+author: Thomas Jungbauer
+type: post
+categories:
+   - OpenShift
+   - Tekton
+   - CICD
+   - Pipelines
+tags: ["OCP", "Tekton", "OpenShift", "Pipleines", "CI/CD", "Supply Chain", "Rekor"] 
+
+aliases: [ 
+	 "/openshift/securesupplychain/step13",
+] 
+---
+
+:imagesdir: /SecureSupplyChain/images/
+:icons: font
+:toc:
+
+If you reached this article, congratulations! You read through tons of pages to build up a Pipeline. The last two steps in our Pipeline are: Creating a new branch and creating a pull request, with the changes of the image tag that must be approved and will be merged then (We will not update the main branch directly!). Finally, we will do a "real" update to the application to see the actual changes. 
+
+<!--more--> 
+
+== Goals
+
+The goals of this step are:
+
+* Create a task that creates a new branch in Git repository.
+* Create a task that creates a pull request in Git repository.
+* Perform a full End2End run of the Pipeline and approve the pull request.
+
+== Create a token at GitHub
+
+To create a pull request we need to authenticate against the Git api. For this, we will need a token. In GitHub open your personal settings (by clicking on your avatar) and then go to "Developer settings". 
+
+Select "Personal access tokens" and "fine-graining tokens" to create a new token. 
+
+.GitHub Personal Access Token
+image::step13-github_pta.png?width=400px[GitHub Personal Access Token]
+
+Enter the required fields:
+
+* Name: Secure Supply Chain
+* Expiration: Whatever your like (max is 1 year)
+* Repository access: Only select repositories
+* Select your repository, for example: tjungbauer/securing-software-supply-chain
+* Permissions: "Pull requests" > Read and write
+
+.GitHub Personal Access Token Created
+image::step13-github_pta_created.png?width=600px[GitHub Personal Access Token Created]
+
+Save the created token and create the following secret: 
+
+[source,yaml]
+----
+kind: Secret
+apiVersion: v1
+metadata:
+  name: github-token
+  namespace: ci
+stringData:
+  token: <Token Value> <1>
+type: Opaque
+----
+<1> Clear-text token. If already base64 encoded, change __stringData__ to __data__.
+
+== Task: Create a new branch
+
+Since we do not update the main branch directly, we will create a new (feature) branch, that will be used for a pull request and can be deleted after the pull request has been merged. 
+
+. Create the following Task object
++
+This Task will use git commands to create a new feature-branch and pushes the changes into that branch.
++
+[source,yaml]
+----
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: new-branch-manifest-repo
+  namespace: ci
+spec:
+  description: >-
+    This task creates a branch for a PR to point to the image tag created with
+    the short commit.
+  params:
+    - description: Used to tag the built image.
+      name: image
+      type: string
+    - default: main
+      description: Target branch to push to
+      name: target-branch
+      type: string
+    - default: Tekton Pipeline
+      description: Git user name for performing the push operation.
+      name: git_user_name
+      type: string
+    - default: tekton@tekton.com
+      description: Git user email for performing the push operation.
+      name: git_user_email
+      type: string
+    - description: File in which the image configuration is stored.
+      name: configuration_file
+      type: string
+    - description: Repo in which the image configuration is stored.
+      name: repository
+      type: string
+  steps:
+    - image: 'alpine/git:latest'
+      name: git
+      resources: {}
+      script: >-
+        # Setting up the git config.
+
+        git config --global user.email "$(params.git_user_email)"
+
+        git config --global user.name "$(params.git_user_name)"
+
+
+        # Checkout target branch to avoid the detached HEAD state
+
+        TMPDIR=$(mktemp -d)
+
+
+        cd $TMPDIR
+
+        git clone $(params.repository) <1>
+
+        cd securing-software-supply-chain
+
+        git checkout -b $(params.target-branch) <2>
+
+
+        # Set to the short commit value passed as parameter.
+
+        # Notice the enclosing " to keep it as a string in the resulting YAML.
+
+        IMAGE=\"$(params.image)\"
+
+
+        sed -i "s#\(.*value:\s*\).*#\1 ${IMAGE}#" $(params.configuration_file)
+
+
+        git add $(params.configuration_file) <3>
+
+        git commit -m "Automatically updated manifest to point to image tag
+        $IMAGE"
+
+        git push origin $(params.target-branch)
+----
+<1> Clone the main repository.
+<2> Create a new feature branch. 
+<3> Add, commit, and push everything to the new branch.
+
+. Modify the Pipeline object
++
+The Task must be added to the Pipeline, it provides several required parameters.
++
+[source,yaml]
+----
+    - name: create-prod-manifest-branch
+      params:
+        - name: image
+          value: '$(params.IMAGE_REPO):$(params.IMAGE_TAG)'
+        - name: configuration_file
+          value: $(params.MANIFEST_FILE_PROD)
+        - name: repository
+          value: $(params.MANIFEST_REPO)
+        - name: git_user_name
+          value: $(params.COMMIT_AUTHOR)
+        - name: target-branch
+          value: feature-for-$(params.COMMIT_SHA)
+      runAfter:
+        - acs-deploy-check
+        - verify-tlog-signature
+      taskRef:
+        kind: Task
+        name: new-branch-manifest-repo
+----
+
+== Task: Create a Pull request
+
+. Create the following Task object
++
+The following task will take the token and create a new pull request at GitHub:
++
+[source,yaml]
+----
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: git-open-pull-request
+  namespace: ci
+spec:
+  description: >-
+    This task will open a PR on Github based on several parameters. This could
+    be useful in GitOps repositories for example.
+  params:
+    - default: api.github.com
+      description: |
+        The GitHub host, adjust this if you run a GitHub enteprise or Gitea
+      name: GITHUB_HOST_URL
+      type: string
+    - default: ''
+      description: |
+        The API path prefix, GitHub Enterprise has a prefix e.g. /api/v3
+      name: API_PATH_PREFIX
+      type: string
+    - description: |
+        The GitHub repository full name, e.g.: tektoncd/catalog
+      name: REPO_FULL_NAME
+      type: string
+    - default: github
+      description: >
+        The name of the kubernetes secret that contains the GitHub token,
+        default: github
+      name: GITHUB_TOKEN_SECRET_NAME
+      type: string
+    - default: token
+      description: >
+        The key within the kubernetes secret that contains the GitHub token,
+        default: token
+      name: GITHUB_TOKEN_SECRET_KEY
+      type: string
+    - default: Bearer
+      description: >
+        The type of authentication to use. You could use the less secure "Basic"
+        for example
+      name: AUTH_TYPE
+      type: string
+    - description: |
+        The name of the branch where your changes are implemented.
+      name: HEAD
+      type: string
+    - description: |
+        The name of the branch you want the changes pulled into.
+      name: BASE
+      type: string
+    - description: |
+        The body description of the pull request.
+      name: BODY
+      type: string
+    - description: |
+        The title of the pull request.
+      name: TITLE
+      type: string
+  results:
+    - description: Number of the created pull request.
+      name: NUMBER
+      type: string
+    - description: URL of the created pull request.
+      name: URL
+      type: string
+  steps:
+    - env:
+        - name: PULLREQUEST_NUMBER_PATH
+          value: $(results.NUMBER.path)
+        - name: PULLREQUEST_URL_PATH
+          value: $(results.URL.path)
+      image: 'registry.access.redhat.com/ubi8/python-38:1'
+      name: open-pr
+      resources: {}
+      script: >-
+        #!/usr/libexec/platform-python <1>
+
+        """This script will open a PR on Github"""
+
+        import json
+
+        import os
+
+        import sys
+
+        import http.client
+
+        github_token = <2>
+        open("/etc/github-open-pr/$(params.GITHUB_TOKEN_SECRET_KEY)",
+        "r").read()
+
+        open_pr_url = "/repos/$(params.REPO_FULL_NAME)/pulls"
+
+        data = { <3>
+            "head": "$(params.HEAD)",
+            "base": "$(params.BASE)",
+            "title": """$(params.TITLE)""",
+            "body": """$(params.BODY)"""
+        }
+
+        print("Sending this data to GitHub: ")
+
+        print(data)
+
+        authHeader = "Bearer " + github_token
+
+        giturl = "api."+"$(params.GITHUB_HOST_URL)"
+                  
+        conn = http.client.HTTPSConnection(giturl)
+
+        conn.request(
+            "POST",
+            open_pr_url,
+            body=json.dumps(data),
+            headers={
+                "User-Agent": "OpenShift Pipelines",
+                "Authorization": authHeader.strip(),
+                "Accept": "application/vnd.github+json",
+                "Content-Type": "application/json",
+                "X-GitHub-Api-Version": "2022-11-28"
+            })
+
+        resp = conn.getresponse()
+
+        if not str(resp.status).startswith("2"):
+            print("Error: %d" % (resp.status))
+            print(resp.read())
+            sys.exit(1)
+        else:
+            # https://docs.github.com/en/rest/reference/pulls#create-a-pull-request
+            body = json.loads(resp.read().decode())
+
+            open(os.environ.get('PULLREQUEST_NUMBER_PATH'), 'w').write(f'{body["number"]}')
+            open(os.environ.get('PULLREQUEST_URL_PATH'), 'w').write(body["html_url"])
+
+            print("GitHub pull request created for $(params.REPO_FULL_NAME): "
+                  f'number={body["number"]} url={body["html_url"]}')
+      volumeMounts:
+        - mountPath: /etc/github-open-pr
+          name: githubtoken
+          readOnly: true
+  volumes:
+    - name: githubtoken
+      secret:
+        secretName: $(params.GITHUB_TOKEN_SECRET_NAME)
+----
+<1> Python script to create the pull request.
+<2> The token from the secret object.
+<3> The data we will send to GitHub.
+
+. Modify the Pipeline object 
++
+[source,yaml]
+----
+    - name: issue-prod-pull-request
+      params:
+        - name: GITHUB_HOST_URL
+          value: $(params.REPO_HOST)
+        - name: GITHUB_TOKEN_SECRET_NAME
+          value: github-token
+        - name: REPO_FULL_NAME
+          value: $(params.MANIFEST_REPO_NAME)
+        - name: HEAD
+          value: feature-for-$(params.COMMIT_SHA)
+        - name: BASE
+          value: main
+        - name: BODY
+          value: Update prod image for $(params.COMMIT_MESSAGE)
+        - name: TITLE
+          value: 'Production update: $(params.COMMIT_MESSAGE)'
+      runAfter:
+        - create-prod-manifest-branch
+      taskRef:
+        kind: Task
+        name: git-open-pull-request
+----
+
+== Review the whole Pipeline
+
+We did it, we created a Secure Supply Chain using Tekton Tasks. The full Pipeline now looks like this: 
+
+.Pipeline Details
+image::step13-pipeline.png[Pipeline Details]
+
+The last step will create a pull request on Git. When this request is approved and merged, the update will finally happen in the production environment. This is a manual process to have control what comes in production and what does not.
+
+== Execute full Pipeline E2E
+
+It is time to execute the whole pipeline now end to end. We will do a real update to the application now, so we can see the differences. 
+
+As described in step 10, the DEV and PROD environments are running on the same cluster. In the field, this will probably not happen, but for now, it is good enough. GitOps/Argo CD monitors any changes and automatically updates whenever the Git repository (Kubernetes Manifests) is changed. During the PipelineRun we will update the image tag for DEV, which automatically rolls out and create a Pull request which is waiting for approval and will roll out the changes onto production. 
+
+Both environments have a route to access the application. At the moment both will look the same: 
+
+.Globex DEV origin
+image::step13-dev_origin.png?width=600px[Globex DEV origin]
+
+=== Update application
+
+The repository of Globex UI is forked at: https://github.com/tjungbauer/globex-ui. We used it throughout this journey to update the README.md file. 
+The readme file does not really change anything. So, let's update the UI itself. 
+
+look for the file **src/index.html** and add the following line before ``</body>``
+
+[source,html]
+----
+<center><strong>My very important update</strong></center>
+----
+
+Save this change and push it to GitHub. 
+This will trigger the Pipeline which is running quite long. However, once it is finished, the DEV environment should now show the new line in the UI. 
+
+NOTE: After the pipeline updated the image tag in Git, the GitOps process must fetch this change. This may take a while. You can speed this up by refreshing the "Application" inside the Argo CD interface. It should then automatically synchronize.
+
+The update can now be seen in the browser. The "important update" is visible at the bottom of the page. 
+
+.Globex DEV updated
+image::step13-dev_updated.png?width=600px[Globex DEV updated]
+
+The production environment was not yet updated. Instead, a pull request has been created: 
+
+.Open pull request
+image::step13-open_pr.png?width=600px[Open pull request]
+
+This request can be reviewed and merged. As you can see there was only one change in the files: 
+
+.Open pull request - changed files
+image::step13-pr_fileschanged.png[Open pull request - changed files]
+
+Merge the pull request and wait until Argo CD fetched the changes and updates the production environment. This is it, the changes are done and promoted to production: 
+
+.Globex PROD updated
+image::step13-prod_updated.png?width=600px[Globex PROD updated]
+
+== Conclusion
+
+This concludes this journey to a Secure Supply Chain using Tekton (OpenShift Pipelines). Is this the best must-have you need to do? No, it is an example, a demonstration. Feel free to use and modify it. You can also use other tools for the tasks or the pipeline as such. It does not matter if you use Tekton, Jenkins, Gitlab Runner etc. What is important is that you secure your whole supply chain as much as possible. 
+Any image you create should be signed to ensure that the source can be trusted. Every source code should be verified against best practices and all images should be scanned for vulnerabilities and policy violations during the build AND the deployment process. 

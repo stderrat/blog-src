@@ -1,0 +1,248 @@
+--- 
+title: "Step 7 - Generating a SBOM"
+description: "Step 7 Secure Supply Chain"
+date: "2023-06-28"
+doctype: book
+
+author: Thomas Jungbauer
+type: post
+categories:
+   - OpenShift
+   - Tekton
+   - CICD
+   - Pipelines
+tags: ["OCP", "Tekton", "OpenShift", "Pipleines", "CI/CD", "Supply Chain", "SBOM"] 
+
+aliases: [ 
+	 "/openshift/securesupplychain/step7",
+] 
+---
+
+:imagesdir: /SecureSupplyChain/images/
+:icons: font
+:toc:
+
+A **software bill of materials** (SBOM) offers an insight into the makeup of an application developed using third-party commercial tools and open-source software. It is a machine-readable, formally structured list of all components. This list is important to gain visibility into what risks might exist in a package and their potential impact. It allows to prioritize the risks and define a remediation path. 
+The teams can use the SBOM to monitor all components that are used across an application.
+
+We will create a Task that will generate a SBOM and uploads it into an SBOM repository. 
+
+<!--more--> 
+
+== Goals
+
+The goals of this step are:
+
+* Install a SBOM repository.
+* Generate a SBOM and upload it to the repository.
+
+== Tool/Standard CycloneDX
+
+OWASP CycloneDX is a full-stack Bill of Materials (BOM) standard that provides advanced supply chain capabilities for cyber risk reduction. The specification supports:
+
+. Software Bill of Materials (SBOM)
+. Software-as-a-Service Bill of Materials (SaaSBOM)
+. Hardware Bill of Materials (HBOM)
+. Operations Bill of Materials (OBOM)
+. Vulnerability Disclosure Reports (VDR)
+. Vulnerability Exploitability eXchange (VEX)
+
+Strategic direction of the specification is managed by the CycloneDX Core Working Group, is backed by the OWASP Foundation, and is supported by the global information security community.
+
+NOTE: Source: https://cyclonedx.org/
+
+The CycloneDX module for Node.js creates a valid CycloneDX Software Bill-of-Materials (SBOM) containing an aggregate of all project dependencies. CycloneDX is a lightweight SBOM specification that is easily created, human and machine-readable, and simple to parse.
+
+NOTE: https://cyclonedx.org/capabilities/sbom/
+
+
+We will use this standard and will deploy a small Pod in our cluster to be able to upload our SBOM locally. 
+
+== Install CycloneDX Repository Server
+
+We can install a CycloneDX Repository Server, which is a simple Pod running in our cluster. You can use the following Argo CD application, which will create the Namespace (cyclonedx),Deployment, Route, and Service.
+
+[source,yaml]
+----
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: in-cluster-install-cyclonedx
+  namespace: openshift-gitops
+spec:
+  destination:
+    namespace: cyclonedx
+    server: 'https://kubernetes.default.svc'
+  info:
+    - name: Description
+      value: Install CycloneDX SBOM Repository
+  project: in-cluster
+  source:
+    path: clusters/management-cluster/cyclonedx <1>
+    repoURL: 'https://github.com/tjungbauer/openshift-cluster-bootstrap'
+    targetRevision: main
+----
+<1> Path and URL to the Git repository.
+
+In Argo CD the following Application will be created:
+
+.CycloneDX Installation
+image::step7-install_cyclonedx.png?width=600px[CycloneDX Installation]
+
+== Update the Tekton Pipeline
+
+. Update the TriggerBinding **globex-ui** and add the following:
++
+[source,yaml]
+----
+    - name: cyclonedxHostUrl
+      value: >-
+        https://cyclonedx-bom-repo-server-cyclonedx.apps.ocp.aws.ispworld.at <1>
+----
+<1> DO NOT add a trailing slash here.
+
+. Update the TriggerTemplate and add the following to the appropriate blocks:
++
+[source,yaml]
+----
+spec:
+  parames:
+    ...
+    - description: Cyclonedx host url
+      name: cyclonedxHostUrl <1>
+  resourcetemplates:
+    ...
+    spec:
+      params:
+        ...
+          - name: CYCLONEDX_HOST_URL
+            value: $(tt.params.cyclonedxHostUrl) <2>   
+----
+<1> The parameter defined in the TriggerBinding
+<2> The parameter as it will be provided to the Pipeline.
+
+. Install the following Task
++
+[source,yaml]
+----
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: generate-sbom
+  namespace: ci
+spec:
+  params: <1>
+    - default: >-
+        https://cyclonedx-bom-repo-server-cyclonedx.apps.placeholder.com/
+      name: cyclonedxHostUrl
+      type: string
+  results:
+    - description: The url location of the generate SBOM
+      name: sbomUrl
+      type: string
+  steps:
+    - image: cyclonedx/cyclonedx-node
+      name: generate-sbom
+      resources:
+        requests:
+          memory: 1Gi
+      script: > <2>
+        apk add git curl
+
+        npm install .
+
+        /usr/src/cyclonedx-bom/bin/make-bom.js -o bom.xml
+
+        curl -v -k $(params.cyclonedxHostUrl)/v1/bom -H "Content-Type:
+        application/vnd.cyclonedx+xml; version=1.4" -H "Accept: */*" -d @bom.xml
+        -D /tmp/header.txt
+
+        LOCATION=$(cat /tmp/header.txt | grep location: | awk '{print $2}' | sed
+        's|http:|https:|g')
+
+        printf "%s" "$LOCATION" > "$(results.sbomUrl.path)"
+
+        echo "SBOM URL accessible on Results of TaskRun $(context.taskRun.name)"
+      workingDir: /workspace/repository
+  workspaces:
+    - name: repository
+----
+<1> Default parameters for this task. Might be overwritten, by the EventListener
+<2> Script to be executed. It will download a script and upload the SBOM to our CycloneDX server.
+
+. Update the Pipeline object
++
+[source,yaml]
+----
+spec:
+  params:
+    ...
+   - name: CYCLONEDX_HOST_URL <1>
+      type: string
+  tasks:
+  ...
+    - name: generate-sbom <2>
+      params:
+        - name: cyclonedxHostUrl
+          value: $(params.CYCLONEDX_HOST_URL)
+      runAfter:
+        - build-sign-image <3>
+      taskRef:
+        kind: Task
+        name: generate-sbom
+      workspaces:
+        - name: repository
+          workspace: shared-data
+----
+<1> Add this to the parameter section
+<2> The new Task to generate a SBOM
+<3> Run after build-sign-image (and in parallel to the ACS tasks)
+
+.Pipeline
+image::step7-pipeline.png?width=800px[Pipeline]
+
+== Execute the Pipeline
+
+Let's trigger the pipeline again. If everything works well, the URL to the uploaded SBOM will be visible in the TaskRun log.
+
+.Pipeline
+image::step7-sbom_url.png[Pipeline]
+
+When you open this URL, you will get a huge list of components end dependencies. 
+
+For example, the following snippet shows that the angular component **animations** (version 13.2.6) is used.
+
+[source,xml]
+----
+<components>
+  <component type="library" bom-ref="pkg:npm/%40angular/animations@13.2.6">
+  <author>angular</author>
+  <group>@angular</group>
+  <name>animations</name>
+  <version>13.2.6</version>
+  <description>Angular - animations integration with web-animations</description>
+  <licenses>
+    <license>
+      <id>MIT</id>
+    </license>
+  </licenses>
+  <purl>pkg:npm/%40angular/animations@13.2.6</purl>
+  <externalReferences>
+    <reference type="website">
+      <url>https://github.com/angular/angular#readme</url>
+    </reference>
+    <reference type="issue-tracker">
+      <url>https://github.com/angular/angular/issues</url>
+    </reference>
+    <reference type="vcs">
+      <url>git+https://github.com/angular/angular.git</url>
+    </reference>
+  </externalReferences>
+</component>
+----
+
+== Summary
+
+This concludes our security scans for the whole build process. With the SBOM you have now a complete list of components and dependencies of your images. 
+
+During the next steps, we will work with the Kubernetes manifests and update them, perform a linting on these manifests, and try to deploy the updated image to our DEV environment.
