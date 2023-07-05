@@ -86,44 +86,32 @@ spec:
             secretKeyRef:
               key: cosign.pub
               name: $(params.cosignSecret)
-      image: quay.io/redhat-gpte/cosign
+      image: quay.io/tjungbau/pipeline-tools:v1.0.0
       name: cosign-verify-image
       resources: {}
       script: > 
+
+        mkdir -p /home/cosign/.docker/
+
         echo "${REGISTRY_SECRET}" > /home/cosign/.docker/config.json
 
         echo "${COSIGN_PUBLIC_KEY}" > /workspace/cosign.pub
 
         cosign verify --key /workspace/cosign.pub $(params.image) --output-file
         /workspace/cosign.verify
-    - image: quay.io/redhat-gpte/jq
-      name: extract-signature-details
-      resources: {}
-      script: >
+
         cat /workspace/cosign.verify | jq --raw-output '.[0] | .critical |
         .image | .["docker-manifest-digest"]' > /workspace/cosign.sha
-    - image: quay.io/redhat-gpte/rekor-cli
-      name: rekor-search-sha
-      resources: {}
-      script: >
+
         rekor-cli search --sha $(cat /workspace/cosign.sha) --format json >
         /workspace/rekor.search
-    - image: quay.io/redhat-gpte/jq
-      name: rekor-extract-uuid
-      resources: {}
-      script: >
+
         cat /workspace/rekor.search | jq '.UUIDs[0]' | sed 's/\"//g' >
         /workspace/rekor.uuid
-    - image: quay.io/redhat-gpte/rekor-cli
-      name: rekor-get-with-uuid
-      resources: {}
-      script: >
+
         rekor-cli get --uuid $(cat /workspace/rekor.uuid) --format json >
         /workspace/rekor.get
-    - image: quay.io/redhat-gpte/jq
-      name: verify-attestation
-      resources: {}
-      script: |
+
         cat /workspace/rekor.get | jq -r .Attestation
 ----
 <1> Registry pull secret.

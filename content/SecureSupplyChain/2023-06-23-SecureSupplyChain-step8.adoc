@@ -73,7 +73,7 @@ spec:
       name: repository
       type: string
   steps: <2>
-    - image: 'alpine/git:latest'
+    - image: registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel8:v1.10.4-4
       name: git
       resources: {}
       script: >
@@ -219,10 +219,16 @@ Run the following command to get the host keys of GitHub:
 
 [source,bash]
 ----
-ssh-keyscan -t rsa github.com
+ssh-keyscan -H github.com
 
-# github.com:22 SSH-2.0-babeld-2ff5bbdf
-github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=
+# github.com:22 SSH-2.0-babeld-c89ab1f3
+# github.com:22 SSH-2.0-babeld-c89ab1f3
+|1|cr4dkqIl2SnZqktvRsFnx1lA5Ag=|eie8EHXqQHgCZJq7F/TtRRZcBbc= ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=
+# github.com:22 SSH-2.0-babeld-c89ab1f3
+|1|r6z4yeEV9Cog/2I4stZp1A34BAE=|EU8VcdD+KHMJJt9uPL4jh5zK0fI= ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=
+# github.com:22 SSH-2.0-babeld-c89ab1f3
+|1|hVnTyBzb/gSR8jpz+NUziUkHy1A=|ENMDVCVsLfz2CWLa1C+BnzZI8Yg= ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+# github.com:22 SSH-2.0-babeld-c89ab1f3
 ----
 
 Finally, we need to create a Secret with the following content:
@@ -239,7 +245,7 @@ metadata:
 type: kubernetes.io/ssh-auth
 data:
   ssh-privatekey: <BASE64 PRIVAT SSH KEY > <2>
-  known_hosts: < base64 of Githubs hostkey> <3>
+  known_hosts: < BASE64 of Githubs hostkey> <3>
 ----
 <1> This annotation defines for which host Tekton will inject the Secret. 
 <2> A base64 decoded string of your PRIVATE ssh key.

@@ -79,13 +79,11 @@ spec:
     public key
   steps:
   - computeResources: {}
-    image: alpine/git:latest
+    image: registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel8:v1.10.4-4
     name: git-verify
     script: |
       set -x <1>
 
-      apk add gpg-agent
-      
       gpg --import /workspace/secrets/public.key
       
       git config --global --add safe.directory /workspace/repository
