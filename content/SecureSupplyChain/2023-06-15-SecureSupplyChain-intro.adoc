@@ -11,7 +11,7 @@ categories:
    - Tekton
    - CICD
    - Pipelines
-tags: ["OCP", "Tekton", "OpenShift", "Pipleines", "CI/CD", "Supply Chain"] 
+tags: ["OCP", "Tekton", "OpenShift", "Pipleines", "CI/CD", "Supply Chain", "Rekor", "cosign", "SBOM", "ACS"] 
 
 aliases: [ 
 	 "/openshift/securesupplychain/intro",

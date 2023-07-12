@@ -2,6 +2,9 @@
 title: "YAUB Yet Another Useless Blog"
 chapter: true
 layout: homepage
+
+tags: ["OCP", "Day-2", "OpenShift", "Pod Placement", "NodeSelector", "Taints", "Tollerations", "Topology Spread Contstraints", "Descheduler", "Affinity", "Anit-Affinity", "Pipelines", "OCP", "Tekton", "GitOps", "Operator", "Grafana", "Thanos", "Sealed Secrets", "Storage", "Vault", "oc", "kubectl", "SSL", "Cert Manager", "Pipleines", "CI/CD", "Supply Chain", "Rekor", "cosign", "SBOM", "ACS", "stackrox", "SSL", "SSO", "Ansible", "Automation", "AAP", "istio", "Service Mesh", "Azure", "Compliance", "Security"] 
+
 ---
 
 ## Welcome to YAUB - Yet Another Useless Blog

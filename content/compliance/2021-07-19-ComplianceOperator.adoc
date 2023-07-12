@@ -11,7 +11,7 @@ draft: false
 categories:
    - OpenShift
    - Compliance/Security
-tags: ["Hardening", "OpenShift", "OCP", "security", "compliance"]
+tags: ["Hardening", "OpenShift", "OCP", "security", "compliance", "Compliance Operator"]
 
 aliases: [
     "/posts-output/2021-07-20-Compliance-Plugin-CLI/",
