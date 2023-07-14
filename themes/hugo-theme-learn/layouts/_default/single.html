@@ -1,5 +1,4 @@
 {{ partial "header.html" . }}
-
 <p class="tracked">
 <time class="f6 mv4 dib tracked" {{ printf `datetime="%s"` (.Date.Format "2006-01-02T15:04:05Z07:00") | safeHTMLAttr }}>
 	<strong>{{- .Date.Format "January 2, 2006" -}}</strong>
@@ -14,7 +13,7 @@
 	{{ end }}
 {{ end }}
 
-( {{ $.Param "Lastmodification" | default (i18n "Lastmodification") }} {{.Page.Lastmod.Format "2006-01-02"}} )
+( {{ $.Param "Lastmodification" | default (i18n "Lastmodification") }} {{.Page.Lastmod.Format "2006-01-02"}} ) - <span class="readtime"><strong>{{ if lt (math.Round (div (countwords .Content) 250.0)) 1 }}1{{ else }}{{ (math.Round (div (countwords .Content) 250.0)) }}{{ end }} min read</strong></span>
 </p>
 
 
