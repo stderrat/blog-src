@@ -157,7 +157,12 @@
             </div>
             {{ end }}
         <div id="head-tags">
+            <!-- Do not show on home page -->
+{{ if .Sections}}
+{{else}}
+
         {{ partial "tags.html" . }}
+{{end}}
         </div>
         {{ if .Params.chapter }}
           <div id="chapter">
