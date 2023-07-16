@@ -1,7 +1,7 @@
 --- 
 title: "OpenShift Cluster Setup with Argo CD"
 description: "Openshift 4.x - Using OpenShift and GitOps to deploy cluster configuration"
-date: "2022-12-01"
+date: "2023-02-27"
 doctype: book
 
 author: Thomas Jungbauer & Toni Schmidbauer
@@ -22,9 +22,9 @@ aliases: [
 :toc:
 
 
-„_If it is not in GitOps, it does not exist_“ - is a mantra I hear quite often and also try to practice at customers. The idea is to have Git as the only source of truth on what happens inside the environment. That said, https://openpracticelibrary.com/practice/everything-as-code/[Everything as Code] is a practice that treats every aspect of the system as a code. Storing this code in Git provides a shared understanding, traceability and repeatability of changes. 
+„_If it is not in GitOps, it does not exist_“ - is a mantra I hear quite often and also try to practice at customer's engagements. The idea is to have Git as the only source of truth on what happens inside the environment. That said, https://openpracticelibrary.com/practice/everything-as-code/[Everything as Code] is a practice that treats every aspect of the system as a code. Storing this code in Git provides a shared understanding, traceability and repeatability of changes. 
 
-While there are many articles about how to get GitOps into the deployment process of applications, this one rather sets the focus on the cluster configurations and tasks system administrators usually have to do. 
+While there are many articles about how to get GitOps into the deployment process of applications, this one rather sets the focus on the *cluster configuration* and tasks system administrators usually have to do. 
 
 <!--more--> 
 
@@ -34,23 +34,32 @@ NOTE: Also check out the article https://blog.stderr.at/openshift/2020-08-06-arg
 
 It all begins with an OpenShift cluster. Such a cluster must be installed and while we will not discuss a bootstrap of the whole cluster … yes it is possible to even automate the cluster deployment using Advanced Cluster Management as an example, we will simply assume that one cluster is up and running. 
 
-For our setup, an OpenShift cluster 4.11 is deployed and we will use the repository https://github.com/tjungbauer/openshift-cluster-bootstrap[OpenShift Cluster Bootstrap] to deploy our configuration onto this cluster. This repository shall act as the source of truth for any configuration. Any cluster configuration shall go into that.  
+For our setup, an OpenShift cluster 4.12 is deployed and we will use the repository https://github.com/tjungbauer/openshift-cluster-bootstrap[OpenShift Cluster Bootstrap] to deploy our configuration onto this cluster. This repository shall act as the source of truth for any configuration. Any cluster configuration shall go into that.  
 
-Everything in this repository above is based on Helm, which must be available on your local machine. 
+Everything in this repository is based on Helm, which must be available on your local machine. 
 
-NOTE: The openshift-bootstrap repository heavily uses the Helm Repository found at https://charts.stderr.at/ 
+NOTE: The openshift-cluster-bootstrap repository heavily uses the Helm Repository found at https://charts.stderr.at/ 
 
 == Deploy OpenShift-GitOps 
 
-The first thing we need to do is to deploy https://docs.openshift.com/container-platform/4.11/cicd/gitops/gitops-release-notes.html[OpenShift-GitOps], which is based on the https://argo-cd.readthedocs.io/en/stable/[Argo CD] project. OpenShift-GitOps comes as an operator and is available to all OpenShift customers. The operator will deploy and configure Argo CD and provides several custom resources to configure Argo CD Applications or ApplicationSets for example. 
+The first thing we need to do is to deploy https://docs.openshift.com/container-platform/4.11/cicd/gitops/gitops-release-notes.html[OpenShift-GitOps], which is based on the https://argo-cd.readthedocs.io/en/stable/[Argo CD] project. OpenShift-GitOps comes as an Operator and is available to all OpenShift customers. The Operator will deploy and configure Argo CD and provides several custom resources to configure Argo CD Applications or ApplicationSets for example. 
 
 To automate the operator deployment the following shell script can be used: https://github.com/tjungbauer/openshift-cluster-bootstrap/blob/main/init_GitOps.sh[init_GitOps.sh]. 
+
+NOTE: This Shell script is the only script that is executed manually. It installs and configures Argo CD. Any other operation on the cluster must then be done using GitOps processes. 
 
 . Clone the repository to your local machine
 +
 [source,bash]
 ----
 git clone https://github.com/tjungbauer/openshift-cluster-bootstrap.git
+----
+
+. Be sure that you are logged in the the required cluster
++
+[source,bash]
+----
+oc whoami --show-server
 ----
 
 . Execute the init_GitOps.sh
@@ -60,9 +69,8 @@ git clone https://github.com/tjungbauer/openshift-cluster-bootstrap.git
 ./init_GitOps.sh
 ----
 
-The script will deploy the operator and configure the Argo CD instance. In addition, it will create the so-called *Application of Applications*, which acts as an umbrella Application, that automatically creates all other Argo CD Application(Sets). 
-
-NOTE: This Shell script is the only script that is executed manually. It installs and configures Argo CD. Any other operation on the cluster must then be done using GitOps processes. 
+The script will deploy the operator and configure the Argo CD instance. In addition, it will create the so-called *Application of Applications*, which acts as an umbrella Application, that automatically creates all other Argo CD Application(Sets).
+For now, the App of Apps is the only Argo CD Application that automatically synchronizes all changes found in Git. This is for security, purposes so you can test the cluster configuration one after another. 
 
 *What will this script do?*
 
@@ -70,11 +78,11 @@ I will not de-assemble the script line by line, but in general, the following wi
 
 . Adding repository https://charts.stderr.at/ and install the Chart https://github.com/tjungbauer/helm-charts/tree/main/charts/openshift-gitops[openshift-gitops]
 +
-CAUTION: OpenShift-GitOps will be deployed with cluster-admin privileges since we want to manage the whole cluster configuration. This Argo CD instance should not be used for application deployment. For that, deploy additional instances of GitOps. 
+CAUTION: This FIRST OpenShift-GitOps will be deployed with *cluster-admin* privileges since we want to manage the whole cluster configuration. This Argo CD instance should not be used for application deployment. For that, deploy additional instances of GitOps. 
 
 . Waiting for Deployments to become ready
 
-. Deploy the *Application of Applications* that is responsible for automatically deploy a set of Applications or ApplicationSets (see <<The Argo CD Object Manager Application>>)
+. Deploy the *Application of Applications* that is responsible to automatically deploy a set of Applications or ApplicationSets (see <<The Argo CD Object Manager Application>>)
 
 The following shows the output of the command: 
 
@@ -177,7 +185,7 @@ TEST SUITE: None
 == Logging into Argo CD
 
 At this point we have GitOps and the "*App of Apps*" deployed.
-Argo CD comes with a WebUI and a command line tool. The latter must installed on your local environment. In this article, we will use the WebUI. 
+Argo CD comes with a WebUI and a command line tool. The latter must installed to your local environment. In this article, we will use the WebUI. 
 
 Since Argo CD, by default, looks up for the OpenShift group "cluster-admins" to authenticate a user with Argo CD-Administrator privileges and since this group does not yet exist, we need to lookup the initial Administrator password: 
 
@@ -208,7 +216,7 @@ image::argocd2/argocd-app-of-apps.png?width=340px[App of Apps]
 It synchronizes everything that is found in the repository in the path: 
 _clusters/argocd-object-manager_ (main branch)
 
-Whenever you would like to create a new Argo CD application(set) it it supposed to be done using this App-of-Apps or to be more exact: in the path mentioned above. 
+Whenever you would like to create a new Argo CD application(set) it is supposed to be done using this App-of-Apps or to be more exact: in the path mentioned above. 
 
 NOTE: The App-of-Apps is the only Argo CD Application (at this moment) that has automatic synchronization enabled. Thus any changes in the App-of-Apps will be propagated automatically as soon as GitOps syncs with Git. 
 
@@ -220,17 +228,19 @@ The current Applications or ApplicationSets that come with the bootstrap reposit
 * Deployment of Compliance Operator
 * and many more. 
 
-Check our the deployed Argo CD objects or the openshift-cluster-bootstrap repository.
+Check out the deployed Argo CD objects or the openshift-cluster-bootstrap repository.
 
 === Interlude: What is the difference between Application and ApplicationSets?
 
-Applications and ApplicationSets are both Custom Resource Definitions that are installed when OpenShift-Gitops (or Argo CD) is installed. 
+{{% expand %}}
+*Applications* and *ApplicationSets* are both Custom Resource Definitions that are installed when OpenShift-Gitops (or Argo CD) is installed. 
 
 Applications are the classic way to configure GitOps. However, the main challenge here is that it can only be used to deploy configurations or applications to one target cluster. This limitation is resolved using ApplicationSets by creating multiple Applications out of an ApplicationSet definition. Therefore, it is now possible to deploy the same configuration on multiple clusters. 
 
 In the used Git repository I am using both options, but mainly ApplicationSets. 
 
 Further information can be found at: https://argo-cd.readthedocs.io/en/stable/user-guide/application-set/ 
+{{% /expand %}}
 
 === Argo CD Object Manager (App-of-Apps) Deep Dive
 

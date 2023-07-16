@@ -4,6 +4,8 @@ description: "Introduction to Secure Supply Chain"
 date: "2023-06-28"
 doctype: book
 
+frontimage: ["/SecureSupplyChain/images/intro-install_Tekton_Operator.png?width=220px"]
+
 author: Thomas Jungbauer
 type: post
 categories:
@@ -11,7 +13,7 @@ categories:
    - Tekton
    - CICD
    - Pipelines
-tags: ["OCP", "Tekton", "OpenShift", "Pipleines", "CI/CD", "Supply Chain", "Rekor", "cosign", "SBOM", "ACS"] 
+tags: ["OCP", "Tekton", "OpenShift", "Pipleines", "CI/CD", "Supply Chain", "Rekor", "cosign", "SBOM", "ACS", "Sigstore"] 
 
 aliases: [ 
 	 "/openshift/securesupplychain/intro",
@@ -78,8 +80,8 @@ The following list of tools (or specifications) are used for our pipeline. They 
 * https://docs.openshift.com/acs/4.1/cli/getting-started-cli.html[roxctl^]
 * https://www.sonarsource.com/products/sonarqube/[SonarQube^] 
 * https://www.redhat.com/en/technologies/cloud-computing/quay[Quay - quay.io as public registry^]
-* https://docs.sigstore.dev/cosign/overview/[CoSign^]
-* https://docs.sigstore.dev/rekor/overview/[Rekor^]
+* https://docs.sigstore.dev/cosign/overview/[CoSign (sigstore)^]
+* https://docs.sigstore.dev/rekor/overview/[Rekor (sigstore)^]
 * https://cyclonedx.org/capabilities/sbom/[Software Bill of Material (SBOM)^]
 * https://docs.kubelinter.io/#/[KubeLinter^]
 * https://kube-score.com/[KubeScore^]

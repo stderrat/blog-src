@@ -34,6 +34,7 @@
     {{- end }}
 
     <script src="{{"js/jquery-3.6.0.min.js"| relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}"></script>
+    <script src="{{"js/jquery.waypoints.min.js"| relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -54,8 +55,11 @@
   <body data-url="{{ .RelPermalink }}">
     <button onclick="scrollTopAnimated()" id="myBtn" class="top-btn button fa fa-arrow-up" title="Go to top"></button>
 
+    
+    <span class="read-progress"></span>
+
     {{ partial "menu.html" . }}
-        <section id="body">
+        <section id="body" class="post-content">
         <div id="overlay"></div>
 
         {{ if not .Params.chapter }}

@@ -64,6 +64,49 @@
 
     </section>
 
+<!-- READING BAR -->
+<script>
+(function(){
+    $("document").ready(function(){
+        var waypoints = $('.read-progress').waypoint({
+            handler: function(direction) {
+                if(direction == "down"){
+                    $('.read-progress').addClass("position-fixed");
+                    $('.read-progress').css("top",0);
+                } else {
+                    $('.read-progress').removeClass("position-fixed");
+                    $('.read-progress').css("top");
+                }
+            }
+        })
+        
+        var view_height = $(window).height(),
+        post_height = $(".post-content").height();
+        //set_viewed_percentage();
+        
+        $(window).on("scroll", set_viewed_percentage);
+        
+        $(window).on("resize", function(){
+            view_height = $(window).height();
+            post_height = $(".post-content").height();
+            
+            set_viewed_percentage();
+        });
+        
+        function set_viewed_percentage(){
+            var scroll_top = $(this).scrollTop();
+            var post_top = $(".post-content").offset().top;
+            
+            var visible = post_height - (post_height - (view_height - (post_top - scroll_top)));
+            var progress = (visible / post_height) * 100;
+            progress = (progress > 100) ? 100 : progress;
+            
+            $(".read-progress").width(progress + "%");
+        }
+    });
+})();
+</script>
+
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>

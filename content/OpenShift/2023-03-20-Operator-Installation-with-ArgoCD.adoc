@@ -138,8 +138,8 @@ The Application would like to synchronize the objects:
 .Argo CD: Installing Compliance Operator
 image::argocd2/argocd-operator-installation.png[Installing Compliance Operator]
 
-
 NOTE: *Where are the objects we need for the Job?* Since they are only available during the Sync-Hook they will not show up here. In fact, they will only show up during the time they are alive and will disappear again after the status of the operator has been verified. 
+
 
 === Helm Chart Configuration
 
