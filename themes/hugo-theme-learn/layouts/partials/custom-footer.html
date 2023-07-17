@@ -1,14 +1,15 @@
-<!-- Partial intended to be overwritten with tags loaded at the end of the page loading (usually for Javascript) 
+<!-- Partial intended to be overwritten with tags loaded at the end of the page loading (usually for Javascript)
 <script>
     console.log("running some javascript");
 </script>
 -->
 
+<!--
 <script>
 
     const btn = document.querySelector(".btn-toggle");
     const prefersDarkScheme = window.matchMedia("(prefers-color-scheme: dark)");
-    
+
     /* store theme selection locally */
     const currentTheme = localStorage.getItem("theme");
     if (currentTheme == "dark") {
@@ -16,7 +17,7 @@
     } else if (currentTheme == "light") {
       document.body.classList.toggle("light-theme");
     }
-    
+
     btn.addEventListener("click", function () {
       if (prefersDarkScheme.matches) {
         document.body.classList.toggle("light-theme");
@@ -32,35 +33,6 @@
       localStorage.setItem("theme", theme);
     });
 
-    
-    /*
-var toggle = document.getElementById("dark-mode-toggle");
-var darkTheme = document.getElementById("dark-mode-theme");
 
-toggle.addEventListener("click", () => {
-    if (toggle.className === "fas fa-moon") {
-        setTheme("dark");
-    } else if (toggle.className === "fas fa-sun") {
-        setTheme("light");
-    }
-});
-
-// the default theme is light
-var savedTheme = localStorage.getItem("dark-mode-storage") || "light";
-setTheme(savedTheme);
-
-function setTheme(mode) {
-
-    localStorage.setItem("dark-mode-storage", mode);
-
-    if (mode === "dark") {
-        darkTheme.disabled = false;
-        toggle.className = "fas fa-sun";
-    } else if (mode === "light") {
-        darkTheme.disabled = true;
-        toggle.className = "fas fa-moon";
-    }
-}
-*/
 </script>
-
+-->

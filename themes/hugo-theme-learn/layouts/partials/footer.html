@@ -79,28 +79,28 @@
                 }
             }
         })
-        
+
         var view_height = $(window).height(),
         post_height = $(".post-content").height();
         //set_viewed_percentage();
-        
+
         $(window).on("scroll", set_viewed_percentage);
-        
+
         $(window).on("resize", function(){
             view_height = $(window).height();
             post_height = $(".post-content").height();
-            
+
             set_viewed_percentage();
         });
-        
+
         function set_viewed_percentage(){
             var scroll_top = $(this).scrollTop();
             var post_top = $(".post-content").offset().top;
-            
+
             var visible = post_height - (post_height - (view_height - (post_top - scroll_top)));
             var progress = (visible / post_height) * 100;
             progress = (progress > 100) ? 100 : progress;
-            
+
             $(".read-progress").width(progress + "%");
         }
     });
@@ -123,31 +123,6 @@
     <script src="{{"js/yaub.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
 
 
-    <script>
-        window.addEventListener('DOMContentLoaded', () => {
-            
-            const observerForTableOfContentActiveState = new IntersectionObserver(entries => {
-                entries.forEach(entry => {
-                    const id = entry.target.getAttribute('id');
-                    if (entry.intersectionRatio > 0) {
-                        clearActiveStatesInTableOfContents();
-                        document.querySelector(`aside nav li a[href="#${id}"]`).parentElement.classList.add('active');
-                    }
-                });
-            });
-
-            document.querySelectorAll('h1[id],h2[id],h3[id],h4[id]').forEach((section) => {
-                observerForTableOfContentActiveState.observe(section);
-            });
-        });
-
-        function clearActiveStatesInTableOfContents() {
-            document.querySelectorAll('aside nav li').forEach((section) => {
-                section.classList.remove('active');
-            });
-        }
-    </script>
-
     <script type="text/javascript">
         function scrollTopAnimated() {
             $("html, body").animate(
@@ -162,12 +137,12 @@
         }
 
         $(".summary-box").click(function() {
-            window.location = $(this).find("a").attr("href"); 
+            window.location = $(this).find("a").attr("href");
             return false;
           });
     </script>
 
-    
+
 
     {{ if (or (and (ne .Params.disableMermaid nil) (not .Params.disableMermaid)) (not .Site.Params.disableMermaid)) }}
         {{ if isset .Params "customMermaidURL" }}
