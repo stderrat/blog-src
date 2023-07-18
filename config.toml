@@ -45,15 +45,15 @@ home = [ "HTML", "RSS", "JSON"]
 [params.yaub]
   copyrightstart = "2020"
 
-#[[menu.shortcuts]]
-#name = "<i class='fas fa-tags'></i> Tags"
-#url = "/tags"
-#weight = 1
+[[menu.shortcuts]]
+name = "<i class='fas fa-tags'></i> Tags"
+url = "/tags"
+weight = 1
 
-#[[menu.shortcuts]]
-#name = "<i class='far fa-bookmark'></i> Catagories"
-#url = "/categories"
-#weight = 2
+[[menu.shortcuts]]
+name = "<i class='far fa-bookmark'></i> Catagories"
+url = "/categories"
+weight = 2
 
 [[menu.shortcuts]]
 name = "<i class='fas fa-book'></i> Helm Charts"

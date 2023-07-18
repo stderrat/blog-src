@@ -7,7 +7,11 @@
 {{ if or (eq .Kind "taxonomy") (eq .Kind "term") }}
 <ul>
 	{{ range .Pages }}
-		<li><a href="{{.RelPermalink}}">{{.Title}}</a></li>
+     <!-- ignore Blog site itself -->
+    {{ if (eq .Title "YAUB Yet Another Useless Blog") }}
+    {{ else }}
+		  <li><a href="{{.RelPermalink}}">{{.Title}}</a></li>
+    {{ end }}
 	{{ end }}
 </ul>
 {{end}}
