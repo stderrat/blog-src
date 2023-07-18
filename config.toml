@@ -40,7 +40,11 @@ home = [ "HTML", "RSS", "JSON"]
   titleSeparator = "::"
   mainSections = ['service-mesh', 'openshift', 'ansible', 'compliance', 'general']
   recent_posts_number = 10
-  
+
+[taxonomies]
+  category = 'categories'
+  archive= 'archive'
+  tag = 'tags'
 
 [params.yaub]
   copyrightstart = "2020"
@@ -56,9 +60,14 @@ url = "/categories"
 weight = 2
 
 [[menu.shortcuts]]
+name = "<i class='fas fa-box'></i> Archive"
+url = "/archive"
+weight = 3
+
+[[menu.shortcuts]]
 name = "<i class='fas fa-book'></i> Helm Charts"
 url = "https://charts.stderr.at/"
-weight = 3
+weight = 4
 
 [[menu.shortcuts]]
 name = "<i class='fab fa-redhat'></i> Red Hat"

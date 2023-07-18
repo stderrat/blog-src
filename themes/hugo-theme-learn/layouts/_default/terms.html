@@ -62,6 +62,22 @@
         {{ end }}
       {{ end }}
     {{ end }}
+
+    <!-- range all pages sorted by their title -->
+    {{ if (eq .Title "Archive") }}
+    <table>
+    {{ range .Site.RegularPages.ByDate.Reverse }}
+      <tr>
+        <td class="archivetable-date">
+          <span class="date">{{ .Date.Format "2006-01-02" }}</span>
+        </td>
+        <td class="archivetable-content">
+          <archive><a class="archive" href="{{ .Permalink }}">{{ .Title }}</a></archive>
+        </td>
+      </tr>
+    {{ end }}
+    </table>
+    {{ end }}
     </div>
 <footer class=" footline" >
 	{{with .Params.LastModifierDisplayName}}

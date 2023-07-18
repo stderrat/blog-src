@@ -55,7 +55,7 @@
   <body data-url="{{ .RelPermalink }}">
     <button onclick="scrollTopAnimated()" id="myBtn" class="top-btn button fa fa-arrow-up" title="Go to top"></button>
 
-    
+
     <span class="read-progress"></span>
 
     {{ partial "menu.html" . }}
@@ -63,19 +63,21 @@
         <div id="overlay"></div>
 
         {{ if not .Params.chapter }}
-        <aside id="toc-field" class="hidden lg:block tableOfContentContainer">
-          <header id="TableOfContentsHeader">What's on this Page</header>
-          {{ .TableOfContents }}
+          {{ if not (eq .Kind "taxonomy") }}
+          <aside id="toc-field" class="hidden lg:block tableOfContentContainer">
+            <header id="TableOfContentsHeader">What's on this Page</header>
+            {{ .TableOfContents }}
+          {{ end }}
         {{ end }}
-        
+
         {{ if not .Params.chapter }}
           <div id="navigation">
         {{ end }}
             <!-- Next prev page -->
             {{ $currentNode := . }}
-    
+
             {{ template "menu-nextprev" dict "menu" .Site.Home "currentnode" $currentNode }}
-    
+
             {{ define "menu-nextprev" }}
                 {{$currentNode := .currentnode }}
                 {{ if ne .menu.Params.hidden true}}
@@ -89,7 +91,7 @@
                         {{end}}
                     {{end}}
                     {{ $currentNode.Scratch.Set "prevPageTmp" .menu }}
-    
+
                         {{ $currentNode.Scratch.Set "pages" .menu.Pages }}
                         {{ if .menu.IsHome}}
                             {{ $currentNode.Scratch.Set "pages" .menu.Sections }}
@@ -97,7 +99,7 @@
                             {{ $currentNode.Scratch.Set "pages" (.menu.Pages | union .menu.Sections) }}
                         {{end}}
                         {{ $pages := ($currentNode.Scratch.Get "pages") }}
-    
+
                         {{ range $pages.ByWeight  }}
                             {{ template "menu-nextprev" dict "menu" . "currentnode" $currentNode }}
                         {{end}}
