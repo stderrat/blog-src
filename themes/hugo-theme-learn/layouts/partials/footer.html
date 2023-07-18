@@ -122,7 +122,8 @@
     <script src="{{"js/hugo-learn.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
     <script src="{{"js/yaub.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
 
-
+{{ if .Sections}}
+{{else}}
      <script>
         window.addEventListener('DOMContentLoaded', () => {
 
@@ -147,7 +148,7 @@
             });
         }
     </script>
-
+{{end}}
     <script type="text/javascript">
         function scrollTopAnimated() {
             $("html, body").animate(
