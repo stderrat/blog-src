@@ -214,7 +214,7 @@ This means every time our build-Tasks successfully completes a URL to the transp
 
 After our PipelineRuns were successful, we can verify if the image has an entry in the Rekor transparency log. This is important to ensure that the image went through a valid signing process. At a later step (before we create the pull request for the production update) we will verify if the log exists.
 
-The following annotations should have been added to the TaskRun secure-supply-chain-XXX-build-sign-image automatically: 
+The following annotations should have been added to the TaskRun or PipelineRun secure-supply-chain-XXX-build-sign-image automatically: 
 
 [source,yaml]
 ----

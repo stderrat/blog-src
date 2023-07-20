@@ -272,10 +272,13 @@ spec:
         
         chmod +x ./roxctl  > /dev/null
         
-        ./roxctl image scan \ <3>
-          $( [ "$(params.insecure-skip-tls-verify)" = "true" ] && \
-          echo -n "--insecure-skip-tls-verify") \
-          -e "$ROX_CENTRAL_ENDPOINT" --image "$(params.image)"
+        if [ "$(params.insecure-skip-tls-verify)" = "true" ]; then
+
+          export ROX_INSECURE_CLIENT_SKIP_TLS_VERIFY=true
+
+        fi
+
+        ./roxctl image scan -e "$ROX_CENTRAL_ENDPOINT" --image "$(params.image)"
 ----
 <1> Token end endpoint which we defined as Secrets
 <2> Script that downloads and executes the CLI **roxctl**
@@ -352,10 +355,13 @@ spec:
         
         chmod +x ./roxctl  > /dev/null
         
-        ./roxctl image check \ <3>
-          $( [ "$(params.insecure-skip-tls-verify)" = "true" ] && \
-          echo -n "--insecure-skip-tls-verify") \
-          -e "$ROX_CENTRAL_ENDPOINT" --image "$(params.image)"
+        if [ "$(params.insecure-skip-tls-verify)" = "true" ]; then
+
+          export ROX_INSECURE_CLIENT_SKIP_TLS_VERIFY=true
+
+        fi
+
+        ./roxctl image check -e "$ROX_CENTRAL_ENDPOINT" --image "$(params.image)"
 ----
 <1> Token end endpoint which we defined as Secrets
 <2> Script that downloads and executes the CLI **roxctl**
