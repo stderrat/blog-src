@@ -88,6 +88,7 @@ spec:
         git config --global user.name "$(params.git_user_name)"
 
         # Checkout target branch to avoid the detached HEAD state
+        
         TMPDIR=$(mktemp -d)
 
         cd $TMPDIR

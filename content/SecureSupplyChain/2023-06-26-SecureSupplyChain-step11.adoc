@@ -135,10 +135,13 @@ spec:
 
         DEPLOYMENT_FILE=$(ls -1a | grep *deployment--globex-ui.yml)
 
-        ./roxctl deployment check \
-         $( [ "$(params.insecure-skip-tls-verify)" = "true" ] && \
-         echo -n "--insecure-skip-tls-verify") \
-         -e "$ROX_CENTRAL_ENDPOINT" --file "$DEPLOYMENT_FILE"
+        if [ "$(params.insecure-skip-tls-verify)" = "true" ]; then
+
+          export ROX_INSECURE_CLIENT_SKIP_TLS_VERIFY=true
+
+        fi
+
+        ./roxctl deployment check -e "$ROX_CENTRAL_ENDPOINT" --file "$DEPLOYMENT_FILE" 
       workingDir: /workspace/repository
   workspaces:
     - name: repository

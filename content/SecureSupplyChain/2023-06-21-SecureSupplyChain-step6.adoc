@@ -278,7 +278,7 @@ spec:
 
         fi
 
-        ./roxctl image scan -e "$ROX_CENTRAL_ENDPOINT" --image "$(params.image)"
+        ./roxctl image scan -e "$ROX_CENTRAL_ENDPOINT" --image "$(params.image)" <3>
 ----
 <1> Token end endpoint which we defined as Secrets
 <2> Script that downloads and executes the CLI **roxctl**
@@ -361,7 +361,7 @@ spec:
 
         fi
 
-        ./roxctl image check -e "$ROX_CENTRAL_ENDPOINT" --image "$(params.image)"
+        ./roxctl image check -e "$ROX_CENTRAL_ENDPOINT" --image "$(params.image)" <3>
 ----
 <1> Token end endpoint which we defined as Secrets
 <2> Script that downloads and executes the CLI **roxctl**
