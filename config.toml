@@ -49,6 +49,13 @@ home = [ "HTML", "RSS", "JSON"]
 [params.yaub]
   copyrightstart = "2020"
 
+[params.social.share]
+  facebook = true
+  linkedin = true
+  twitter = true
+  whatsapp = true
+  email = true
+
 [[menu.shortcuts]]
 name = "<i class='fas fa-tags'></i> Tags"
 url = "/tags"
