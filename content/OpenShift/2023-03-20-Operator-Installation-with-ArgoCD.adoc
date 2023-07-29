@@ -28,7 +28,7 @@ In this article, I would like to share how I deal with cluster configuration whe
 
 <!--more--> 
 
-NOTE: This article assumes that you have the *openshift-gitops* Operator, which provides Argo CD, already installed, and configured. If you are new to GitOps check out this article: http://localhost:52942/openshift/2020-08-06-argocd/[Argo CD]
+NOTE: This article assumes that you have the *openshift-gitops* Operator, which provides Argo CD, already installed, and configured. If you are new to GitOps check out this article: https://blog.stderr.at/openshift/2020-08-06-argocd/[Argo CD]
 
 == TL;DR
 If you want to jump directly to the technical fun part, go here: <<source_1,Let’s start>>.
