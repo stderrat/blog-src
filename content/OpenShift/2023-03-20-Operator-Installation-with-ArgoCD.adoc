@@ -34,7 +34,7 @@ NOTE: This article assumes that you have the *openshift-gitops* Operator, which 
 If you want to jump directly to the technical fun part, go here: <<source_1,Let’s start>>.
 
 == The Idea
-Everything should be seen as a code. Everything should be possible to be deployed in a repeatable way. With a GitOps approach, everything is stored naturally in Git and from there a GitOps agent validates and synchronizes changes to one or more clusters. 
+Everything should be seen as a code. Everything should be possible to be deployed in a repeatable way. With a GitOps approach, everything is stored naturally in Git and from there, a GitOps agent validates and synchronizes changes to one or more clusters. 
 
 When it comes to OpenShift, Red Hat supports Argo CD using the Operator *openshift-gitops*. This gives you everything you need to deploy an Argo CD instance. The only thing you need to take care of is a Git repository, no matter if it is GitHub, Gitlab, Bitbucket etc. 
 
@@ -43,7 +43,7 @@ Sometimes Kubernetes objects depend on each other. This is especially true when 
 
 Why is that? Well, when you want to deploy an Operator, you will store a “Subscription object” in Git. Argo CD will take this object and applies it to the cluster. However, for an Operator, the creation of the Subscription object is just the first step. A lot of other steps are required until the Operator gets ready. Unfortunately, Argo CD cannot verify if the installation is successful. All it sees is that the Subscription object has been created and then it immediately tries to deploy the CRD. The CRD which is not yet available on the system because the Operator is still installing it.
 
-Even if you use Argo CD features like Sync waves it would wait until the Operator is successfully installed because for Argo CD the “success” is the creation of the Subscription object. 
+Even if you use Argo CD features like Sync waves it would not wait until the Operator is successfully installed because for Argo CD the “success” is the creation of the Subscription object. 
 
 Subsequently, the Argo CD synchronisation process will fail. 
 You could now try to automatically “Retry” the sync or use multiple Argo CD applications that you execute one after each other, but I was not fully happy with that and tried a different approach.  
@@ -60,7 +60,7 @@ This “Wait until the Operator is ready” is the tricky party for Argo CD. Wha
 
 . Install the Operator, this is the first step and is done during Sync Wave 0.
 
-. Create a Kubernetes Job that verifies the status of the Operator. This Job additionally requires a ServiceAccount and a role with a binding. The configured Sync Wave is 1. Moreover, I use a *Hook* (another Argo CD feature) with the deletion policy “HookSucceeded”. This makes sure that the Job, ServiceAccount, Role and RoleBinding are removed after the status has been verified. 
+. Create a Kubernetes Job that verifies the status of the Operator. This Job additionally requires a ServiceAccount and a role with a binding. They are configured during Sync Wave is 1. Moreover, I use a *Hook* (another Argo CD feature) with the deletion policy “HookSucceeded”. This makes sure that the Job, ServiceAccount, Role and RoleBinding are removed after the status has been verified. 
 The verification is successful as soon as the Operator status says “Succeeded”. In fact, all the Job does is to execute some oc commands. For example, 
 +
 [source,bash]
@@ -72,7 +72,7 @@ Succeeded
 +
 . Finally, during the next Sync Wave (2+) the CRD can be deployed. In this case, I deploy the object *ScanSettingBinding*.
 
-In Argo CD everything is correctly synchronized, and the Operator and its configuration are in place.
+In Argo CD everything is correctly synchronized, and the Operator and its configuration is in place.
 
 NOTE: If you are new to the compliance operator, I recommend the following article: https://blog.stderr.at/compliance/2021/07/compliance-operator/[Compliance Operator]
 
@@ -174,7 +174,7 @@ helper-operator:
 It is executed during Sync Wave 0 and defines if a Namespace (openshift-compliance) shall be created (true) and the specification of the Operator which you need to know upfront:
 
 . *channel*: Defines which channel shall be used. Some operators offer different channels.
-. *approval*: Either Automatic or Manuel … defines if the Operator shall be updated automatically or requires and approval.
+. *approval*: Either Automatic or Manual … defines if the Operator shall be updated automatically or requires an approval.
 . *operatorName*: the actual name of the Operator (compliance-operator)
 . *source*: Where does this Operator come from (redhat-operator)
 . *sourceNamespace*: In this case openshift-marketplace
@@ -248,12 +248,12 @@ image::argocd2/argocd-starting-operator-installation.png?width=480[]
 .Argo CD: Status Checker Job started (Sync Wave 1)
 image::argocd2/argocd-starting-job.png?width=480[]
 
-. The Log output of the Operator. You can see that the status switches from Pending, to Installing to Succeeded.
+. The Log output of the Operator. You can see that the status switches from Pending to Installing to Succeeded.
 +
 .Argo CD: Log of the Status Checker Pod
 image::argocd2/argocd-status-checker-log.png?width=480[]
 
-. After Sync Wave 3 the whole Application has been synchronized and the Checker Job has been removed.
+. After Sync Wave 3, the whole Application has been synchronized and the Checker Job has been removed.
 +
 .Argo CD: Compliance Operator is fully deployed
 image::argocd2/argocd-operator-installed.png?width=480[]
