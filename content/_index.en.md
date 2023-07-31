@@ -9,6 +9,6 @@ tags: ["OCP", "Day-2", "OpenShift", "Pod Placement", "NodeSelector", "Taints", "
 
 ## Welcome to YAUB - Yet Another Useless Blog
 
-The articles in this blog shall help to easily tests and understand specific issues so they can be reproduced and tested on local environments.
+The articles in this blog shall help to easily test and understand specific issues so they can be reproduced and tested on local environments.
 
 You can find the most recent posts on this site or walk through the different categories via the left navigation.
