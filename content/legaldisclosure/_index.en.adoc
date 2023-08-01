@@ -16,13 +16,13 @@ Toni Schmidbauer & Thomas Jungbauer +
 1200 Vienna, Austria
 
 === Contact Information
-E-Mail: 
+Toni Schmidbauer:
 
 image::ts.png[] 
 
 {nbsp}
 
-image::tju.png[]
+Thomas Jungbauer: https://jungbauer.stderr.at
 
 Internet address: https://blog.stderr.at/
 
