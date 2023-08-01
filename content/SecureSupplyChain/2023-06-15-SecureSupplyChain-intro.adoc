@@ -4,7 +4,9 @@ description: "Introduction to Secure Supply Chain"
 date: "2023-06-28"
 doctype: book
 
-frontimage: ["/SecureSupplyChain/images/intro-install_Tekton_Operator.png?width=220px"]
+featured_image: /SecureSupplyChain/images/logo/tekton-horizontal-color.png
+show_featured_image_summary: false
+show_featured_image_article: true
 
 author: Thomas Jungbauer
 type: post
