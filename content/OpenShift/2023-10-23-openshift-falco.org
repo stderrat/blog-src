@@ -82,6 +82,8 @@ mv: cannot stat '/usr/src/falco-6.0.1+driver/bpf/probe.o': No such file or direc
 Unable to load the falco eBPF probe
 #+end_src
 
+Seems to be an issue with a missing directory.
+
 And we told the helm chart to enable ~falco-sidekick~ and
 ~falco-sidekick-ui~, but where are they?
 
@@ -107,11 +109,10 @@ make[1]: *** /lib/modules/4.18.0-372.73.1.el8_6.x86_64/build: No such file or di
 #+end_src
 
 As far as we know there are no kernel sources on RHCOS nodes in
-OpenShift.
+OpenShift. After a little bit of searching the interweb we found the
+following issue comment on Github:
 
-After a little bit of searching the interweb we found the following issue comment on github:
-
-https://github.com/falcosecurity/falco/issues/1505#issuecomment-754745960
+[[https://github.com/falcosecurity/falco/issues/1505#issuecomment-754745960][OpenShift under vsphere: Download failed, consider compiling your own falco module and loading it or getting in touch with the Falco community]]
 
 So we need to enable the ~kernel-devel~ extension, the official docs are
 [[https://docs.openshift.com/container-platform/4.12/post_installation_configuration/machine-configuration-tasks.html#rhcos-add-extensions_post-install-machine-configuration-tasks][here]]. It does not mention ~kernel-devel~, but there a [[https://access.redhat.com/solutions/6972423][knowledge base
