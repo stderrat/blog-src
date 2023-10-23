@@ -11,7 +11,11 @@ While playing around with [[https://falco.org/][Falco]] (worth another post) I h
 MachineConfig update even so the actual configuration of the machine
 did not change.
 
-AS this seems to be not clearly documented here it comes
+This posts documents the steps taken.
+
+# more
+
+As this seems to be not clearly documented here it comes
 
 1. Get the list of current MaschineConfigs
    #+begin_src shell
@@ -53,3 +57,5 @@ oc patch node ip-10-0-182-18.eu-central-1.compute.internal --patch '{ "metadata"
    #+begin_src shell
 $ oc get mcp
    #+end_src
+
+Wait for the config rollout to complete.
