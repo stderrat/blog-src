@@ -199,7 +199,7 @@ Back to searching the interweb only reveals an old [[https://github.com/falcosec
 be fixed already.
 
 So as a quick hack we [[https://github.com/tosmi/playground/blob/master/openshift/falco/custom-falco-driver-loader/Dockerfile][modified]] the ~falco-driver-loader~ image to
-contain ~libelf-def~ and pushed to image to [[https://quay.io/repository/tosmi/falco-driver-loader?tab=tags][quay]].
+contain ~libelf-dev~ and pushed to image to [[https://quay.io/repository/tosmi/falco-driver-loader?tab=tags][quay]].
 
 We then modified our falco helm configuration to use the updated image:
 
