@@ -1,4 +1,4 @@
-#+title: How to force a MaschineConfig rollout
+#+title: How to force a MachineConfig rollout
 #+author: Toni Schmidbauer
 #+lastmod: [2023-10-18 Wed 18:24]
 #+categories[]: OpenShift
@@ -19,7 +19,7 @@ As this seems to be not clearly documented here it comes
 
 # more
 
-1. Get the list of current MaschineConfigs
+1. Get the list of current MachineConfigs
    #+begin_src shell
 $ oc get mc
 NAME                                               GENERATEDBYCONTROLLER                      IGNITIONVERSION   AGE
