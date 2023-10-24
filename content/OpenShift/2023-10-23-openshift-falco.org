@@ -1,6 +1,6 @@
 #+title: Running Falco on OpenShift 4.12
 #+author: Toni Schmidbauer
-#+lastmod: [2023-10-23 Mon 11:30]
+#+lastmod: [2023-10-24 Tue 11:30]
 #+categories[]: OpenShift
 #+draft: false
 #+variable: value
@@ -10,6 +10,8 @@
 [[https://falco.org/][Falco]] is a security tool to monitor kernel events like system calls to
 provide real-time alerts. In this post I'll document the steps taken
 to get Open Source [[https://falco.org/][Falco]] running on an OpenShift 4.12 cluster.
+
+[[http://localhost:1313/openshift/2023-10-23-openshift-falco/#headline-4][UPDATE]]: Use the ~falco-driver-loader-legacy~ image for OpenShift 4.12 deployments.
 
 # more
 
@@ -284,6 +286,36 @@ looks promising. So up to the next problem, getting falco-sidekick and falco-sid
 
 We also [[https://github.com/falcosecurity/falco/issues/2884][opened a bug]] report upstream to get feedback from the
 developers on this issue.
+
+
+** UPDATE
+
+[[https://github.com/Andreagit97][Andreagit97]] was so nice mentioning in the issue above that
+actually there is an image with libelf-dev available,
+[[https://hub.docker.com/r/falcosecurity/falco-driver-loader-legacy][falco-driver-loader-legacy]]. We can confirm that this image fixes the
+problem mentioned above.
+
+So this is our final falco helm chart values.yaml:
+
+#+begin_src yaml
+driver:
+  kind: ebpf
+  loader:
+    initContainer:
+      image:
+        repository: falcosecurity/falco-driver-loader-legacy
+
+falco:
+  json_output: true
+  json_include_output_property: true
+  log_syslog: false
+  log_level: info
+
+falcosidekick:
+  enabled: true
+  webui:
+    enabled: true
+#+end_src
 
 * Fixing falco-sidekick and falco-sidekick-ui
 
