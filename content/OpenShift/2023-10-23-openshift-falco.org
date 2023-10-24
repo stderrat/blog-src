@@ -8,17 +8,14 @@
 #+list[]: value_1 value_2 value_3
 
 [[https://falco.org/][Falco]] is a security tool to monitor kernel events like system calls to
-provide real-time alerts.
-
-In this post I'll document the steps taken to get Open Source [[https://falco.org/][Falco]]
-running on an OpenShift 4.12 cluster.
+provide real-time alerts. In this post I'll document the steps taken
+to get Open Source [[https://falco.org/][Falco]] running on an OpenShift 4.12 cluster.
 
 # more
 
-
 * First Try
 
-We will use the [[https://falcosecurity.github.io/charts][Falco Helm chart]] version 3.8.0 for our first try of setting up Falco.
+We will use the [[https://falcosecurity.github.io/charts][Falco Helm chart]] version 3.8.0 for our first try of setting up Falco on our OpenShift cluster.
 
 This is our values file:
 
@@ -38,8 +35,13 @@ falcosidekick:
     enabled: true
 #+end_src
 
+We would like to use the eBPF driver to monitor kernel events, enable
+falco sidekick, which is used to route events and the falco sidekick
+UI for easier testing.
+
 Because of reasons we leverage kustomize to render the helm chart. The
-final kustomize config is [[https://github.com/tosmi-gitops/openshift-gitops/tree/main/components/apps/falco/base][here]].
+final kustomize config is [[https://github.com/tosmi-gitops/openshift-gitops/tree/main/components/apps/falco/base][here]] (after fixing all problems mentioned
+below).
 
 So after deploying the chart via ArgoCD (another story), we have the following pods:
 
@@ -82,7 +84,7 @@ mv: cannot stat '/usr/src/falco-6.0.1+driver/bpf/probe.o': No such file or direc
 Unable to load the falco eBPF probe
 #+end_src
 
-Seems to be an issue with a missing directory.
+Seems to be an issue with a missing directory _/lib/modules/4.18.0-372.73.1.el8_6.x86_64/build_.
 
 And we told the helm chart to enable ~falco-sidekick~ and
 ~falco-sidekick-ui~, but where are they?
@@ -94,32 +96,35 @@ Let's check the events with ~oc get events~ as well, and what do we see?
 6s          Warning   FailedCreate             replicaset/falco-falcosidekick-ui-76885bd484   Error creating: pods "falco-falcosidekick-ui-76885bd484-" is forbidden: unable to validate against any security context constraint: [provider "anyuid": Forbidden: not usable by user or serviceaccount, provider restricted-v2: .spec.securityContext.fsGroup: Invalid value: []int64{1234}: 1234 is not an allowed group, provider restricted-v2: .containers[0].runAsUser: Invalid value: 1234: must be in the ranges: [1000730000, 1000739999], provider "restricted": Forbidden: not usable by user or serviceaccount, provider "nonroot-v2": Forbidden: not usable by user or serviceaccount, provider "nonroot": Forbidden: not usable by user or serviceaccount, provider "hostmount-anyuid": Forbidden: not usable by user or serviceaccount, provider "machine-api-termination-handler": Forbidden: not usable by user or serviceaccount, provider "hostnetwork-v2": Forbidden: not usable by user or serviceaccount, provider "hostnetwork": Forbidden: not usable by user or serviceaccount, provider "hostaccess": Forbidden: not usable by user or serviceaccount, provider "falco": Forbidden: not usable by user or serviceaccount, provider "node-exporter": Forbidden: not usable by user or serviceaccount, provider "privileged": Forbidden: not usable by user or serviceaccount]
 #+end_src
 
+Looks like a problem with OpenShifts Security Context constraints (SCC's).
+
 ** Summary of problems
 
-- The falco ~DaemonSet~ fails to start pods because there seems to be an issue with a missing directory
-- Falco Sidekick and Falco Sidekick UI fail to start because of security context constraint issues
+- The falco ~DaemonSet~ fails to start pods because there is an issue with a missing directory
+- Falco Sidekick and Falco Sidekick UI fails to start because of
+  Security Context Constraint (SCC) issues
 
 * Fixing the Falco daemonset
 
 Falco tries to download a pre-compiled eBPF probe, fails and then
-tries to compile that probe for our host OS kernel. This fails with
+tries to compile that probe for our host OS kernel. This fails with the message:
 
 #+begin_src bash
 make[1]: *** /lib/modules/4.18.0-372.73.1.el8_6.x86_64/build: No such file or directory.  Stop.
 #+end_src
 
-As far as we know there are no kernel sources on RHCOS nodes in
-OpenShift. After a little bit of searching the interweb we found the
-following issue comment on Github:
+As far as we know there are no kernel sources installed on RHCOS nodes
+in OpenShift. After a little bit of searching the interweb we found
+the following issue comment on Github:
 
 [[https://github.com/falcosecurity/falco/issues/1505#issuecomment-754745960][OpenShift under vsphere: Download failed, consider compiling your own falco module and loading it or getting in touch with the Falco community]]
 
 So we need to enable the ~kernel-devel~ extension, the official docs are
-[[https://docs.openshift.com/container-platform/4.12/post_installation_configuration/machine-configuration-tasks.html#rhcos-add-extensions_post-install-machine-configuration-tasks][here]]. It does not mention ~kernel-devel~, but there a [[https://access.redhat.com/solutions/6972423][knowledge base
+[[https://docs.openshift.com/container-platform/4.12/post_installation_configuration/machine-configuration-tasks.html#rhcos-add-extensions_post-install-machine-configuration-tasks][here]]. It does not mention ~kernel-devel~, but there's a [[https://access.redhat.com/solutions/6972423][knowledge base
 article]] mentioning ~kernel-devel~, so let's give it a try.
 
 We deploy two ~MachineConfigs~, one for [[https://github.com/tosmi-gitops/openshift-gitops/blob/main/components/apps/falco/base/worker-machineconfig.yaml][worker]] and one for [[https://github.com/tosmi-gitops/openshift-gitops/blob/main/components/apps/falco/base/master-machineconfig.yaml][master]] nodes
-to rollout the extension:
+to rollout the extension, the worker configuration looks like this:
 
 #+begin_src yaml
 apiVersion: machineconfiguration.openshift.io/v1
@@ -135,7 +140,7 @@ spec:
 
 See also our Kustomize configuration [[https://github.com/tosmi-gitops/openshift-gitops/blob/main/components/apps/falco/base/kustomization.yaml][here]].
 
-As soon as we apply our ~MachineConfigs~, OpenShift starts the rollout:
+As soon as we apply our ~MachineConfigs~, OpenShift starts the rollout via MaschineConfigPool's:
 
 #+begin_src
 $ oc get mcp
@@ -189,7 +194,7 @@ mv: cannot stat '/usr/src/falco-6.0.1+driver/bpf/probe.o': No such file or direc
 Unable to load the falco eBPF probe
 #+end_src
 
-So this time we get another error, the culprit seems to be
+So this time we get another error, the culprit is the following line
 
 #+begin_src bash
 Makefile:1005: *** "Cannot generate ORC metadata for CONFIG_UNWINDER_ORC=y, please install libelf-dev, libelf-devel or elfutils-libelf-devel".  Stop.
@@ -277,6 +282,9 @@ Especially the line
 
 looks promising. So up to the next problem, getting falco-sidekick and falco-sidekick-ui running.
 
+We also [[https://github.com/falcosecurity/falco/issues/2884][opened a bug]] report upstream to get feedback from the
+developers on this issue.
+
 * Fixing falco-sidekick and falco-sidekick-ui
 
 Remember pod startup actually failed because of the following event (check with ~oc get events~):
@@ -286,7 +294,7 @@ Remember pod startup actually failed because of the following event (check with 
 #+end_src
 
 It seems the sidekick pods want to run with a specific UID. The
-default OpenShift Security Context Constraint (SCC) restricted
+default OpenShift Security Context Constraint (SCC) ~restricted~
 prohibits this.
 
 Lets confirm our suspicion:
@@ -299,7 +307,7 @@ $ oc get deploy -o jsonpath='{.spec.template.spec.securityContext}{"\n"}' falco-
 #+end_src
 
 Bingo! ~securityContext~ is set to 1234 for both deployments. There is
-another SCC that we could leverage, ~nonroot~ which basically allows any
+another SCC that we could leverage, ~nonroot~, which basically allows any
 UID expect 0. We just need to get the ~ServiceAccount~ that
 falco-sidekick and falco-sidekick-ui are actually using:
 
@@ -311,7 +319,7 @@ falco-falcosidekick-ui
 #+end_src
 
 So falco-sidekick uses ~falco-sidekick~ as ~ServiceAccount~ and falco-sidekick-ui ~falco-sidekick-ui~. Lets
-grant both ~ServiceAccount~ access to the ~nonroot~ SCC.
+grant both ~ServiceAccounts~ access to the ~nonroot~ SCC.
 
 #+begin_src
 kind: ClusterRoleBinding
@@ -366,8 +374,8 @@ pod/falco-tzm8d                               2/2     Running   0          21m
 
 * Testing Falco
 
-Now that everything seems to be up and running, lets do a quick
-test. First we will try to access the Falco Sidekick user interface.
+Now that everything seems to be running, lets do a quick test. First
+we will try to access the Falco Sidekick user interface.
 
 Falco will not deploy a route for the UI automatically, instead we've
 created a [[https://github.com/tosmi-gitops/openshift-gitops/tree/main/components/apps/falco/overlays/sidekick-ui-route][Kustomize overlay]] with a custom route:
@@ -392,14 +400,14 @@ spec:
 
 After deploying the ~Route~ we can access the Falco UI with the hostname
 specified in the route object. The default username seems to be
-_admin/admin_ which is strange for a security tool, maybe that's the
-reason Falco does not expose the UI per default.
+_admin/admin_ which is kind of strange for a security tool, maybe that's
+the reason Falco does not expose the UI per default.
 
 [[file:/OpenShift/images/falco/falco-ui.png]]
 
-** Create an alert
+** Creating an event
 
-As a last test let's try to trigger an alert. We open a shell to one
+As a last test let's try to trigger an event. We open a shell to one
 of the falco ~DaemonSet~ pods and execute a suspicious command:
 
 #+begin_src shell
