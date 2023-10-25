@@ -11,7 +11,7 @@
 provide real-time alerts. In this post I'll document the steps taken
 to get Open Source [[https://falco.org/][Falco]] running on an OpenShift 4.12 cluster.
 
-[[http://localhost:1313/openshift/2023-10-23-openshift-falco/#headline-4][UPDATE]]: Use the ~falco-driver-loader-legacy~ image for OpenShift 4.12 deployments.
+[[https://blog.stderr.at/openshift/2023-10-23-openshift-falco/#headline-4][UPDATE]]: Use the ~falco-driver-loader-legacy~ image for OpenShift 4.12 deployments.
 
 # more
 
