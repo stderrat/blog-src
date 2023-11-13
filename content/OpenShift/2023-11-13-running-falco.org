@@ -1,0 +1,63 @@
+#+title: Running Falco on OpenShift 4.12
+#+author: Toni Schmidbauer
+#+lastmod: [2023-10-24 Tue 11:30]
+#+categories[]: OpenShift
+#+draft: true
+#+variable: value
+#+date: 2023-10-23
+#+list[]: value_1 value_2 value_3
+
+[[https://falco.org/][Falco]] is a security tool to monitor kernel events like system calls to
+provide real-time alerts. In this post I'll document things I
+discovered while preparing Falco to a deployment to production
+OpenShift Cluster.
+
+# more
+
+Minimal setup with just a few custom rules. custom wants to monitor shell execs
+
+falco is resilient when it comes to errors in rules files
+
+- disable falco artifact follow, will download rules from
+  #+begin_src
+falco-glts4 falcoctl-artifact-follow  INFO   (ghcr.io/falcosecurity/rules/falco-rules:2) pulling artifact from remote repository...
+falco-glts4 falcoctl-artifact-follow  INFO   (ghcr.io/falcosecurity/rules/falco-rules:2) check if pulling an allowed type of artifact
+falco-glts4 falcoctl-artifact-follow  INFO   (ghcr.io/falcosecurity/rules/falco-rules:2) pulling artifact "ghcr.io/falcosecurity/rules/falco-rules:2"
+falco-glts4 falcoctl-artifact-follow  INFO   (ghcr.io/falcosecurity/rules/falco-rules:2) verifying signature for ghcr.io/falcosecurity/rules/falco-rules@sha256:8ac74658d3a4b3d4db6228db23b5706c1cf5e25f33c8eb33881e28f660a43828
+falco-glts4 falcoctl-artifact-follow  INFO   (ghcr.io/falcosecurity/rules/falco-rules:2) signature successfully verified
+falco-glts4 falcoctl-artifact-follow  INFO   (ghcr.io/falcosecurity/rules/falco-rules:2) extracting artifact
+falco-glts4 falcoctl-artifact-follow  INFO   (ghcr.io/falcosecurity/rules/falco-rules:2) cleaning up leftovers files
+falco-glts4 falcoctl-artifact-follow  INFO   (ghcr.io/falcosecurity/rules/falco-rules:2) artifact correctly pulled
+falco-glts4 falcoctl-artifact-follow  INFO   (ghcr.io/falcosecurity/rules/falco-rules:2) installing file "falco_rules.yaml"...
+falco-glts4 falcoctl-artifact-follow  INFO   (ghcr.io/falcosecurity/rules/falco-rules:2) checking if file "falco_rules.yaml" already exists in "/rulesfiles"
+falco-glts4 falcoctl-artifact-follow  INFO   (ghcr.io/falcosecurity/rules/falco-rules:2) file "falco_rules.yaml" already exists in "/rulesfiles", checking if it is equal to the existing one
+falco-glts4 falcoctl-artifact-follow  INFO   (ghcr.io/falcosecurity/rules/falco-rules:2) the two file are equal, nothing to be done
+falco-glts4 falcoctl-artifact-follow  INFO   (ghcr.io/falcosecurity/rules/falco-rules:2) artifact with tag "2" correctly installed
+  #+end_src
+
+
+
+* Exec audit logs
+
+
+#+begin_src
+{"kind":"Event","apiVersion":"audit.k8s.io/v1","level":"Metadata","auditID":"5c19c1d0-00a7-4af5-a236-5345b5963581","stage":"ResponseComplete","requestURI":"/api/v1/namespaces/falco/pods/falco-8mqj7/exec?command=cat\u0026command=%2Fetc%2Ffalco%2Fextra-rules.d%2Ffalco-extra-rules.yaml\u0026container=falco\u0026stderr=true\u0026stdout=true","verb":"create","user":{"username":"root","uid":"d82ec74a-75e3-4798-a084-4b766dcea5ef","groups":["cluster-admins","system:authenticated:oauth","system:authenticated"],"extra":{"scopes.authorization.openshift.io":["user:full"]}},"sourceIPs":["10.0.32.220"],"userAgent":"oc/4.13.0 (linux/amd64) kubernetes/92b1a3d","objectRef":{"resource":"pods","namespace":"falco","name":"falco-8mqj7","apiVersion":"v1","subresource":"exec"},"responseStatus":{"metadata":{},"code":101},"requestReceivedTimestamp":"2023-11-13T17:23:16.999602Z","stageTimestamp":"2023-11-13T17:23:17.231121Z","annotations":{"authorization.k8s.io/decision":"allow","authorization.k8s.io/reason":"RBAC: allowed by ClusterRoleBinding \"root-cluster-admin\" of ClusterRole \"cluster-admin\" to User \"root\""}}
+#+end_src
+* Disabling standard rules
+
+* Kustomize patch helm to deploy rules via configmapGenerator
+
+
+* Monitor Redis disk usage
+
+Cost some time: redis disk was full
+
+* Monitor _falco_ pod logs when changing rules
+
+after deploying new rules:
+
+#+begin_src
+{"hostname":"falco-2hlkm","output":"Falco internal: hot restart failure: /etc/falco/extra-rules.d/falco-extra-rules.yaml: Invalid\n1 Errors:\nIn rules content: (/etc/falco/extra-rules.d/falco-extra-rules.yaml:0:0)\n    rule 'Terminal shell in container': (/etc/falco/extra-rules.d/falco-extra-rules.yaml:25:2)\n    condition expression: (\"spawned_process a...\":26:71)\n------\n...ocess and container and shell_procs and proc.tty != 0 and container_entrypoint\n                                                                                ^\n------\nLOAD_ERR_VALIDATE (Error validating rule/macro/list/exception objects): Undefined macro 'container_entrypoint' used in filter.\n","output_fields":{},"priority":"Critical","rule":"Falco internal: hot restart failure","source":"internal","time":"2023-11-13T11:47:14.639547735Z"}
+#+end_src
+
+macro was missing
