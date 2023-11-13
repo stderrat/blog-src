@@ -1,4 +1,4 @@
-#+title: Running Falco on OpenShift 4.12
+#+title: Setting up Falco on OpenShift 4.12
 #+author: Toni Schmidbauer
 #+lastmod: [2023-10-24 Tue 11:30]
 #+categories[]: OpenShift
