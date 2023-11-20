@@ -7,10 +7,18 @@
 #+date: 2023-10-23
 #+list[]: value_1 value_2 value_3
 
-[[https://falco.org/][Falco]] is a security tool to monitor kernel events like system calls to
-provide real-time alerts. In this post I'll document things I
-discovered while preparing Falco to a deployment to production
-OpenShift Cluster.
+As mentioned in our [[https://blog.stderr.at/openshift/2023-10-23-openshift-falco/][previous post]] about [[https://falco.org/][Falco]], Falco is a security
+tool to monitor kernel events like system calls to provide real-time
+alerts.
+
+In this post I'll how to customize Falco for a specific use case:
+
+We would like to monitor the following events:
+
+- An interactive shell is opened in a container
+- Log all commands executed in an interactive shell in a container
+- Log read and writes to files within an interactive shell inside a container
+
 
 # more
 
@@ -35,10 +43,7 @@ falco-glts4 falcoctl-artifact-follow  INFO   (ghcr.io/falcosecurity/rules/falco-
 falco-glts4 falcoctl-artifact-follow  INFO   (ghcr.io/falcosecurity/rules/falco-rules:2) artifact with tag "2" correctly installed
   #+end_src
 
-
-
 * Exec audit logs
-
 
 #+begin_src
 {"kind":"Event","apiVersion":"audit.k8s.io/v1","level":"Metadata","auditID":"5c19c1d0-00a7-4af5-a236-5345b5963581","stage":"ResponseComplete","requestURI":"/api/v1/namespaces/falco/pods/falco-8mqj7/exec?command=cat\u0026command=%2Fetc%2Ffalco%2Fextra-rules.d%2Ffalco-extra-rules.yaml\u0026container=falco\u0026stderr=true\u0026stdout=true","verb":"create","user":{"username":"root","uid":"d82ec74a-75e3-4798-a084-4b766dcea5ef","groups":["cluster-admins","system:authenticated:oauth","system:authenticated"],"extra":{"scopes.authorization.openshift.io":["user:full"]}},"sourceIPs":["10.0.32.220"],"userAgent":"oc/4.13.0 (linux/amd64) kubernetes/92b1a3d","objectRef":{"resource":"pods","namespace":"falco","name":"falco-8mqj7","apiVersion":"v1","subresource":"exec"},"responseStatus":{"metadata":{},"code":101},"requestReceivedTimestamp":"2023-11-13T17:23:16.999602Z","stageTimestamp":"2023-11-13T17:23:17.231121Z","annotations":{"authorization.k8s.io/decision":"allow","authorization.k8s.io/reason":"RBAC: allowed by ClusterRoleBinding \"root-cluster-admin\" of ClusterRole \"cluster-admin\" to User \"root\""}}
@@ -46,7 +51,6 @@ falco-glts4 falcoctl-artifact-follow  INFO   (ghcr.io/falcosecurity/rules/falco-
 * Disabling standard rules
 
 * Kustomize patch helm to deploy rules via configmapGenerator
-
 
 * Monitor Redis disk usage
 
