@@ -81,7 +81,7 @@ The complete Helm values files is available [[https://raw.githubusercontent.com/
 
 Falco updates all rules when it starts (via an _initContainer_) and also
 updates those rules on a regular basis. We would also like to disable
-this behaviour:
+this behavior:
 
 #+begin_src yaml
 falcoctl:
@@ -95,15 +95,15 @@ falcoctl:
 * Create events for _kubectl/oc exec_
 
 One problem problem is monitoring pod exec events. Using Falcos eBPF
-monitoring capabilites we found no way to limite those events to pod
-exec's. This might be becauses the Falco rule language is new to us
+monitoring capabilities we found no way to limit those events to pod
+exec's. This might be because the Falco rule language is new to us
 and maybe there is a way to use eBPF filtering. Just let us know if
 you find a solution!
 
 But we came up with a different way of capturing pod/exec events:
 
 Falco also allows monitoring Kubernetes audit events, logged by the
-~kube-apiserver~. Evertime you hit the ~pod/exec~ endpoint, K8s logs the
+~kube-apiserver~. Every time you hit the ~pod/exec~ endpoint, K8s logs the
 following event in the audit log:
 
 #+begin_src json
@@ -134,7 +134,7 @@ falco:
 
 * Implementing event routing
 
-We had an additional requirment to route events based on the following rules:
+We had an additional requirement to route events based on the following rules:
 
 - Events that *do not* contain sensitive data (like usernames) should go
   to a specific Kafka topic
@@ -146,7 +146,7 @@ field for routing. Events with sensitive data would get a higher
 priority.  But the sink with a lower _minimumpriority_ would get events
 with higher priority as well, which means events with sensitive data.
 
-Futhermore as far as we know Falco currently only supports one Kafka
+Furthermore as far as we know Falco currently only supports one Kafka
 configuration (we need two for two topics).
 
 At this point in time we are not aware of a possibility to implement
@@ -230,7 +230,7 @@ vector --> NonConfidential
 ** Monitor Redis disk usage
 
 One small hint when using ~falcosidekick-ui~ to debug/monitor events. It
-happend to us that the Redis volume was full and suddenly we couldn't
+happened to us that the Redis volume was full and suddenly we couldn't
 see new events in the UI.
 
 We stopped the UI and Redis pods, removed the PVC and just ran our kustomization
