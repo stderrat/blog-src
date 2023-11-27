@@ -160,7 +160,7 @@ There are some discussions upstream on implementing such a feature:
 Our current idea is to use [[https://vector.dev/][Vector]] for event routing. We will try to
 implement the following pipeline:
 
-#+begin_src plantuml :file ../OpenShift/images/falco/falco-pipeline.png :exports results
+#+begin_src plantuml :file ../OpenShift/images/falco/falco-pipeline.png :exports results :results none
 @startuml
 component Falco {
 	file audit.log
@@ -169,20 +169,24 @@ component Falco {
 	eBPF Events
 	====
 	Login to container
+	Tags: [SIEM, NonConfidential]
 	----
 	Command execute in container
+	Tags: [SIEM, NonConfidential, GCS]
 	----
 	File opened in container
+	Tags: [SIEM, NonConfidential]
 	]
 
 	agent k8saudit [
 	Falco K8s audit plugin
 	====
 	Attach/Exec Pod events
+	Tags: [k8s, SIEM, Confidential]
 	]
 
 	agent sidekick [
-	Falco Sidekick
+	(Falco Sidekick)
 	----
 	HTTP output directly to Vector
 	]
@@ -191,7 +195,10 @@ component Falco {
 agent vector [
 Vector
 ====
-HTTP Sink with filter based routing to outputs
+Source: Falco
+Sink: [Kafka, GCS]
+
+Routing based on Falco tags
 ]
 
 component Kafka {
@@ -201,6 +208,16 @@ component Kafka {
 
 	queue NonConfidential[
 	Non-Confidential logs
+	]
+
+	queue SIEM[
+	SIEM relevant logs
+	]
+}
+
+cloud google {
+	database GCS[
+	Google Cloud Storage
 	]
 }
 
@@ -214,6 +231,8 @@ sidekick -> vector
 
 vector --> Confidential
 vector --> NonConfidential
+vector --> SIEM
+vector --> GCS
 
 #+end_src
 
