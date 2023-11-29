@@ -1,0 +1,24 @@
+#+title: Building an event pipeline with Falco, Vector and Kafka
+#+author: Toni Schmidbauer
+#+lastmod: [2023-11-29 Wed]
+#+categories[]: OpenShift
+#+draft: true
+#+variable: value
+#+date: 2023-11-29
+#+hugo_base_dir: ../
+#+OPTIONS: ^:nil
+
+In this post we are going to build an event pipeline to:
+
+- Capture Security related events from
+  - Falco
+  - OpenShift audit log
+- Modify and filter those events with Vector
+- and finally ship events to multiple Kafka queues
+
+# more
+
+* falco setup
+* kafka setup
+* vector setup
+* vector testing
