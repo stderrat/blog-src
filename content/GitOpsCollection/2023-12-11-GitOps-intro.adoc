@@ -1,0 +1,88 @@
+--- 
+title: "Introducing the GitOps Approach"
+description: "Introduction to the GitOps Approach"
+date: "2023-12-01"
+doctype: book
+
+featured_image: /GitOpsCollection/images/logo/NONE
+show_featured_image_summary: false
+show_featured_image_article: false
+
+author: Thomas Jungbauer
+type: post
+draft: false
+
+categories:
+   - OpenShift
+   - GitOps
+   - CICD
+   - ArgoCD
+tags: ["OCP", "GitOps", "OpenShift", "GitOps Approach", "Argo CD", "ArgoCD"] 
+
+aliases: [ 
+	 "/openshift/gitopscollection/intro",
+] 
+---
+
+:imagesdir: /GitOpsCollection/images/
+:icons: font
+:toc:
+
+When managing one or more clusters, the question arises as to how cluster configurations and applications can be installed securely, regularly, and in the same way. 
+This is where the so-called GitOps approach helps, according to the mantra: "*If it is not in Git, it does not exist*". 
+
+The idea is to have Git as the only source of truth on what happens inside the environment. While there are many articles about how to get GitOps into the deployment process of applications, this series of articles tries to set the focus on the *cluster configuration* and tasks system administrators usually have to do, for example: Setup an Operator.
+
+<!--more--> 
+
+WARNING: In this series, I will focus on cluster configuration.
+
+The GitOps approach is a very common practice and the-facto "standard" as of today. 
+
+WARNING: When I write standard, then be assured, that the approach itself should be followed, but HOW this is done can be a topic of many tough discussions.
+
+But what is it and why should a company invest time to follow this approach? 
+
+_GitOps is a declarative way to implement continuous deployment for cloud-native applications. It should be a repeatable process to manage multiple clusters.
+
+GitOps adds the following features to company processes:
+
+* *Everything as code*: The entire state of the application, infrastructure and configuration is declaratively defined as code.
+* *Git and the single source of truth*: Every setting and every manifest is stored and versioned in Git. Any change must first be saved to Git.
+* *Operations via Git workflows*: Standard Git procedures, such as pull or merge requests, should be used to track any changes to the applications or cluster configurations.
+
+It is important that not only the manifests of the applications but also the cluster configuration is stored in Git. The goal should be to ensure that no manual changes are made directly to the cluster. 
+
+== Benefits/Challenges
+
+Deploying new versions of applications or cluster configurations with a high degree of confidence is a desirable goal as getting features reliably to production is one of the most important characteristics of fast-moving organisations. 
+GitOps is a set of **common practices** where the entire code delivery process is controlled via Git, including infrastructure and application definition as code and automation to complete updates and rollbacks.
+
+GitOps constantly watches for changes in Git repositories and compares them with the current state of the cluster. If there is a drift it will either automatically synchronise to the wanted state or warn accordingly (manual sync must then be performed).
+
+The key GitOps advantages are:
+
+* Cluster and application configuration versioned in Git
+* Visualisation of desired system state
+* Automatically syncs configuration from Git to clusters (if enabled)
+* Drift detection, visualisation, and correction
+* Rollback and roll-forward to any Git commit.
+* Manifest templating support (Helm, Kustomize, etc.)
+* Visual insight into sync status and history.
+* Role-Based access support
+* Pipeline integration
+
+Adopting GitOps has enormous benefits but does pose some challenges. Many teams will have to adjust their culture and way of working to support using Git as the single source of truth. Strictly adhering to GitOps processes will mean all changes will be committed. This may present a challenge when it comes to debugging a live environment. There may be times when that is necessary and will require suspending GitOps in some way.
+
+Some other prerequisites for adopting GitOps include
+
+* Good testing and CI processes are in place.
+* A strategy for dealing with promotions between environments.
+* Strategy for Secrets management.
+
+== Used Tools
+
+The following list of tools (or specifications) are used for our GitOps Approach. 
+
+* https://docs.openshift.com/gitops/1.11/understanding_openshift_gitops/what-is-gitops.html#what-is-gitops[OpenShift GitOps^]
+* https://helm.sh/docs/topics/charts/[Helm^]
