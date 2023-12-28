@@ -1,0 +1,93 @@
+--- 
+title: "GitOps - Choosing the right Git repository structure"
+description: "Choosing the right Git repository/folder strucutre"
+date: "2023-12-28"
+doctype: book
+
+featured_image: /GitOpsCollection/images/logo/NONE
+show_featured_image_summary: false
+show_featured_image_article: false
+
+author: Thomas Jungbauer
+type: post
+draft: true
+
+categories:
+   - OpenShift
+   - GitOps
+   - ArgoCD
+   - Git
+tags: ["OCP", "GitOps", "OpenShift", "GitOps Approach", "Argo CD", "ArgoCD"] 
+
+aliases: [ 
+	 "/openshift/gitopscollection/gitops-structure",
+] 
+---
+
+:imagesdir: /GitOpsCollection/images/2_repostructure
+:icons: font
+:toc:
+
+One of the most popular questions asked before adopting the GitOps approach is how to deploy an application to different environments (Test, Dev, Production, etc.) in a safe and repeatable way.
+ 
+Each organisation has different requirements, and the choice will depend on a multitude of factors that also include non-technical aspects.
+
+Therefore, it is important to state: "*There is no unique “right” way, there are common practices*".
+
+<!--more--> 
+
+WARNING: In this series, I will focus on cluster configuration.
+
+== Git Repository Strategy - Options
+
+As written in the introduction: There is no unique “right” way, there are common practices. But how shall the Git repository structure look like? How shall the folder structure look like? Multiple options might be considered. Each has advantages and disadvantages, some I would recommend, some I would not recommend. 
+Before I describe, what I usually try to leverage, let's see the different options.
+
+=== Environment-per-branch. 
+
+In this case, there is a Git branch for each environment. A “Dev” branch holds the configuration for the DEV environments, a “production” branch for production and so on. This approach is very popular and will be familiar to people who have adopted git flow in the past. However, it is focused on application source code and not environment configuration and is best used when you need to support multiple versions of your application in production. I do not recommend this approach for GitOps, the main reasons are that pull requests and merges will be very complex and promotions between environments are a hurdle. The whole life cycle of a cluster configuration will be very complex. 
+
+=== Environment-per-folder - Monorepo
+
+In this case, all environments are in a *single* Git repository, and all are in the same branch. The filesystem has different folders that hold configuration files for each environment. The configuration of the “DEV” environment is described by a “DEV” folder, the “production” environment is found in a “production” folder and so on. 
+
+.GitOps Monorepo Approach
+image::monorepo.png[GitOps Monorepo Approach]
+
+This is the approach I usually recommend, especially when someone is new to the whole GitOps workflow and because of the simplicity of setting up such a repository. 
+
+The following advantages and disadvantages should be considered:
+
+*Pros*
+
+- Provides a central location for configuration changes.
+- This simplicity enabled straightforward Git workflows that will be centrally visible to the entire organisation, allowing a smoother and clearer approval process and merging.
+- Better suitable for small teams that are managing the cluster and easy to read and understand
+- Easy to debug problems.
+
+*Cons*
+
+- Scalability >> Increase complexity >> Management
+- Performance for huge repositories
+- Challenging to control access permissions on a single repository
+
+
+=== Environment-per-repository - Multirepo 
+
+In this case, each environment is on its separate git repository. So, the DEV environment is in a git repository called “DEV”, the “production” environment is in a “production” git repository and so on. The GitOps agent (OpenShift GitOps) connects to multiple repositories and takes care to apply the correct configuration to the correct target cluster.
+
+.GitOps Multirepo Approach
+image::multirepo.png[GitOps Multirepo Approach]
+
+Like the Monorepo approach, Multirepo comes with some advantages and disadvatnages:
+
+*Pros*
+
+- Allows separating concerns between different departments of organisations (a repository for the security team, a repository for the operations team, etc.)
+
+*Cons*
+
+- More complex to manage
+- Harder to understand and read the configuration (what is coming from where)
+- Argo CD Application dependencies might not be solved (i.e., Security tries to manage the same object as the operating team. Who is the leader?)
+

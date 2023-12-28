@@ -15,7 +15,7 @@ draft: false
 categories:
    - OpenShift
    - GitOps
-   - CICD
+   - Git
    - ArgoCD
 tags: ["OCP", "GitOps", "OpenShift", "GitOps Approach", "Argo CD", "ArgoCD"] 
 
