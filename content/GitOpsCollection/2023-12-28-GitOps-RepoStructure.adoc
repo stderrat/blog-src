@@ -41,9 +41,15 @@ WARNING: In this series, I will focus on cluster configuration.
 == Git Repository Strategy - Options
 
 As written in the introduction: There is no unique “right” way, there are common practices. But how shall the Git repository structure look like? How shall the folder structure look like? Multiple options might be considered. Each has advantages and disadvantages, some I would recommend, some I would not recommend. 
+
+It is important to understand that: 
+
+- The Git repository structure will depend heavily on how the organisation is laid out.
+- The final repo and directory structure is unique for every organisation, as such the right one will be a discovery process within the organisation and the teams involved in the GitOps engineering process.
+
 Before I describe, what I usually try to leverage, let's see the different options.
 
-=== Environment-per-branch. 
+=== Environment-per-branch
 
 In this case, there is a Git branch for each environment. A “Dev” branch holds the configuration for the DEV environments, a “production” branch for production and so on. This approach is very popular and will be familiar to people who have adopted git flow in the past. However, it is focused on application source code and not environment configuration and is best used when you need to support multiple versions of your application in production. I do not recommend this approach for GitOps, the main reasons are that pull requests and merges will be very complex and promotions between environments are a hurdle. The whole life cycle of a cluster configuration will be very complex. 
 
@@ -79,7 +85,7 @@ In this case, each environment is on its separate git repository. So, the DEV en
 .GitOps Multirepo Approach
 image::multirepo.png[GitOps Multirepo Approach]
 
-Like the Monorepo approach, Multirepo comes with some advantages and disadvatnages:
+Like the Monorepo approach, Multirepo comes with some advantages and disadvantages:
 
 *Pros*
 
@@ -91,3 +97,59 @@ Like the Monorepo approach, Multirepo comes with some advantages and disadvatnag
 - Harder to understand and read the configuration (what is coming from where)
 - Argo CD Application dependencies might not be solved (i.e., Security tries to manage the same object as the operating team. Who is the leader?)
 
+
+== Example Setup
+
+=== What approach I choose
+
+I usually use and recommend *Monorepo* approach.
+The *environment-per-folder* approach is a very good way to organise your GitOps applications. Not only is it very simple to implement and maintain, but it is also the optimal method for promoting releases between different GitOps environments. This approach can also work for any number of environments without any additional effort. Cluster configurations (for multiple clusters) are typically done by one team, therefore controlling access permissions in Git is not a big issue.
+
+=== Example folder structure
+
+Over time the following folder structure evolved or my repository:
+
+```bash
+├── base
+│   ├── argocd-onboarding-manager
+│   ├── argocd-resources-manager
+│   └── init_app_of_apps
+├── clusters
+│   ├── all
+│   │   ├── base-operators
+│   │   ├── etcd-encryption
+│   ├── management-cluster
+│   │   ├── branding
+│   │   ├── generic-cluster-config
+│   │   ├── management-gitops
+│   │   ├── node-labels
+│   │   ├── openshift-data-foundation
+│   │   ├── setup-acm
+│   │   ├── setup-acs
+│   │   ├── setup-compliance-oeprator
+│   │   ├── setup-openshift-logging
+│   │   └── setup-quay
+│   └── production-cluster
+│   │   ├── branding
+│   │   ├── generic-cluster-config
+│   │   ├── node-labels
+│   │   ├── openshift-data-foundation
+│   │   ├── setup-acs
+│   │   ├── setup-compliance-oeprator
+│   │   └── setup-openshift-logging
+├── init_GitOps.sh
+├── scripts
+│   ├── example_htpasswd
+│   ├── sealed_secrets
+├── tenant-projects
+    ├── my-main-app
+    └── my-second-app
+```
+
+=== Why repeating folders?
+
+Some may argue why certain folders are equal for management and production clusters, for example, "setup-compliance-operator", when this could be done more easily by defining such folder only once and using different overlays (using Kustomize) or different values-files (using Helm Charts). However, while this is a very valid question, I personally, like to see immediately what is configured on each cluster. I see, based on the folders, what is configured on the management cluster and where I could modify the configuration.
+
+Using Kustomize overlays, for example, would mean recreating the overlays or each configuration (if you want to have a clean separation and not combine all manifests into one overlay). Using different values-files is again a valid option, but (also again), you do not see what is configured on which cluster with one look.
+
+Therefore, I like this folder structure, even if it may look weird (especially if you are used to Kustomize overlays). However, everyone is invited to define their very own structure :)
