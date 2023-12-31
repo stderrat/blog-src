@@ -35,6 +35,12 @@ The idea is to have Git as the only source of truth on what happens inside the e
 
 <!--more--> 
 
+== The GitOps Approach
+
+This series includes the following articles: 
+
+. link:/openshift/gitopscollection/gitops-structure/[Choosing the right Git repository structure]
+
 WARNING: In this series, I will focus on cluster configuration.
 
 The GitOps approach is a very common practice and the-facto "standard" as of today. 
@@ -86,3 +92,10 @@ The following list of tools (or specifications) are used for our GitOps Approach
 
 * https://docs.openshift.com/gitops/1.11/understanding_openshift_gitops/what-is-gitops.html#what-is-gitops[OpenShift GitOps^]
 * https://helm.sh/docs/topics/charts/[Helm^]
+
+== Used Repositories
+
+The following two Git repositories are used throughout the series:
+
+* https://github.com/tjungbauer/openshift-cluster-bootstrap[OpenShift Configuration^]
+* https://charts.stderr.at/[Helm Repository^]
