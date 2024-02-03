@@ -97,5 +97,5 @@ The following list of tools (or specifications) are used for our GitOps Approach
 
 The following two Git repositories are used throughout the series:
 
-* https://github.com/tjungbauer/openshift-cluster-bootstrap[OpenShift Configuration^]
+* https://github.com/tjungbauer/openshift-clusterconfig-gitops[OpenShift Configuration^]
 * https://charts.stderr.at/[Helm Repository^]

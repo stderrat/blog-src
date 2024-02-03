@@ -56,7 +56,7 @@ A new stable version will arrive soon. :)
 == Node Labelling Chart
 In this example, I would like to use a Helm chart that will try to set two different labels on 2 nodes. This is a very easy example to demonstrate the feature. 
 
-As a Helm chart, I have prepared the following: https://github.com/tjungbauer/openshift-cluster-bootstrap/tree/main/clusters/management-cluster/node-labels 
+As a Helm chart, I have prepared the following: https://github.com/tjungbauer/openshift-clusterconfig-gitops/tree/main/clusters/management-cluster/node-configuration 
 
 The values for this chart are straightforward: per node, a list of custom labels is defined.
 
@@ -141,8 +141,8 @@ spec:
     helm:
       valueFiles:
         - values.yaml
-    path: clusters/management-cluster/node-labels <1>
-    repoURL: 'https://github.com/tjungbauer/openshift-cluster-bootstrap'
+    path: clusters/management-cluster/node-configuration <1>
+    repoURL: 'https://github.com/tjungbauer/openshift-clusterconfig-gitops'
     targetRevision: main
   syncPolicy:
     syncOptions:

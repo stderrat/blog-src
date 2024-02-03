@@ -40,7 +40,7 @@ https://www.sonarsource.com/products/sonarqube/[SonarQube^] by Sonar helps devel
 
 === SonarQube Installation
 
-To install SonarQube I have prepared a https://github.com/tjungbauer/openshift-cluster-bootstrap/tree/main/clusters/management-cluster/sonarqube[Helm Chart^] that I use with GitOps when I deploy a new lab environment. Feel free to use it. It simply calls the Chart that is provided by Sonar. In addition, it creates a Job that changes the default administrator password to a different one. 
+To install SonarQube I have prepared a https://github.com/tjungbauer/helm-charts/tree/main/charts/sonarqube[Helm Chart^] that I use with GitOps when I deploy a new lab environment. Feel free to use it. It simply calls the Chart that is provided by Sonar. In addition, it creates a Job that changes the default administrator password to a different one. 
 
 The values file is good to go, the only item you must change is the route in the very first line. 
 Also, if you prefer not to deploy any plugins (for example, the German language pack), you can remove the appropriate line. 

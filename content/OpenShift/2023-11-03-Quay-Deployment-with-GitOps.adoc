@@ -77,7 +77,7 @@ The workflow of the deployment is as the following image demonstrates
 .Argo CD: Syncwaves
 image::quay-setup/quay-synwaves.png[Argo CD Syncwaves]
 
-. Everything starts with the Helm Chart https://github.com/tjungbauer/openshift-cluster-bootstrap/tree/main/clusters/management-cluster/setup-quay[setup-quay]. This Chart itself provides the logic to create an S3-bucket, a Job to generate the configuration and the creation of a Secret, that provides the initial administrator credential.
+. Everything starts with the Helm Chart https://github.com/tjungbauer/openshift-clusterconfig-gitops/tree/main/clusters/management-cluster/setup-quay[setup-quay]. This Chart itself provides the logic to create an S3-bucket, a Job to generate the configuration and the creation of a Secret, that provides the initial administrator credential.
 
 . **setup-quay** has multiple dependencies to other Helm charts, that can be found at my https://charts.stderr.at[Helm repository]:
 .. https://github.com/tjungbauer/helm-charts/tree/main/charts/quay-registry-setup[quay-registry-setup]
@@ -87,7 +87,7 @@ image::quay-setup/quay-synwaves.png[Argo CD Syncwaves]
 
 == Configuration
 
-All values for the Helm Charts can be found in the https://github.com/tjungbauer/openshift-cluster-bootstrap/blob/main/clusters/management-cluster/setup-quay/values.yaml[values file]
+All values for the Helm Charts can be found in the https://github.com/tjungbauer/openshift-clusterconfig-gitops/blob/main/clusters/management-cluster/setup-quay/values.yaml[values file]
 
 Since sub-charts are used the file is divided into 4 blocks:
 
@@ -122,7 +122,7 @@ spec:
   project: in-cluster
   source:
     path: clusters/management-cluster/setup-quay <3>
-    repoURL: 'https://github.com/tjungbauer/openshift-cluster-bootstrap'
+    repoURL: 'https://github.com/tjungbauer/openshift-clusterconfig-gitops'
     targetRevision: main
 ....
 <1> The destination cluster. Here the "in-cluster" means the local cluster of Argo CD.

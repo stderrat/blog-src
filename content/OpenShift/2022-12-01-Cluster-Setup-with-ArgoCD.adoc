@@ -34,17 +34,17 @@ NOTE: Also check out the article https://blog.stderr.at/openshift/2020-08-06-arg
 
 It all begins with an OpenShift cluster. Such a cluster must be installed and while we will not discuss a bootstrap of the whole cluster … yes it is possible to even automate the cluster deployment using Advanced Cluster Management as an example, we will simply assume that one cluster is up and running. 
 
-For our setup, an OpenShift cluster 4.12 is deployed and we will use the repository https://github.com/tjungbauer/openshift-cluster-bootstrap[OpenShift Cluster Bootstrap] to deploy our configuration onto this cluster. This repository shall act as the source of truth for any configuration. Any cluster configuration shall go into that.  
+For our setup, an OpenShift cluster 4.12 is deployed and we will use the repository https://github.com/tjungbauer/openshift-clusterconfig-gitops[OpenShift Cluster Bootstrap] to deploy our configuration onto this cluster. This repository shall act as the source of truth for any configuration. Any cluster configuration shall go into that.  
 
 Everything in this repository is based on Helm, which must be available on your local machine. 
 
-NOTE: The openshift-cluster-bootstrap repository heavily uses the Helm Repository found at https://charts.stderr.at/ 
+NOTE: The openshift-clusterconfig-gitops repository heavily uses the Helm Repository found at https://charts.stderr.at/ 
 
 == Deploy OpenShift-GitOps 
 
 The first thing we need to do is to deploy https://docs.openshift.com/container-platform/4.11/cicd/gitops/gitops-release-notes.html[OpenShift-GitOps], which is based on the https://argo-cd.readthedocs.io/en/stable/[Argo CD] project. OpenShift-GitOps comes as an Operator and is available to all OpenShift customers. The Operator will deploy and configure Argo CD and provides several custom resources to configure Argo CD Applications or ApplicationSets for example. 
 
-To automate the operator deployment the following shell script can be used: https://github.com/tjungbauer/openshift-cluster-bootstrap/blob/main/init_GitOps.sh[init_GitOps.sh]. 
+To automate the operator deployment the following shell script can be used: https://github.com/tjungbauer/openshift-clusterconfig-gitops/blob/main/init_GitOps.sh[init_GitOps.sh]. 
 
 NOTE: This Shell script is the only script that is executed manually. It installs and configures Argo CD. Any other operation on the cluster must then be done using GitOps processes. 
 
@@ -52,7 +52,7 @@ NOTE: This Shell script is the only script that is executed manually. It install
 +
 [source,bash]
 ----
-git clone https://github.com/tjungbauer/openshift-cluster-bootstrap.git
+git clone https://github.com/tjungbauer/openshift-clusterconfig-gitops.git
 ----
 
 . Be sure that you are logged in the the required cluster
@@ -228,7 +228,7 @@ The current Applications or ApplicationSets that come with the bootstrap reposit
 * Deployment of Compliance Operator
 * and many more. 
 
-Check out the deployed Argo CD objects or the openshift-cluster-bootstrap repository.
+Check out the deployed Argo CD objects or the openshift-clusterconfig-gitops repository.
 
 === Interlude: What is the difference between Application and ApplicationSets?
 
@@ -244,7 +244,7 @@ Further information can be found at: https://argo-cd.readthedocs.io/en/stable/us
 
 === Argo CD Object Manager (App-of-Apps) Deep Dive
 
-The object manager application of Argo CD is monitoring the following path: https://github.com/tjungbauer/openshift-cluster-bootstrap/tree/main/clusters/argocd-object-manager 
+The object manager application of Argo CD is monitoring the following path: https://github.com/tjungbauer/openshift-clusterconfig-gitops/tree/main/clusters/argocd-object-manager 
 
 It is a Helm Chart that is using the Subchart *helper-argocd* found at https://charts.stderr.at/. However, any configuration should be done in the *values.yaml* file of the main Chart. 
 
@@ -260,7 +260,7 @@ mgmt-cluster-name: &mgmtclustername in-cluster
 production-cluster: &prodcluster https://api.ocp.ispworld.at:6443 <2>
 production-cluster-name: &prodclustername prod
 
-repourl: &repourl 'https://github.com/tjungbauer/openshift-cluster-bootstrap' <3>
+repourl: &repourl 'https://github.com/tjungbauer/openshift-clusterconfig-gitops' <3>
 repobranch: &branch main
 ----
 <1> First management cluster. This is the local cluster, thus the URL and the name are given
@@ -305,7 +305,7 @@ helper-argocd: <1>
 <3> Enabled true or false ... I use this switch in any Chart as common practice
 <4> Optional: A set of labels 
 <5> The path inside the Git repository, here we will use the definitions found at _clusters/all/clusterconfig/_
-<6> Using cluster specific values files for each cluster to set defined values per cluster. For example: A console banner usually looks different for production and development clusters. *These files must then be called <clustername>-values.yaml (for example: https://github.com/tjungbauer/openshift-cluster-bootstrap/tree/main/clusters/all/clusterconfig)*
+<6> Using cluster specific values files for each cluster to set defined values per cluster. For example: A console banner usually looks different for production and development clusters. *These files must then be called <clustername>-values.yaml (for example: https://github.com/tjungbauer/openshift-clusterconfig-gitops/tree/main/clusters/all/clusterconfig)*
 <7> Define a list of clustesr. For any cluster in this list an Argo CD Application will be created, called <clustername>-generic-clusterconfig. *An empty list means ALL clusters*
 <8> Optional: Overwrite the *repourl* defined at the beginning of the values files
 <9> Optional: Overwrite the *repobranch* defined at the beginning of the values files

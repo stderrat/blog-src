@@ -79,7 +79,7 @@ spec:
   project: in-cluster
   source:
     path: clusters/management-cluster/cyclonedx <1>
-    repoURL: 'https://github.com/tjungbauer/openshift-cluster-bootstrap'
+    repoURL: 'https://github.com/tjungbauer/openshift-clusterconfig-gitops'
     targetRevision: main
 ----
 <1> Path and URL to the Git repository.
