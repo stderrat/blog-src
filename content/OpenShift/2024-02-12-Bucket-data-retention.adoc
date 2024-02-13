@@ -31,7 +31,7 @@ This article is a simple step-by-step guide to configure such lifecycle for Open
 
 == Prerequisites
 . Installed OpensShift 4.x cluster (latest version during the creation of this article 4.14)
-. Installed Open Data Foundation Operator (latest version during the creation of this article 4.14)
+. Installed Open Data Foundation Operator (4.14+)
 . Configured Multi-Cloud Gateway (for example) to provide OpenShift with object storage.
 . Installed aws command line tool. The deployment for different operating system is explained at: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html#cliv2-linux-install[Installing AWS Client]
 . A configured bucket and running openshift logging.
@@ -154,7 +154,7 @@ Now you have to wait. With the configuration used above, it takes 4 days until t
 
 This article describes very, and I mean very, briefly how to configure such data retention for OpenShift Data Foundation. Unfortunately, public documentation can be confusing, so I summarized here the commands I have used. 
 
-There are some limitation with the Noobaa integration tough. For example file transition (to a different storage class) is (currently) not supported. 
+There are some limitations with the Noobaa integration though. For example file transition (to a different storage class) is (currently) not supported. 
 
 Also, there are much more possible API calls that might be interesting. Please follow the AWS documentation:
 
