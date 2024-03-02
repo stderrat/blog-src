@@ -39,7 +39,9 @@ The idea is to have Git as the only source of truth on what happens inside the e
 
 This series includes the following articles: 
 
-. link:/openshift/gitopscollection/gitops-structure/[Choosing the right Git repository structure]
+. link:/gitopscollection/gitops-structure/[Choosing the right Git repository structure]
+. link:/gitopscollection/2024-02-02-setup-argocd/[Install GitOps to the cluster]
+
 
 WARNING: In this series, I will focus on cluster configuration.
 

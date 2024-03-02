@@ -46,7 +46,7 @@ Please check out other ways of pod placements:
 
 Matching taints and tolerations is defined by a key/value pair and a taint effect. 
 
-For example, a node can be tained as: 
+For example, a node can be tainted as: 
 
 [source,yaml]
 ----
