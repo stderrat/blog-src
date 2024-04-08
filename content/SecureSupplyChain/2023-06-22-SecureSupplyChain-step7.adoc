@@ -136,12 +136,15 @@ spec:
         https://cyclonedx-bom-repo-server-cyclonedx.apps.placeholder.com/
       name: cyclonedxHostUrl
       type: string
+    - default: 'cyclonedx/cyclonedx-node'
+      name: cycloneDXnodeImage
+      type: string
   results:
     - description: The url location of the generate SBOM
       name: sbomUrl
       type: string
   steps:
-    - image: cyclonedx/cyclonedx-node
+    - image: $(params.cycloneDXnodeImage)
       name: generate-sbom
       resources:
         requests:

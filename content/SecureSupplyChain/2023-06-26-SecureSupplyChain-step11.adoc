@@ -73,12 +73,21 @@ spec:
         endpoint.  Defaults to `"false"`.
       name: insecure-skip-tls-verify
       type: string
+    - default: 'quay.io/wpernath/kustomize-ubi'
+      name: kustomieBuildImage
+      type: string
+    - default: 'looztra/kubesplit'
+      name: kubesplitImage
+      type: string
+    - default: 'registry.access.redhat.com/ubi8:8.7-1026'
+      name: ubi8Image
+      type: string
   results:
     - description: Output of `roxctl deployment check`
       name: check_output
       type: string
   steps:
-    - image: quay.io/wpernath/kustomize-ubi
+    - image: $(params.kustomieBuildImage)
       name: kustomize-build
       resources: {}
       script: | <1>
@@ -94,7 +103,7 @@ spec:
 
         kustomize build . --output /workspace/repository/input/all.yaml
       workingDir: /workspace/repository
-    - image: looztra/kubesplit <2>
+    - image: $(params.kubesplitImage) <2>
       name: kustomize-split
       resources: {}
       script: >
@@ -116,7 +125,7 @@ spec:
             secretKeyRef:
               key: rox_central_endpoint
               name: $(params.rox_central_endpoint)
-      image: 'registry.access.redhat.com/ubi8:8.7-1026'
+      image: $(params.ubi8Image)
       name: rox-deploy-scan <3>
       resources: {}
       script: |

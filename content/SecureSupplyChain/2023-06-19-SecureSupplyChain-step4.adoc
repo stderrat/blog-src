@@ -77,9 +77,13 @@ metadata:
 spec:
   description: This task verifies the latest commit and signature against the gpg
     public key
+  params:
+    - default: 'registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel8:v1.10.4-4'
+      name: gitInit
+      type: string
   steps:
   - computeResources: {}
-    image: registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel8:v1.10.4-4
+    image: $(params.gitInit)
     name: git-verify
     script: |
       set -x <1>

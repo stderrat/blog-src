@@ -240,6 +240,9 @@ spec:
         endpoint.  Defaults to `"false"`.
       name: insecure-skip-tls-verify
       type: string
+    - default: 'registry.access.redhat.com/ubi9@sha256:089bd3b82a78ac45c0eed231bb58bfb43bfcd0560d9bba240fc6355502c92976'
+      name: ubi9
+      type: string
   results:
     - description: Output of `roxctl image check`
       name: check_output
@@ -256,8 +259,7 @@ spec:
             secretKeyRef:
               key: rox_central_endpoint
               name: $(params.rox_central_endpoint)
-      image: >-
-        registry.access.redhat.com/ubi9@sha256:089bd3b82a78ac45c0eed231bb58bfb43bfcd0560d9bba240fc6355502c92976
+      image: $(params.ubi9)
       name: rox-image-scan
       resources: {}
       script: | <2>
@@ -323,6 +325,9 @@ spec:
         endpoint.  Defaults to `"false"`.
       name: insecure-skip-tls-verify
       type: string
+    - default: 'registry.access.redhat.com/ubi9@sha256:089bd3b82a78ac45c0eed231bb58bfb43bfcd0560d9bba240fc6355502c92976'
+      name: ubi9
+      type: string
   results:
     - description: Output of `roxctl image check`
       name: check_output
@@ -339,8 +344,7 @@ spec:
             secretKeyRef:
               key: rox_central_endpoint
               name: $(params.rox_central_endpoint)
-      image: >-
-        registry.access.redhat.com/ubi9@sha256:089bd3b82a78ac45c0eed231bb58bfb43bfcd0560d9bba240fc6355502c92976
+      image: $(params.ubi9)
       name: rox-image-check
       resources: {}
       script: | 

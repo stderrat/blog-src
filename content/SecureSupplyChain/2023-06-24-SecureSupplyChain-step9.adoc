@@ -208,8 +208,11 @@ spec:
     - default: 'false'
       name: informLintingOnly
       type: string
+    - default: 'quay.io/tjungbau/linter-image:v1.0.2'
+      name: linterImage
+      type: string
   steps:
-    - image: 'quay.io/tjungbau/linter-image:v1.0.2'
+    - image: $(params.linterImage)
       name: kube-linter
       resources: {}
       script: >
@@ -253,8 +256,11 @@ spec:
     - default: 'false'
       name: informLintingOnly
       type: string
+    - default: 'quay.io/tjungbau/linter-image:v1.0.2'
+      name: linterImage
+      type: string
   steps:
-    - image: 'quay.io/tjungbau/linter-image:v1.0.2'
+    - image: $(params.linterImage)
       name: kube-linter
       resources: {}
       script: >
@@ -301,8 +307,11 @@ spec:
     - default: 'false'
       name: informLintingOnly
       type: string
+    - default: 'quay.io/tjungbau/linter-image:v1.0.2'
+      name: linterImage
+      type: string
   steps:
-    - image: 'quay.io/tjungbau/linter-image:v1.0.2'
+    - image: $(params.linterImage)
       name: yaml-lint
       resources: {}
       script: |

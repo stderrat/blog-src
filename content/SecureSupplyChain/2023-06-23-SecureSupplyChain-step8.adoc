@@ -72,8 +72,11 @@ spec:
     - description: Repo in which the image configuration is stored.
       name: repository
       type: string
+    - default: 'registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel8:v1.10.4-4'
+      name: gitInit
+      type: string
   steps: <2>
-    - image: registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel8:v1.10.4-4
+    - image: $(params.gitInit)
       name: git
       resources: {}
       script: >

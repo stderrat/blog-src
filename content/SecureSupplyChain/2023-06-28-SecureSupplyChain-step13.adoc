@@ -110,8 +110,11 @@ spec:
     - description: Repo in which the image configuration is stored.
       name: repository
       type: string
+    - default: 'registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel8:v1.10.4-4'
+      name: gitInit
+      type: string
   steps:
-    - image: registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel8:v1.10.4-4
+    - image: $(params.gitInit)
       name: git
       resources: {}
       script: >-
@@ -249,6 +252,9 @@ spec:
         The title of the pull request.
       name: TITLE
       type: string
+    - default: 'registry.access.redhat.com/ubi8/python-38:1'
+      name: ubi8PythonImage
+      type: string
   results:
     - description: Number of the created pull request.
       name: NUMBER
@@ -262,7 +268,7 @@ spec:
           value: $(results.NUMBER.path)
         - name: PULLREQUEST_URL_PATH
           value: $(results.URL.path)
-      image: 'registry.access.redhat.com/ubi8/python-38:1'
+      image: $(params.ubi8PythonImage)
       name: open-pr
       resources: {}
       script: >-
