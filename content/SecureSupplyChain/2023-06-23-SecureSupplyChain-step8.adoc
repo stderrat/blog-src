@@ -75,14 +75,25 @@ spec:
     - default: 'registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel8:v1.10.4-4'
       name: gitInit
       type: string
+    - name: verbose
+      description: Verbose output
+      type: string
+      default: "true"
   steps: <2>
     - image: $(params.gitInit)
       name: git
+      env:
+        - name: PARAM_VERBOSE
+          value: $(params.verbose)
       resources: {}
       script: >
         #!/usr/bin/env sh
 
-        set -eux
+        set -eu
+
+        if [ "${PARAM_VERBOSE}" = "true" ] ; then
+          set -x
+        fi
         
         # Setting up the git config.
         
