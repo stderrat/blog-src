@@ -1,7 +1,7 @@
 --- 
 title: "Configure App-of-Apps"
 description: "Adding ApplicationSets and Applications to our GitOps"
-date: "2024-03-02"
+date: "2024-04-02"
 doctype: book
 
 author: Thomas Jungbauer
