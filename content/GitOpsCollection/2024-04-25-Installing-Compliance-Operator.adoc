@@ -1,0 +1,305 @@
+--- 
+title: "Setup & Configure Compliance Operator using GitOps"
+description: "Installing and configuring Compliance Operator using GitOps approach."
+date: "2024-04-25"
+doctype: book
+
+author: Thomas Jungbauer
+type: post
+draft: false
+categories:
+   - OpenShift
+   - Day-2
+   - security
+   - Compliance
+tags: ["ApplicationSet", "Application", "Compliance", "OpenShift", "OCP", "GitOps", "Argo CD", "Compliance Operator"] 
+
+aliases: [ 
+	 "/posts-output/2024-04-25-setup-compliance-operator/",
+] 
+---
+
+:imagesdir: /GitOpsCollection/images/
+:icons: font
+:toc:
+
+
+In the previous articles, we have discussed the link:/gitopscollection/2023-12-28-gitops-repostructure/[Git repository folder structure] and the configuration of the link:gitopscollection/2024-04-02-configure_app_of_apps/[App-Of-Apps]. Now it is time to deploy our first configuration. One of the first things I usually deploy is the https://docs.openshift.com/container-platform/4.15/security/compliance_operator/co-overview.html[Compliance Operator^]. This Operator is recommended for any cluster and can be deployed without any addition to the Subscription. 
+
+In this article, I will describe how it is installed and how the Helm Chart is configured.
+
+<!--more--> 
+
+== Prerequisites 
+
+. Argo CD (OpenShift GitOps) deployed
+. App-Of-Apps deployed
+
+== Introduction
+
+As a reminder, at link:/gitopscollection/2023-12-28-gitops-repostructure/[Git repository folder structure] I described my preferred folder structure. I would like to deploy the Compliance Operator in the Management Cluster now. All my examples can be found at GitHub repository https://github.com/tjungbauer/openshift-clusterconfig-gitops[OpenShift Clusterconfig GitOps^]. The folder *clusters/management-cluster/setup-compliance-operator* is the one I am interested in.
+
+Inside this folder, you will find another Helm Chart. The Helm Chart has no local templates, instead, it uses dependencies to call other (sub-) charts. However, the https://github.com/tjungbauer/openshift-clusterconfig-gitops/blob/main/clusters/management-cluster/setup-compliance-operator/values.yaml[values.yaml^] is the main part to configure everything.
+
+NOTE: In case you want to have any local template, that you do NOT want to integrate into one of the sub-charts, you can easily do so, by storing them in the templates folder.
+
+=== Why "empty" Helm Charts?
+
+Actually, it would be possible to use the Helm Chart of the Chart repository directly, without creating a separate chart, that does nothing else than using dependency charts. 
+
+The reasons why I am using such an "empty" Chart are the following (in no particular order):
+
+1. With that way it is possible to add templates (i.e. SealedSecrets) and modify the values-file without packaging and releasing a new Chart version every time you change a small thing.
+2. The Multi-Source Option, which allows you to use a Helm Chart from repository A and a values file from repository B is still a TechPreview feature (Argo CD 2.10). I am using this for the App-of-Apps already, but I did not do this for all charts. This feature is on the list for Argo CD version 2.11 to become globally available.
+
+As an alternative, it is also possible to mix Kustomize and Helm. That way you only need a kustomization.yaml file and reference to a Helm Chart. In the folder https://github.com/tjungbauer/openshift-clusterconfig-gitops/tree/main/clusters/management-cluster/ingresscontroller[clusters/management-cluster/ingresscontroller^] I have such an example.
+
+== Installing Compliance Operator
+
+=== Analysing Chart.yaml
+
+As any Helm Chart a Chart.yaml file exists, that stores the basic information. The most important ones for now are the dependencies.
+
+The file looks like the following. Three sub-charts are defined as required to deploy and configure the Compliance Operator.
+
+[source,yaml]
+----
+apiVersion: v2
+name: setup-compliance-operator
+description: Deploy and configure the Compliance Operator
+version: 1.0.1
+dependencies:
+  - name: compliance-operator-full-stack <1>
+    version: ~1.0.0 <2>
+    repository: https://charts.stderr.at/
+  - name: helper-operator <3>
+    version: ~1.0.21
+    repository: https://charts.stderr.at/
+  - name: helper-status-checker <4>
+    version: ~4.0.0
+    repository: https://charts.stderr.at/
+    condition: helper-status-checker.enabled <5>
+----
+<1> Dependency: https://github.com/tjungbauer/helm-charts/tree/main/charts/compliance-operator-full-stack[Compliance Operator Full Stack^]
+<2> Version that will be used. The "~" means that the latest version of 1.0.X will be used.
+<3> Dependency: https://github.com/tjungbauer/helm-charts/tree/main/charts/helper-operator[Helper Operator^]
+<4> Dependency: https://github.com/tjungbauer/helm-charts/tree/main/charts/helper-status-checker[Helper Status Checker^]
+<5> Only use this dependency when "enabled" is set
+
+NOTE: Verify the READMEs of the different Charts for detailed information on how to configure them. 
+
+As you can see three other Helm Charts are used to actually deploy and configure the Operator. 
+
+=== Configuration of the Chart
+
+To configure the Compliance Operator, the values files must be prepared accordingly. 
+
+WARNING: The important thing here is, that any value that should be bypassed to a sub-chart is defined under the name of the sub-chart. For example, everything under **helper-operator:** will be sent to the helper-operator Chart and is used there for its configuration.
+
+The following is a full example of the values I typically use.
+
+[source,yaml]
+----
+# Install Operator Compliance Operator
+# Deploys Operator --> Subscription and Operatorgroup
+helper-operator:
+  operators:
+    compliance-operator:
+      enabled: true
+      syncwave: '0'
+      namespace:
+        name: openshift-compliance
+        create: true
+      subscription:
+        channel: stable
+        approval: Automatic
+        operatorName: compliance-operator
+        source: redhat-operators
+        sourceNamespace: openshift-marketplace
+      operatorgroup:
+        create: true
+        notownnamespace: true
+
+# Verify if the Operator has been successfully deployed
+helper-status-checker:
+  enabled: true
+
+  checks:
+    - operatorName: compliance-operator
+      namespace:
+        name: openshift-compliance
+      serviceAccount:
+        name: "status-checker-compliance"
+
+# Setting for the Compliance Operator
+compliance-operator-full-stack:
+  compliance:
+    namespace:
+      name: openshift-compliance
+      syncwave: '0'
+      descr: 'Red Hat Compliance'
+    scansettingbinding:
+      enabled: true
+      syncwave: '3'
+
+      profiles:
+        - name: ocp4-cis-node
+          kind: Profile  # Could be Profile or TailedProfile
+        - name: ocp4-cis
+          kind: Profile
+      scansetting: default
+----
+
+Let us walk through the settings in more detail.
+
+=== Installing the Operator
+
+The first thing to do is to deploy the Operator. Two resources are relevant to install an Operator:
+
+. Subscription
+. OperatorGroup
+
+Both objects should be deployed at the very beginning of Argo CD synchronisation. This is done by setting the Syncwave to 0.
+
+The main settings are the operatorName, the channel (which is the version of the operator) and the approval (which defines if the Operator is updated automatically or manually). 
+
+In addition, a Namespace object is deployed, because this Operator should run in its very own namespace. 
+
+This will start the Operator installation process.
+
+[source,yaml]
+----
+helper-operator:
+  operators:
+    compliance-operator: <1>
+      enabled: true <2>
+      syncwave: '0' <3>
+      namespace:
+        name: openshift-compliance <4>
+        create: true
+      subscription: <5>
+        channel: stable # Version of the Operator
+        approval: Automatic # Automatic or Manual
+        operatorName: compliance-operator # Name of the Operator
+        source: redhat-operators
+        sourceNamespace: openshift-marketplace
+      operatorgroup: <6>
+        create: true
+        notownnamespace: true
+----
+<1> Key that can be freely defined. Theoretically, you can deploy multiple operators at once.
+<2> Is this Operator enabled yes/no. 
+<3> Syncwave for the Operator deployment. (Subscription and OperatorGroup etc.)
+<4> The Namespace where the Operator shall be deployed and if this namespace shall be created.
+<5> Configuration of the Subscription resource. 
+<6> Configuration of the OperatorGroup
+
+NOTE: Verify the README at https://github.com/tjungbauer/helm-charts/tree/main/charts/helper-operator[Helper Operator^] to find additional possible configurations.
+
+=== Verify the Status of the Operator
+
+After Argo CD creates the subscription and operatorgroup resources (and namespace), OpenShift will start the installation of the Operator. This installation will take a while but Argo CD does not see this. All it sees is that the Subscription resource is available and it tries to continue with the configuration of the Operator. Here it will fail because the CRDs are not available yet. 
+
+Therefore, I created a mechanism to verify if an Operator is ready or not. 
+
+NOTE: Also verify the separate article https://blog.stderr.at/openshift/2023-03-20-operator-installation-with-argocd/[Operator Installation with Argo CD] that addresses the problem in more detail.
+
+All it does is to start a small Job inside OpenShift and to verify the status of the Operator installation. If everything is fine, the Job will end successfully and Argo CD will continue with the next syncwave. Argo CD Hook and syncwaves are required here. The Job should be started _after_ the Subscription/OperatorGroup resources have been created, which means any syncwave after "0".
+
+The following annotations will be used by the Job:
+[source,yaml]
+----
+    argocd.argoproj.io/hook: Sync <1>
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded <2>
+    argocd.argoproj.io/sync-wave: {{ .syncwave | default 1 | quote }} <3>
+----
+<1> Hooks are ways to run scripts before, during, and after a Sync operation.
+<2> Deletes the OpenShift Job again. The hook resource is deleted after the hook succeeded (e.g. Job/Workflow completed successfully).
+<3> Syncwave: can be configured. Must be after helper-operator (default 0) and before the Operator is configured further. Default value is 1.
+
+The configuration for **hepler_status_checker** will look like the following:
+
+[source,yaml]
+----
+# Verify if the Operator has been successfully deployed
+helper-status-checker:
+  enabled: true <1>
+
+  checks: <2>
+    - operatorName: compliance-operator <3>
+      namespace:
+        name: openshift-compliance <4>
+      serviceAccount:
+        name: "status-checker-compliance" <5>
+----
+<1> Enable status checker or not. Default: false
+<2> List of operators to check. Typically, only one is checked, but there could be more.
+<3> Name of the Operator to check (same as for helper-operator)
+<4> Namespace where the Operator has been installed (same as for helper-operator)
+<5> Name of the ServiceAccount that will be created to check the status.
+
+NOTE: Verify the README at https://github.com/tjungbauer/helm-charts/tree/main/charts/helper-status-checker[Helper Operator Status Checker^] to find additional possible configurations.
+
+=== Configuring Compliance Operator
+
+Finally, the Operator has been deployed and has been verified. Now the time is right to configure the Operator with any configuration we would like. This means, using CRDs to do whatever the Operator offers.
+
+This is reflected in the following part of the values file. All these settings are handed over to the sub-chart **compliance-operator-full-stack**.
+
+NOTE: Verify the README at https://github.com/tjungbauer/helm-charts/tree/main/charts/compliance-operator-full-stack[Compliance Operator Chart^] to find additional possible configurations. Especially, if you like to do Tailored Profiles.
+
+The compliance operator requires a so-called ScanSettingBinding that uses Profiles which are used to check the cluster compliance once a day. In this case, I am using CIS Benchmarks. There are two profiles:
+
+. ocp4-cis-node: will check the node operating system for missing but suggested configuration.
+. ocp4-cis: will check the OpenShift cluster for missing but suggested configuration.
+
+[source,yaml]
+----
+# Setting for the Compliance Operator
+compliance-operator-full-stack: <1>
+  compliance:
+    namespace:
+      name: openshift-compliance <2>
+      syncwave: '0' 
+      descr: 'Red Hat Compliance'
+    scansettingbinding: <3>
+      enabled: true
+      syncwave: '3'
+
+      profiles: <4>
+        - name: ocp4-cis-node
+          kind: Profile  # Could be Profile or TailedProfile
+        - name: ocp4-cis
+          kind: Profile
+      scansetting: default
+----
+<1> Handing everything that comes below to the sub-chart **compliance-operator-full-stack**
+<2> Namespace where the configuration should be deployed. The Syncwave at this point could be omitted.
+<3> The configuration for the ScanSettingBinding. It is enabled (default = false) and has a Syncwave AFTER the helper-status-checker.
+<4> The list of profiles that shall be used. These must exist. The Compliance Operator offers several profiles. I usually use these two for full CIS compliance check.
+
+== Conclusion
+
+With this configuration, the Compliance Operator will not only be installed but also configured with the same Argo CD Application. All you need to do is to synchronize Argo CD and let the magic happen. After a few minutes, everything should be in sync.
+
+.Sync Compliance Operator
+image::setup-compliance-operator.png?width=720px[Sync Compliance Operator]
+
+Inside OpenShift the Operator is configured and starts doing its job:
+
+.Configured Compliance Operator
+image::configured-compliance-operator.png?width=720px[Configured Compliance Operator]
+
+This concludes the deployment of the Compliance Operator. For further information about the Operator itself, please read the documentation or articles:
+
+. https://docs.openshift.com/container-platform/4.15/security/compliance_operator/co-overview.html[Official Documentation: Compliance Operator^]
+. https://blog.stderr.at/compliance/2021/07/compliance-operator/[Blog: Compliance Operator]
+
+Also, be sure to check out the READMEs of the different Charts: 
+
+. https://github.com/tjungbauer/helm-charts/tree/main/charts/helper-operator[Helper Operator^]
+. https://github.com/tjungbauer/helm-charts/tree/main/charts/helper-status-checker[Helper Operator Status Checker^] 
+. https://github.com/tjungbauer/helm-charts/tree/main/charts/compliance-operator-full-stack[Compliance Operator Chart^]
+. https://github.com/tjungbauer/openshift-clusterconfig-gitops/blob/main/clusters/management-cluster/setup-compliance-operator/[Compliance Operator Setup^]
+
+If you have any questions or problems, feel free to create a GitHub issue at any time.
