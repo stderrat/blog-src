@@ -5,12 +5,11 @@ date: "2020-04-15"
 doctype: book
 
 
-author: Toni Schmidbauer
+authors: [Toni Schmidbauer]
 type: post
 draft: false
 categories:
-   - Satellite
-   - General
+   - Other
 tags: ["Satellite"]
 
 aliases: [ 

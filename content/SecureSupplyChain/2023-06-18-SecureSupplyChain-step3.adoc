@@ -4,13 +4,11 @@ description: "Step 3 Secure Supply Chain"
 date: "2023-06-28"
 doctype: book
 
-author: Thomas Jungbauer
+authors: [Thomas Jungbauer]
 type: post
 categories:
    - OpenShift
-   - Tekton
-   - CICD
-   - Pipelines
+   - Supply Chain
 tags: ["OCP", "Tekton", "OpenShift", "Pipleines", "CI/CD", "Supply Chain", "SonarQube"] 
 
 aliases: [ 

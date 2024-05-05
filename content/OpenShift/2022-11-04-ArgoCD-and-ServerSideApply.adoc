@@ -4,13 +4,11 @@ description: "Using ServerSideApply with ArgoCD"
 date: "2022-11-04"
 doctype: book
 
-author: Thomas Jungbauer
+authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
    - OpenShift
-   - Day-2
-   - ArgoCD
    - GitOps
 tags: ["oc", "kubectl", "OpenShift", "OCP", "GitOps", "Argo CD"] 
 

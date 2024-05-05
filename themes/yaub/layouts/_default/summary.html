@@ -1,0 +1,64 @@
+{{ partial "header.html" . }}
+
+
+{{/* query current .Section to show only posts of current section */}}
+{{/* Define a section to pull recent posts from. For Hugo 0.20 this will default to the section with the most number of pages. */}}
+{{ $currentSection := .Section | default (slice "post") }}
+
+{{/* Create a variable with that section to use in multiple places. */}}
+{{ $section := where .Site.RegularPages "Section" "in" $currentSection }}
+
+{{/* Check to see if the section is defined for ranging through it */}}
+{{ $section_count := len $section }}
+
+{{ if ge $section_count 1 }}
+  {{/* Derive the section name  */}}
+
+  {{/* {{ $section_name := index (.Site.Params.mainSections) 0 }} */}}
+  {{ $section_name := $currentSection }}
+
+  <div class="flex flex-wrap">
+
+	{{/* Use $section_name to get the section title. Use "with" to only show it if it exists */}}
+	 {{ with .Site.GetPage "section" $section_name }}
+		<h1 class="flex-none recentlist">
+		  {{ $.Param "recent_copy" | default (i18n "summaryTitle" .) }}
+		</h1>
+	  {{ end }}
+	{{/* fix n_post to 10000 since we want to show ALL on the summary page */}}
+	{{ $n_posts := 10000 }}
+
+
+	<section class="flex-ns flex-wrap justify-between w-100">
+	  {{/* Range through the first $n_posts items of the section */}}
+	  {{ range (first $n_posts $section) }}
+		<div class="relative flex-auto w-100 w-40-l mr3 mb3 bg-white ba b--moon-gray nested-copy-line-height weight-5">
+			<div class="bg-white mb2 pa3 pa4-l gray">
+		  {{ partial "summary-with-image.html" . }}
+		</div>
+		</div>
+	  {{ end }}
+	</section>
+	</div>
+{{ end }}
+
+{{ if eq .Kind "section" }}
+	{{ .Content }}
+{{end}}
+
+{{ if or (eq .Kind "taxonomy") (eq .Kind "term") }}
+<ul>
+	{{ range .Pages }}
+		<li><a href="{{.RelPermalink}}">{{.Title}}</a></li>
+	{{ end }}
+</ul>
+{{end}}
+
+<footer class=" footline" >
+	{{with .Params.LastModifierDisplayName}}
+	    <i class='fas fa-user'></i> <a href="mailto:{{ $.Params.LastModifierEmail }}">{{ . }}</a> {{with $.Date}} <i class='fas fa-calendar'></i> {{ .Format "02/01/2006" }}{{end}}
+	    </div>
+	{{end}}
+</footer>
+
+{{ partial "footer.html" . }}

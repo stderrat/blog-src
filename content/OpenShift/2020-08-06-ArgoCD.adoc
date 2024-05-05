@@ -5,12 +5,12 @@ date: "2020-08-06"
 doctype: book
 
 
-author: Thomas Jungbauer
+authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
    - OpenShift
-   - Tekton
+   - GitOps
 tags: ["Gitops", "OpenShift", "OCP", "ArgoCD"]
 
 aliases: [ 

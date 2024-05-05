@@ -4,7 +4,7 @@ description: "Enable LDAP authentication and create and example LDAP server"
 date: "2021-10-25"
 doctype: book
 
-author: Thomas Jungbauer
+authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:

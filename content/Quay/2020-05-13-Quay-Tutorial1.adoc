@@ -5,12 +5,11 @@ date: "2020-05-13"
 doctype: book
 
 
-author: Thomas Jungbauer
+authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
    - OpenShift
-   - Tekton
    - Quay
 tags: ["Quay", "Registry", "OpenShift", "Container Security"] 
 

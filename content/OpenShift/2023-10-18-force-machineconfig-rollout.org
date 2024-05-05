@@ -1,5 +1,5 @@
 #+title: How to force a MachineConfig rollout
-#+author: Toni Schmidbauer
+#+authors[]: Toni-Schmidbauer
 #+lastmod: [2023-10-18 Wed 18:24]
 #+categories[]: OpenShift
 #+draft: false

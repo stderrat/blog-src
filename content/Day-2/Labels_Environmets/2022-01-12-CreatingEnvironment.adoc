@@ -4,13 +4,11 @@ description: "Create separate environments on one OpenShift cluster"
 date: "2022-01-12"
 doctype: book
 
-author: Thomas Jungbauer
+authors: [Thomas Jungbauer]
 type: post
 categories:
    - OpenShift
-   - Day-2
    - Pod Placement
-   - Environments
 tags: ["OCP", "Day-2", "OpenShift", "Pod Placement", "NodeSelector", "Environments", "Ingress", "IngressController", "Labels", "Annotations"] 
 
 aliases: [ 

@@ -1,5 +1,5 @@
 #+title: Ansible CI Deployment with GitLab Pipelines
-#+author: Toni Schmidbauer
+#+authors[]: Toni-Schmidbauer
 #+lastmod: [2022-05-05 Tue 08:47]
 #+categories[]: Ansible
 #+draft: true

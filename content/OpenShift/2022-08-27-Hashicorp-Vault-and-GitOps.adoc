@@ -5,11 +5,11 @@ date: "2022-08-27"
 doctype: book
 draft: true
 
-author: Thomas Jungbauer
+authors: [Thomas Jungbauer]
 type: post
 categories:
    - OpenShift
-   - Day-2
+   - Security
 tags: ["OCP", "Day-2", "OpenShift", "Vault", "Secrets", "GitOps", "ArgoCD"] 
 
 aliases: [ 

@@ -1,7 +1,7 @@
 #+title: Stumbling into Azure Part I: Building a site-to-site VPN tunnel for testing
-#+author: Toni Schmidbauer
+#+authors[]: Toni-Schmidbauer
 #+lastmod: [2021-10-16 Sat 16:40]
-#+categories[]: Azure ARO OpenShift
+#+categories[]: OpenShift
 #+draft: false
 #+variable: value
 #+date: 2021-10-16

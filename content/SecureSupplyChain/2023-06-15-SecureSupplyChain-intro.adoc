@@ -8,13 +8,11 @@ featured_image: /SecureSupplyChain/images/logo/tekton-horizontal-color.png
 show_featured_image_summary: false
 show_featured_image_article: true
 
-author: Thomas Jungbauer
+authors: [Thomas Jungbauer]
 type: post
 categories:
    - OpenShift
-   - Tekton
-   - CICD
-   - Pipelines
+   - Supply Chain
 tags: ["OCP", "Tekton", "OpenShift", "Pipleines", "CI/CD", "Supply Chain", "Rekor", "cosign", "SBOM", "ACS", "Sigstore"] 
 
 aliases: [ 

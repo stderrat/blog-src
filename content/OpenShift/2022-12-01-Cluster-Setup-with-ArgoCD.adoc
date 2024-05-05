@@ -4,12 +4,11 @@ description: "Openshift 4.x - Using OpenShift and GitOps to deploy cluster confi
 date: "2023-02-27"
 doctype: book
 
-author: Thomas Jungbauer & Toni Schmidbauer
+authors: [Thomas Jungbauer, Toni Schmidbauer]
 type: post
 draft: true
 categories:
    - OpenShift
-   - Day-2
 tags: ["oc", "kubectl", "OpenShift", "OCP", "GitOps", "Argo CD"] 
 
 aliases: [ 

@@ -4,12 +4,11 @@ description: "Using cert-manager to automatically issue new certificates"
 date: "2023-02-16"
 doctype: book
 
-author: Thomas Jungbauer
+authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
    - OpenShift
-   - Day-2
 tags: ["oc", "OpenShift", "OCP", "SSL", "Certificates", "Cert Manager"] 
 
 aliases: [ 

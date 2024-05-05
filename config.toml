@@ -1,7 +1,7 @@
 baseURL = "https://blog.stderr.at/"
 languageCode = "en-us"
 title = "TechBlog about OpenShift/Ansible/Satellite and much more"
-theme = ["hugo-theme-learn"]
+theme = ["yaub"]
 enableGitInfo = true
 copyright = "Toni Schmidbauer & Thomas Jungbauer"
 enableRobotsTXT = true
@@ -45,6 +45,7 @@ home = [ "HTML", "RSS", "JSON"]
   category = 'categories'
   archive= 'archive'
   tag = 'tags'
+  author = "authors"
 
 [params.yaub]
   copyrightstart = "2020"
@@ -75,6 +76,11 @@ weight = 3
 name = "<i class='fas fa-book'></i> Helm Charts"
 url = "https://charts.stderr.at/"
 weight = 4
+
+[[menu.shortcuts]]
+name = "<i class='fa-solid fa-pen'></i> Authors"
+url = "/authors"
+weight = 5
 
 [[menu.shortcuts]]
 name = "<i class='fab fa-redhat'></i> Red Hat"

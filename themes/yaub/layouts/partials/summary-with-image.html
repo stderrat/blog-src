@@ -1,0 +1,83 @@
+{{ $featured_image := partial "func/GetFeaturedImage.html" . }}
+<article class="bb b--black-10">
+  <div class="db pv4 ph3 ph0-l no-underline dark-gray">
+    <div class="flex flex-column flex-row-ns">
+      {{ if $featured_image }}
+      {{ if .Params.show_featured_image_summary }}
+          {{/* Trimming the slash and adding absURL make sure the image works no matter where our site lives */}}
+        {{ $featured_image := (trim $featured_image "/") | absURL }}
+        <div class="pr3-ns mb4 mb0-ns w-100 w-40-ns">
+          <a href="{{.RelPermalink}}">
+            <img src="{{ $featured_image }}" class="img" alt="image from {{ .Title }}">
+          </a>
+        </div>
+      {{ end }}
+      {{ end }}
+      
+      <div class="w-100{{ if $featured_image }} w-60-ns pl3-ns{{ end }}">
+
+        {{ if .Params.categories }}
+        <div class="catagories">    
+          {{range .Params.categories}}
+              <a id="textElement" class="category-link no-highlight" href="{{ "/categories/" | relLangURL }}{{ . | urlize }}">{{ . }}</a>
+            {{end}}
+        </div>
+        {{end}}
+
+
+        <h2 class="recentlist">
+          <a href="{{.RelPermalink}}" class="recentlist">
+            {{ .Title }}
+            </a>
+        </h2>
+         
+        <div class="articleinfo">
+          <time class="f6 mv4 dib tracked" {{ printf `datetime="%s"` (.Date.Format "2006-01-02T15:04:05Z07:00") | safeHTMLAttr }}>
+            <strong>{{- .Date.Format "January 2, 2006" -}}</strong>
+          </time>
+
+          <span class="divider">
+          -
+          </span>
+
+          {{ range .Param "authors" }}
+          {{ $name := . }}
+          {{ $path := printf "/%s/%s" "authors" ($name | urlize) }}
+          {{ with $.Site.GetPage $path }}
+            <a href="{{ "/authors/" | relLangURL }}{{ .Params.name  | urlize }}">
+            <img class="avatar" src="/img{{ $path }}.png" alt="{{ .Params.name }}"/> 
+            {{ .Params.name }}
+            </a>
+          {{ end }}
+        {{ end }}
+
+        <!-- old 
+        {{ with .Params.author }}
+          By: 
+          {{ if reflect.IsSlice . }}
+            {{ delimit . ", " | markdownify }}
+          {{else}}
+            {{ . | markdownify }}
+          {{ end }}
+        {{ end }}
+        -->
+
+          ( {{ $.Param "Lastmodification" | default (i18n "Lastmodification") }} {{.Page.Lastmod.Format "2006-01-02"}} ) 
+          </span>
+
+          <span class="divider">
+            -
+          </span>
+
+          <span class="readtime"><strong>{{ if lt (math.Round (div (countwords .Content) 250.0)) 1 }}1{{ else }}{{ (math.Round (div (countwords .Content) 250.0)) }}{{ end }} min read</strong></span>
+        </div>
+        <div class="f6 f5-l lh-copy nested-copy-line-height nested-links">
+          {{ .Summary }}
+        </div>
+          <a href="{{.RelPermalink}}" class="nav-prev btn btn-default">{{ $.Param "read_more_copy" | default (i18n "readMore") }} <i class="fas fa-angle-double-right"></i></a>
+        {{/* TODO: add author
+        <p class="f6 lh-copy mv0">By {{ .Author }}</p> */}}
+      </div>
+    </div>
+  </div>
+</article>

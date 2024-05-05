@@ -4,14 +4,12 @@ description: "How to configure a bucket lifecycle for Noobaa and OpenShift Data 
 date: "2024-02-12"
 doctype: book
 
-author: Thomas Jungbauer
+authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
    - OpenShift
-   - Noobaa
-   - ODF
-   - Storage
+   - Other
 tags: ["OpenShift", "OCP", "ODF", "OpenShift Data Foundation", "Noobaa", "Bucket", "Lifecycle"] 
 
 aliases: [ 

@@ -1,5 +1,5 @@
 #+title: Adventures in Java Land: JPA disconnected entities
-#+author: Toni Schmidbauer
+#+authors[]: Toni-Schmidbauer
 #+lastmod: [2022-02-25 Fri 08:47]
 #+categories[]: Java
 #+draft: false

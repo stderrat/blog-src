@@ -1,0 +1,24 @@
+{{ partial "header.html" . }}
+
+<h3>Archive</h3>
+<table>
+{{ range .Site.RegularPages.ByDate.Reverse }}
+<tr>
+	<td class="archivetable-date">
+		<span class="date">{{ .Date.Format "2006-01-02" }}</span>
+	</td>
+	<td class="archivetable-content">
+		<archive><a class="archive" href="{{ .Permalink }}">{{ .Title }}</a></archive>
+	</td>
+</tr>
+{{ end }}
+</table>
+
+<footer class="footline">
+	{{with .Params.LastModifierDisplayName}}
+	    <i class='fas fa-user'></i> <a href="mailto:{{ $.Params.LastModifierEmail }}">{{ . }}</a> {{with $.Date}} <i class='fas fa-calendar'></i> {{ .Format "02/01/2006" }}{{end}}
+	    </div>
+	{{end}}
+</footer>
+
+{{ partial "footer.html" . }}

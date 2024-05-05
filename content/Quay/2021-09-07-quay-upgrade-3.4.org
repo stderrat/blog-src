@@ -1,5 +1,5 @@
 #+title: Stumbling into Quay: Upgrading from 3.3 to 3.4 with the quay-operator
-#+author: Toni Schmidbauer
+#+authors[]: Toni-Schmidbauer
 #+lastmod: [2021-10-16 Sat 16:40]
 #+categories[]: Quay
 #+draft: false

@@ -1,0 +1,48 @@
+{{ partial "header.html" . }}
+
+
+
+{{ range .Data.Pages }}
+
+
+<div class="container">
+	<div class="avatar">
+		
+		{{ $name := .Params.name }}
+		{{ $path := printf "/%s/%s" "authors" ($name | urlize) }}
+		{{ with $.Site.GetPage $path }}
+		  <img class="avatar-big" src="/img{{ $path }}.png" alt="{{ .Params.name }}"/>
+		{{ end }}
+
+	</div>
+	<div class="authorinfo">
+		
+		<h1 class="authors"><a class="no-highlight" href="{{ "/authors/" | relLangURL }}{{ .Params.name  | urlize }}">{{ .Params.name }}</a></h1>
+		<div>
+		  <span class="articleinfo tracked">{{ .Params.position }}</span>
+		</div>
+		<div>
+		  <span>
+			<svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 512 512" class="hidden shrink-0 grow-0 self-center text-omega-500 md:block" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path fill="none" stroke-linecap="square" stroke-miterlimit="10" stroke-width="48" d="M184 112l144 144-144 144"></path></svg>
+			<a href="{{ .Params.homepage }}">Personal Homepage</a></span>
+		</div>
+		<div>
+		  <span>
+			<svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 512 512" class="hidden shrink-0 grow-0 self-center text-omega-500 md:block" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path fill="none" stroke-linecap="square" stroke-miterlimit="10" stroke-width="48" d="M184 112l144 144-144 144"></path></svg>
+			<a href="{{ .Params.linkedIn }}">LinkedIn Profile</a></span>
+		</div>
+	
+		<h1 class="bio">Bio:</h1>
+		<p class="bio">{{ .Params.bio }}</p>
+
+
+	</div>
+  </div>
+
+
+	<hr class="author" />
+
+{{end}}
+
+
+{{ partial "footer.html" . }}

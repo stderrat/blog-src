@@ -1,5 +1,5 @@
 #+title: Overview of Red Hat's Multi Cloud Gateway (Noobaa)
-#+author: Toni Schmidbauer
+#+authors[]: Toni-Schmidbauer
 #+lastmod: [2022-04-22 Fr 09:00]
 #+categories[]: OpenShift
 #+draft: false

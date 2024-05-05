@@ -1,5 +1,5 @@
 #+title: Org mode test post
-#+author: Toni Schmidbauer
+#+authors[]: Toni-Schmidbauer
 #+lastmod: [2021-03-04 Thu 12:37]
 #+categories[]: Java
 #+draft: true

@@ -4,12 +4,12 @@ description: "Adding ApplicationSets and Applications to our GitOps"
 date: "2024-04-02"
 doctype: book
 
-author: Thomas Jungbauer
+authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
    - OpenShift
-   - Day-2
+   - GitOps
 tags: ["ApplicationSet", "Application", "App-of-Apps", "OpenShift", "OCP", "GitOps", "Argo CD", "Matrix Generator", "Git Generator", "List Generator", "Helm"] 
 
 aliases: [ 

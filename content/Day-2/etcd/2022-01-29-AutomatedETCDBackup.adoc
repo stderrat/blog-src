@@ -4,13 +4,11 @@ description: "Create ETCD backups using cronjobs"
 date: "2022-01-29"
 doctype: book
 
-author: Thomas Jungbauer
+authors: [Thomas Jungbauer]
 type: post
 categories:
    - OpenShift
-   - Day-2
-   - etcd
-   - Environments
+   - Security
 tags: ["OCP", "Day-2", "OpenShift", "etcd"] 
 
 aliases: [ 

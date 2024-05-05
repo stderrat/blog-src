@@ -8,15 +8,14 @@ featured_image: /GitOpsCollection/images/logo/NONE
 show_featured_image_summary: false
 show_featured_image_article: false
 
-author: Thomas Jungbauer
+authors: [Thomas Jungbauer]
+
 type: post
 draft: false
 
 categories:
    - OpenShift
    - GitOps
-   - Git
-   - ArgoCD
 tags: ["OCP", "GitOps", "OpenShift", "GitOps Approach", "Argo CD", "ArgoCD"] 
 
 aliases: [ 

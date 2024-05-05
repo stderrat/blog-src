@@ -1,0 +1,90 @@
+{{ partial "header.html" . }}
+
+{{ if eq .Kind "section" }}
+	{{ .Content }}
+{{end}}
+
+<!-- removing list of tags
+{{ if or (eq .Kind "taxonomy") (eq .Kind "term") }}
+<ul>
+	{{ range .Pages }}
+		<li><a href="{{.RelPermalink}}">{{.Title}}</a></li>
+	{{ end }}
+</ul>
+{{end}}
+-->
+    <div class="post">
+      <!-- <h1><i class="fas fa-tags"></i> {{ .Title }}</h1> -->
+        {{ .Content }}
+
+    <!-- create a list with all uppercase letters -->
+    {{ $letters := split "ABCDEFGHIJKLMNOPQRSTUVWXYZ" "" }}
+    <!-- range all pages sorted by their title -->
+    {{ if (eq .Title "Tags") }}
+      {{ range sort .Site.Taxonomies.tags }}
+        <!-- get the first character of each title. Assumes that the title is never empty! -->
+        {{ $firstChar := substr .Page.Title 0 1 | upper }}
+
+        <!-- in case $firstChar is a letter -->
+        {{ if $firstChar | in $letters }}
+          <!-- get the current letter -->
+          {{ $curLetter := $.Scratch.Get "curLetter" }}
+          <!-- if $curLetter isn't set or the letter has changed -->
+          {{ if ne $firstChar $curLetter }}
+          <!-- update the current letter and print it -->
+            {{ $.Scratch.Set "curLetter" $firstChar }}
+            <span class="tag-letter">{{ $firstChar }}</span><br />
+          {{ end }}
+
+         <a class="badge badge-tag-list-page" href="{{ .Page.Permalink }}"><i class="fas fa-tags"></i> {{ .Page.Title }} ({{ .Count }})</a>
+        {{ end }}
+      {{ end }}
+    {{ end }}
+
+
+    <!-- range all pages sorted by their title -->
+    {{ if (eq .Title "Categories") }}
+      {{ range sort .Site.Taxonomies.categories }}
+        <!-- get the first character of each title. Assumes that the title is never empty! -->
+        {{ $firstChar := substr .Page.Title 0 1 | upper }}
+
+        <!-- in case $firstChar is a letter -->
+        {{ if $firstChar | in $letters }}
+          <!-- get the current letter -->
+          {{ $curLetter := $.Scratch.Get "curLetter" }}
+          <!-- if $curLetter isn't set or the letter has changed -->
+          {{ if ne $firstChar $curLetter }}
+          <!-- update the current letter and print it -->
+            {{ $.Scratch.Set "curLetter" $firstChar }}
+            <span class="tag-letter">{{ $firstChar }}</span><br />
+          {{ end }}
+
+         <a class="badge badge-tag-list-page" href="{{ .Page.Permalink }}"><i class="fas fa-bookmark"></i> {{ .Page.Title }} ({{ .Count }})</a>
+        {{ end }}
+      {{ end }}
+    {{ end }}
+
+    <!-- range all pages sorted by their title -->
+    {{ if (eq .Title "Archive") }}
+    <table>
+    {{ range .Site.RegularPages.ByDate.Reverse }}
+      <tr>
+        <td class="archivetable-date">
+          <span class="date">{{ .Date.Format "2006-01-02" }}</span>
+        </td>
+        <td class="archivetable-content">
+          <archive><a class="archive" href="{{ .Permalink }}">{{ .Title }}</a></archive>
+        </td>
+      </tr>
+    {{ end }}
+    </table>
+    {{ end }}
+    </div>
+<footer class=" footline" >
+	{{with .Params.LastModifierDisplayName}}
+	    <i class='fas fa-user'></i> <a href="mailto:{{ $.Params.LastModifierEmail }}">{{ . }}</a> {{with $.Date}} <i class='fas fa-calendar'></i> {{ .Format "02/01/2006" }}{{end}}
+	    </div>
+	{{end}}
+</footer>
+
+{{ partial "footer.html" . }}

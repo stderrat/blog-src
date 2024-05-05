@@ -4,13 +4,11 @@ description: "Using GitOps approach to install and configure Quay Enterprise"
 date: "2023-11-03"
 doctype: book
 
-author: Thomas Jungbauer
+authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
    - OpenShift
-   - Day-2
-   - Quay
    - GitOps
 tags: ["OpenShift", "OCP", "GitOps", "Argo CD", "Quay"] 
 

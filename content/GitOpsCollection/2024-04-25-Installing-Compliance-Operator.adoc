@@ -4,13 +4,13 @@ description: "Installing and configuring Compliance Operator using GitOps approa
 date: "2024-04-25"
 doctype: book
 
-author: Thomas Jungbauer
+authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
    - OpenShift
-   - Day-2
-   - security
+   - GitOps
+   - Security
    - Compliance
 tags: ["ApplicationSet", "Application", "Compliance", "OpenShift", "OCP", "GitOps", "Argo CD", "Compliance Operator"] 
 

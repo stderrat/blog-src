@@ -5,13 +5,12 @@ date: "2021-12-11"
 doctype: book
 
 
-author: Thomas Jungbauer
+authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
-   - OpenShift
    - Security
-   - ACS
+   - Advanced Cluster Security
 tags: ["ACS", "Advanced Cluster Security", "OpenShift", "Security", "Keycloak", "Authentication", "SSO", "Stackrox"] 
 
 aliases: [ 

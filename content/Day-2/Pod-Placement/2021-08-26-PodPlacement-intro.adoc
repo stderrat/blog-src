@@ -4,11 +4,10 @@ description: "Introduction to Pod Placement"
 date: "2021-08-26"
 doctype: book
 
-author: Thomas Jungbauer
+authors: [Thomas Jungbauer]
 type: post
 categories:
    - OpenShift
-   - Day-2
    - Pod Placement
 tags: ["OCP", "Day-2", "OpenShift", "Pod Placement", "NodeSelector", "Affinity", "Anti-Affinity"] 
 

@@ -4,12 +4,12 @@ description: "Openshift 4.x - Install GitOps to the cluster"
 date: "2024-02-02"
 doctype: book
 
-author: Thomas Jungbauer & Toni Schmidbauer
+authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
    - OpenShift
-   - Day-2
+   - GitOps
 tags: ["oc", "kubectl", "OpenShift", "OCP", "GitOps", "Argo CD"] 
 
 aliases: [ 

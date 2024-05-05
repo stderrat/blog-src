@@ -5,12 +5,13 @@ date: "2021-07-19"
 doctype: book
 
 
-author: Thomas Jungbauer
+authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
    - OpenShift
-   - Compliance/Security
+   - Compliance
+   - Security
 tags: ["Hardening", "OpenShift", "OCP", "security", "compliance", "Compliance Operator"]
 
 aliases: [

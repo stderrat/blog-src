@@ -4,7 +4,7 @@ description: "Howto write and debug Ansible playbooks"
 date: "2021-11-30"
 doctype: book
 
-author: Thomas Jungbauer
+authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:

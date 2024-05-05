@@ -4,11 +4,11 @@ description: "Secrets Management with HashiCorp Vault"
 date: "2022-08-16"
 doctype: book
 
-author: Thomas Jungbauer
+authors: [Thomas Jungbauer]
 type: post
 categories:
    - OpenShift
-   - Day-2
+   - Security
 tags: ["OCP", "Day-2", "OpenShift", "Vault", "Secrets"] 
 
 aliases: [ 

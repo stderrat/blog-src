@@ -5,12 +5,11 @@ date: "2020-05-08"
 doctype: book
 
 
-author: Toni Schmidbauer
+authors: [Toni Schmidbauer]
 type: post
 draft: false
 categories:
-   - Git
-   - General
+   - Other
 tags: ["git", "github"]
 
 aliases: [ 

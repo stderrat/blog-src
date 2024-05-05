@@ -1,0 +1,38 @@
+<!-- Partial intended to be overwritten with tags loaded at the end of the page loading (usually for Javascript)
+<script>
+    console.log("running some javascript");
+</script>
+-->
+
+<!--
+<script>
+
+    const btn = document.querySelector(".btn-toggle");
+    const prefersDarkScheme = window.matchMedia("(prefers-color-scheme: dark)");
+
+    /* store theme selection locally */
+    const currentTheme = localStorage.getItem("theme");
+    if (currentTheme == "dark") {
+      document.body.classList.toggle("dark-theme");
+    } else if (currentTheme == "light") {
+      document.body.classList.toggle("light-theme");
+    }
+
+    btn.addEventListener("click", function () {
+      if (prefersDarkScheme.matches) {
+        document.body.classList.toggle("light-theme");
+        var theme = document.body.classList.contains("light-theme")
+          ? "light"
+          : "dark";
+      } else {
+        document.body.classList.toggle("dark-theme");
+        var theme = document.body.classList.contains("dark-theme")
+          ? "dark"
+          : "light";
+      }
+      localStorage.setItem("theme", theme);
+    });
+
+
+</script>
+-->

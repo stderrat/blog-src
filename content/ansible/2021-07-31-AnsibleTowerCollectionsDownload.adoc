@@ -4,7 +4,7 @@ description: "Getting Ansible Tower to download collections can be hard"
 date: "2021-07-31"
 doctype: book
 
-author: Toni Schmidbauer
+authors: [Toni Schmidbauer]
 type: post
 draft: false
 categories:

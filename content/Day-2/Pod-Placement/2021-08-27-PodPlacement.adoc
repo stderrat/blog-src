@@ -4,13 +4,11 @@ description: "Placeing Pods Using the NodeSelector"
 date: "2021-08-26"
 doctype: book
 
-author: Thomas Jungbauer
+authors: [Thomas Jungbauer]
 type: post
 categories:
    - OpenShift
-   - Day-2
    - Pod Placement
-   - nodeSelector
 tags: ["OCP", "Day-2", "OpenShift", "Pod Placement", "NodeSelector"] 
 
 aliases: [ 

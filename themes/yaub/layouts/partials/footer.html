@@ -1,0 +1,227 @@
+        {{ if .Params.chapter }}
+            </div> <!-- end chapter-->
+        {{ end }}
+        </div>
+        {{ partial "custom-comments.html" . }}
+      </div>
+
+
+
+      <div id="navigation-bottom">
+        <!-- Next prev page -->
+        {{ $currentNode := . }}
+
+        {{ template "menu-nextprev" dict "menu" .Site.Home "currentnode" $currentNode }}
+
+        {{ define "menu-nextprev" }}
+            {{$currentNode := .currentnode }}
+            {{ if ne .menu.Params.hidden true}}
+                {{if hasPrefix $currentNode.RelPermalink .menu.RelPermalink }}
+                    {{ $currentNode.Scratch.Set "NextPageOK" "OK" }}
+                    {{ $currentNode.Scratch.Set "prevPage" ($currentNode.Scratch.Get "prevPageTmp") }}
+                {{else}}
+                    {{if eq ($currentNode.Scratch.Get "NextPageOK") "OK"}}
+                        {{ $currentNode.Scratch.Set "NextPageOK" nil }}
+                        {{ $currentNode.Scratch.Set "nextPage" .menu }}
+                    {{end}}
+                {{end}}
+                {{ $currentNode.Scratch.Set "prevPageTmp" .menu }}
+
+                    {{ $currentNode.Scratch.Set "pages" .menu.Pages }}
+                    {{ if .menu.IsHome}}
+                        {{ $currentNode.Scratch.Set "pages" .menu.Sections }}
+                    {{ else if .menu.Sections}}
+                        {{ $currentNode.Scratch.Set "pages" (.menu.Pages | union .menu.Sections) }}
+                    {{end}}
+                    {{ $pages := ($currentNode.Scratch.Get "pages") }}
+
+                    {{ range $pages.ByWeight  }}
+                        {{ template "menu-nextprev" dict "menu" . "currentnode" $currentNode }}
+                    {{end}}
+            {{ end }}
+        {{ end }}
+
+
+   {{$showPrevNext := (and (not .Params.disableNextPrev) (not .Site.Params.disableNextPrev))}}
+
+   {{if $showPrevNext}}
+    {{with ($.Scratch.Get "prevPage")}}
+      <a class="nav-prev btn btn-default" href="{{.RelPermalink}}" title="{{.Title}}"> <i class="fa fa-chevron-left btn-bottom-prev"></i><span class="btn-bottom-text">Previous: </span> {{.Title}}</a>
+    {{end}}
+    {{with ($.Scratch.Get "nextPage")}}
+      <a class="nav-next btn btn-default" href="{{.RelPermalink}}" title="{{.Title}}" style="margin-right: 0px;"><i class="fa fa-chevron-right btn-bottom-next"></i><span class="btn-bottom-text">Next:</span> {{.Title}}</a>
+    {{end}}
+  {{end}}
+    </div>
+
+
+    {{ if .Site.Copyright }}
+    <div class="copyright">
+      <p>{{ $.Param "copyright" | default (i18n "Copyright") }} &copy; {{ with .Site.Params.yaub.copyrightstart }} {{ . }}{{ end }} - {{ dateFormat "2006" now }} {{ .Site.Copyright }}</p>
+    </div>
+    {{ end }}
+    </section>
+
+<!-- READING BAR -->
+<script>
+(function(){
+    $("document").ready(function(){
+        var waypoints = $('.read-progress').waypoint({
+            handler: function(direction) {
+                if(direction == "down"){
+                    $('.read-progress').addClass("position-fixed");
+                    $('.read-progress').css("top",0);
+                } else {
+                    $('.read-progress').removeClass("position-fixed");
+                    $('.read-progress').css("top");
+                }
+            }
+        })
+
+        var view_height = $(window).height(),
+        post_height = $(".post-content").height();
+        //set_viewed_percentage();
+
+        $(window).on("scroll", set_viewed_percentage);
+
+        $(window).on("resize", function(){
+            view_height = $(window).height();
+            post_height = $(".post-content").height();
+
+            set_viewed_percentage();
+        });
+
+        function set_viewed_percentage(){
+            var scroll_top = $(this).scrollTop();
+            var post_top = $(".post-content").offset().top;
+
+            var visible = post_height - (post_height - (view_height - (post_top - scroll_top)));
+            var progress = (visible / post_height) * 100;
+            progress = (progress > 100) ? 100 : progress;
+
+            $(".read-progress").width(progress + "%");
+        }
+    });
+})();
+</script>
+
+    <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
+      <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
+    </div>
+    <script src="{{"js/clipboard.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+    <script src="{{"js/perfect-scrollbar.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+    <script src="{{"js/perfect-scrollbar.jquery.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+    <script src="{{"js/jquery.sticky.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+    <script src="{{"js/featherlight.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+    <script src="{{"js/highlight.pack.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script src="{{"js/modernizr.custom-3.6.0.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+    <script src="{{"js/learn.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+    <script src="{{"js/hugo-learn.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+    <script src="{{"js/yaub.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+
+{{ if .Sections}}
+{{else}}
+     <script>
+        window.addEventListener('DOMContentLoaded', () => {
+
+            const observerForTableOfContentActiveState = new IntersectionObserver(entries => {
+                entries.forEach(entry => {
+                    const id = entry.target.getAttribute('id');
+                    if (entry.intersectionRatio > 0) {
+                        clearActiveStatesInTableOfContents();
+                        document.querySelector(`aside nav li a[href="#${id}"]`).parentElement.classList.add('active');
+                    }
+                });
+            });
+
+            document.querySelectorAll('h1[id],h2[id],h3[id]').forEach((section) => {
+                observerForTableOfContentActiveState.observe(section);
+            });
+        });
+
+        function clearActiveStatesInTableOfContents() {
+            document.querySelectorAll('aside nav li').forEach((section) => {
+                section.classList.remove('active');
+            });
+        }
+    </script>
+{{end}}
+    <script type="text/javascript">
+        function scrollTopAnimated() {
+            $("html, body").animate(
+                { scrollTop: "0" }, 500);
+        }
+    </script>
+
+    <script>
+        function topFunction() {
+          document.body.scrollTop = 0; // For Safari
+          document.documentElement.scrollTop = 0; // For Chrome, Firefox, IE and Opera
+        }
+
+        // disabled because it returns the first link of the summary-box which would be the first catagory
+//        $(".summary-box").click(function() {
+//            window.location = $(this).find("a").attr("href");
+//            return false;
+//          });
+    </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Select all anchor elements with class "category-link"
+            var elements = document.querySelectorAll("a.category-link");
+
+            // Loop through each anchor element
+            elements.forEach(function(element) {
+                // Get the text content of the anchor element
+                var text = element.textContent.trim().toLowerCase();
+
+                // Add a class based on the text content
+                if (text === "openshift") {
+                    element.classList.add("openshift");
+                }
+                if (text === "compliance") {
+                    element.classList.add("compliance");
+                }
+                if (text === "service mesh") {
+                    element.classList.add("mesh");
+                }
+                if (text === "security") {
+                    element.classList.add("security");
+                }
+                if (text === "other") {
+                    element.classList.add("other");
+                }
+                if (text === "ansible") {
+                    element.classList.add("ansible");
+                }
+                if (text === "supply chain") {
+                    element.classList.add("cicd");
+                }
+                if (text === "gitops") {
+                    element.classList.add("gitops");
+                }
+                if (text === "advanced cluster security") {
+                    element.classList.add("acs");
+                }
+            });
+        });
+    </script>
+
+    {{ if (or (and (ne .Params.disableMermaid nil) (not .Params.disableMermaid)) (not .Site.Params.disableMermaid)) }}
+        {{ if isset .Params "customMermaidURL" }}
+            <script src="{{ .Params.customMermaidURL }}"></script>
+        {{ else if isset .Site.Params "customMermaidURL" }}
+            <script src="{{ .Site.Params.customMermaidURL }}"></script>
+        {{ else }}
+            <script src="{{"mermaid/mermaid.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+        {{ end }}
+        <script>
+            mermaid.initialize({ startOnLoad: true });
+        </script>
+    {{ end }}
+
+    {{ partial "custom-footer.html" . }}
+  </body>
+</html>

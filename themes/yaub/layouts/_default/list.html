@@ -1,0 +1,41 @@
+{{ partial "header.html" . }}
+
+{{ if eq .Kind "section" }}
+	{{ .Content }}
+{{end}}
+
+<!-- only print summary page for categories or authors -->
+{{if eq .Data.Singular "category"}}
+  {{ partial "summary_index.html" . }}
+{{end}}
+{{if eq .Data.Singular "author"}}
+  {{ partial "summary_index.html" . }}
+{{end}}
+
+{{ if or (eq .Kind "taxonomy") (eq .Kind "term") }}
+<ul>
+	{{ range .Pages }}
+     <!-- ignore Blog site itself -->
+    {{ if (eq .Title "YAUB Yet Another Useless Blog") }}
+	 <!-- or ignore author list -->
+	{{ else if (eq $.Data.Singular "author") }}
+	 <!-- ignore category list -->
+	{{ else if (eq $.Data.Singular "category") }}
+    {{ else }}
+		  <li><a href="{{.RelPermalink}}">{{.Title}}</a></li>
+    {{ end }}
+	{{ end }}
+</ul>
+{{end}}
+
+
+</p>
+
+<footer class=" footline" >
+	{{with .Params.LastModifierDisplayName}}
+	    <i class='fas fa-user'></i> <a href="mailto:{{ $.Params.LastModifierEmail }}">{{ . }}</a> {{with $.Date}} <i class='fas fa-calendar'></i> {{ .Format "02/01/2006" }}{{end}}
+	    </div>
+	{{end}}
+</footer>
+
+{{ partial "footer.html" . }}

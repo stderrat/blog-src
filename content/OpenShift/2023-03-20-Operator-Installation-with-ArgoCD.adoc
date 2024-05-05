@@ -4,12 +4,11 @@ description: "Openshift 4.x - Using Argo CD to deploy Operators"
 date: "2023-03-20"
 doctype: book
 
-author: Thomas Jungbauer & Toni Schmidbauer
+authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
    - OpenShift
-   - Day-2
 tags: ["oc", "operator", "OpenShift", "OCP", "GitOps", "Argo CD"] 
 
 aliases: [ 
