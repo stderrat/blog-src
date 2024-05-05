@@ -40,6 +40,7 @@
           -
           </span>
 
+          <span class="author">
           {{ range .Param "authors" }}
           {{ $name := . }}
           {{ $path := printf "/%s/%s" "authors" ($name | urlize) }}
@@ -49,7 +50,7 @@
             {{ .Params.name }}
             </a>
           {{ end }}
-        {{ end }}
+          {{ end }}
 
         <!-- old 
         {{ with .Params.author }}
