@@ -123,6 +123,11 @@
       {{ end }}
 
         <div class="padding highlightable">
+
+          {{ partial "top-navigation.html" . }}
+
+          
+<!-- currently disabled 
           {{if not .IsHome}}
           <div>
             <div id="top-bar">
@@ -176,8 +181,10 @@
     </div>
   </a>
       {{ end }}
-
+-->
       <!-- Twitter -->
+
+<!-- currently disabled       
       {{ if .Site.Params.social.share.twitter }}
   <a href="https://twitter.com/intent/tweet?hashtags=codingnconcepts&amp;url={{ .Permalink }}&amp;text={{ .Title }}" class="twitter no-highlight" aria-label="share on Twitter">
     <div class="resp-sharing-button resp-sharing-button--twitter resp-sharing-button--small">
@@ -188,8 +195,9 @@
   </a>
       {{ end }}
 
-
+-->
       <!-- LinkedIn -->
+      <!-- currently disabled 
       {{ if .Site.Params.social.share.linkedin }}
   <a href="https://www.linkedin.com/shareArticle?mini=true&amp;url={{ $url }}&amp;source={{ $url }}&amp;title={{ $title }}&amp;summary={{ $title }}" class="linkedin no-highlight" aria-label="share on Linkedin">
     <div class="resp-sharing-button resp-sharing-button--linkedin resp-sharing-button--small">
@@ -199,8 +207,9 @@
     </div>
   </a>
       {{ end }}
-
+-->
       <!-- WhatsApp -->
+      <!-- currently disabled 
       {{ if .Site.Params.social.share.whatsapp }}
   <a href="whatsapp://send?text={{ $body }}" class="whatsapp  no-highlight" aria-label="share on Whatsapp">
     <div class="resp-sharing-button resp-sharing-button--whatsapp resp-sharing-button--small">
@@ -210,8 +219,9 @@
     </div>
   </a>
       {{ end }}
-
+-->
       <!-- Email -->
+      <!-- currently disabled 
       {{ if .Site.Params.social.share.email }}
   <a href="mailto:?subject={{ .Site.Title }} - {{ $title }}.&amp;body={{ $body }}" class="email  no-highlight" aria-label="share on Email">
     <div class="resp-sharing-button resp-sharing-button--email resp-sharing-button--small">
@@ -227,7 +237,7 @@
             </div>
             {{ end }}
      
-     
+     -->
      
      
      

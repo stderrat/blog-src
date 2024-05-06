@@ -41,7 +41,8 @@
         {{end}}
     </ul>
 
-    {{ $disableShortcutsTitle := .Site.Params.DisableShortcutsTitle}}
+    <!-- Shortcuts moved to top navigation bar -->
+    <!-- {{ $disableShortcutsTitle := .Site.Params.DisableShortcutsTitle}}
     {{with .Site.Menus.shortcuts}}
       <section id="shortcuts">
         <h3 class="shortcut-title">{{ if not $disableShortcutsTitle}}{{ T "Shortcuts-Title"}}{{ end }}</h3>
@@ -54,6 +55,8 @@
         </ul>
       </section>
     {{end}}
+    -->
+    <!-- Shortcuts moved to top navigation bar -->
 
     {{ if or .Site.IsMultiLingual $showvisitedlinks }}
     <section id="prefooter">
