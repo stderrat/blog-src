@@ -56,6 +56,7 @@ home = [ "HTML", "RSS", "JSON"]
   twitter = true
   whatsapp = true
   email = true
+  rss = true
 
 [[menu.shortcuts]]
 name = "<i class='fas fa-tags padding-right-25rem'></i> Tags"

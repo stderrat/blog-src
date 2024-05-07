@@ -110,6 +110,20 @@
                 </div>
               </a>
                   {{ end }}
+
+                  <!-- RSS -->
+                  {{ if .Site.Params.social.share.rss }}
+              <a href="/rss/" class="rss  no-highlight" aria-label="RSS">
+                <div class="resp-sharing-button resp-sharing-button--rss resp-sharing-button--small">
+                  <div aria-hidden="true" class="resp-sharing-button__icon resp-sharing-button__icon--solid">
+                    {{ partial "svg/rss.svg" (dict "size" "32px") }}
+                  </div>
+                </div>
+              </a>
+                  {{ end }}
+
+
+
             </div>
             
         </div>
