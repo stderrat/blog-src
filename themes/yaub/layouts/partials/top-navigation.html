@@ -3,7 +3,7 @@
             <div id="top-nav" class="margin-bottom-15">
               {{if not .Site.Params.disableLandingPageButton }}
               <section id="homelinks" class="text-align-center">
-                <ul class="list-no-style margin-0 display-inline-block text-align-left vertical-align-middle">
+                <ul class="list-no-style margin-0 padding-0 overflow-hidden text-align-left vertical-align-middle">
                   <li class="list-horizontal padding-left-15 padding-right-15">
                     <a class="padding-topnav" href='{{ (cond (and (ne .Site.Params.landingPageURL nil) (.Site.IsMultiLingual)) .Site.Params.landingPageURL "/") }}'>{{ safeHTML (cond (ne .Site.Params.landingPageName nil) .Site.Params.landingPageName "<i class='fas fa-home'></i> Home") }}</a>
                   </li>
@@ -11,7 +11,7 @@
                 {{ $disableShortcutsTitle := .Site.Params.DisableShortcutsTitle}}
                 {{with .Site.Menus.shortcuts}}
                   {{ range sort . "Weight"}}
-                      <li class="list-horizontal padding-left-15 padding-right-15">
+                      <li class="list-horizontal {{ .Params.class }} padding-left-15 padding-right-15">
                           {{.Pre}}<a class="padding-topnav" href="{{.URL | absLangURL }}">{{safeHTML .Name}}</a>{{.Post}}
                       </li>
                   {{end}}
