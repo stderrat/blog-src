@@ -5,4 +5,5 @@ bio: "Thomas Jungbauer is an experienced and committed IT professional specializ
 position: "Senior Architect, Red Hat"
 homepage: https://jungbauer.stderr.at/
 linkedIn: https://www.linkedin.com/in/thomas-jungbauer
+github: https://github.com/tjungbauer
 ---

@@ -7,8 +7,11 @@ tags: ["OCP", "Day-2", "OpenShift", "Pod Placement", "NodeSelector", "Taints", "
 
 ---
 
-## Welcome to YAUB - Yet Another Useless Blog
+## Welcome to  Yet Another Useless Blog
 
-The articles in this blog shall help to easily test and understand specific issues so they can be reproduced and tested on local environments.
+Well we hope the articles here are not totally useless. 
 
-You can find the most recent posts on this site or walk through the different categories via the left navigation.
+Who are we, you might ask.
+We (Thomas Jungbauer and Toni Schmidbauer) are two old IT guys, working in the business since more than 20 years (each or us). At the moment we are architects at Red Hat Austria, mainly responsible helping customers with OpenShift or Ansible architecture. 
+
+The articles in this blog shall help to easily test and understand specific issues so they can be reproduced and tested. We simply wrote down what we saw in the field and of what we thought it might be helpful, so no frustrating searches in documentations or manual testing is required. 
