@@ -16,7 +16,7 @@ aliases: [
 ] 
 ---
 
-:imagesdir: /Day-2/images/
+:imagesdir: /day-2/images/
 :icons: font
 :toc:
 

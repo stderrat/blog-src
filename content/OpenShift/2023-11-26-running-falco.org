@@ -160,7 +160,7 @@ There are some discussions upstream on implementing such a feature:
 Our current idea is to use [[https://vector.dev/][Vector]] for event routing. We will try to
 implement the following pipeline:
 
-#+begin_src plantuml :file ../openshift/images/falco/falco-pipeline.png :exports results :results none
+#+begin_src plantuml :file /openshift/images/falco/falco-pipeline.png :exports results :results none
 @startuml
 component Falco {
 	file audit.log
@@ -236,7 +236,7 @@ vector --> GCS
 
 #+end_src
 
-[[file:../../openshift/images/falco/falco-pipeline.png]]
+[[file://openshift/images/falco/falco-pipeline.png]]
 
 * Tips and Tricks
 
