@@ -5,7 +5,7 @@
 #+draft: false
 #+variable: value
 #+date: 2021-10-29
-#+imagesdir: Azure/images/
+#+imagesdir: azure/images/
 #+list[]: value_1 value_2 value_3
 
 In Part I of our blog post we covered setting up required resources in
@@ -20,7 +20,7 @@ the ARO cluster.
 
   #+attr_html: :width 100px
   #+attr_latex: :width 100px
-  [[file:/Azure/images/azure_network_setup_with_aro.png]]
+  [[file:/azure/images/azure_network_setup_with_aro.png]]
 
   On the right hand side can see the resources required for our lab:
 

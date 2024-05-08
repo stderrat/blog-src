@@ -16,7 +16,7 @@ aliases: [
 ] 
 ---
 
-:imagesdir: /OpenShit/images/
+:imagesdir: /openshift/images/
 :icons: font
 :toc:
 

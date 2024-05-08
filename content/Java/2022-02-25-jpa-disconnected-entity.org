@@ -122,7 +122,7 @@ mvn quarkus:dev
 Quarkus is so friendly and provides a swagger-ui in dev mode for testing
 our endpoint. Super duper lets call the ~create()~ endpoint via Swagger:
 
-[[file:/Java/images/swagger_post_500.png]]
+[[file:/java/images/swagger_post_500.png]]
 
 Because we are lazy we accept the default Swagger provides for us and
 just click _Execute_.
@@ -162,7 +162,7 @@ vs Editor and Editor vs Editor wars).
 
 So looking at the ~Speaker~ entity before calling ~persist()~ revealed the following:
 
-[[file:/Java/images/speaker_object_debugger.png]]
+[[file:/java/images/speaker_object_debugger.png]]
 
 The ~Speaker~ object passed into ~create()~ has an _Id_ of 0 and all
 the internal Hibernate fields are set to null. So this seems to
@@ -191,7 +191,7 @@ public class SpeakerService {
 Looking at the ~newSpeaker~ object returned by calling ~entitymanager.merge()~
 in the debugger revealed the following:
 
-[[file:/Java/images/speaker_object_entitymanager_debugger.png]]
+[[file:/java/images/speaker_object_entitymanager_debugger.png]]
 
 ~newSpeaker~ has an Id of 1 (hm, why no 0?) and some those special
 Hibernate fields starting with $$ have a value assigned. So for me

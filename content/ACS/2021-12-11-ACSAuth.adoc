@@ -18,7 +18,7 @@ aliases: [
 ] 
 ---
 
-:imagesdir: /ACS/images/
+:imagesdir: /acs/images/
 :icons: font
 :toc:
 

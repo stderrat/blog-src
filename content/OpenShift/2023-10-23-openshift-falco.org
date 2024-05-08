@@ -435,7 +435,7 @@ specified in the route object. The default username seems to be
 _admin/admin_ which is kind of strange for a security tool, maybe that's
 the reason Falco does not expose the UI per default.
 
-[[file:/OpenShift/images/falco/falco-ui.png]]
+[[file:/openshift/images/falco/falco-ui.png]]
 
 ** Creating an event
 
@@ -468,6 +468,6 @@ nobody:*:19639:0:99999:7:::
 
 and we can see an event with priority *Warning* in the Falco ui.
 
-[[file:/OpenShift/images/falco/falco-cat-etc-shadow.png]]
+[[file:/openshift/images/falco/falco-cat-etc-shadow.png]]
 
 That's it, seems like Falco is successfully running on OpenShift 4.12.

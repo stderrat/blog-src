@@ -4,7 +4,7 @@ description: "Introduction to Secure Supply Chain"
 date: "2023-06-28"
 doctype: book
 
-featured_image: /SecureSupplyChain/images/logo/tekton-horizontal-color.png
+featured_image: /securesupplychain/images/logo/tekton-horizontal-color.png
 show_featured_image_summary: false
 show_featured_image_article: true
 
@@ -20,7 +20,7 @@ aliases: [
 ] 
 ---
 
-:imagesdir: /SecureSupplyChain/images/
+:imagesdir: /securesupplychain/images/
 :icons: font
 :toc:
 

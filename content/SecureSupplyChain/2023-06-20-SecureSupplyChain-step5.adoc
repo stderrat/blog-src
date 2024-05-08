@@ -16,7 +16,7 @@ aliases: [
 ] 
 ---
 
-:imagesdir: /SecureSupplyChain/images/
+:imagesdir: /securesupplychain/images/
 :icons: font
 :toc:
 

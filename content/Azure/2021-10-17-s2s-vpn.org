@@ -5,7 +5,7 @@
 #+draft: false
 #+variable: value
 #+date: 2021-10-16
-#+imagesdir: Azure/images/
+#+imagesdir: azure/images/
 #+list[]: value_1 value_2 value_3
 
 So we want to play with ARO (Azure Red Hat OpenShift) private
@@ -24,7 +24,7 @@ cluster.
 
   #+attr_html: :width 100px
   #+attr_latex: :width 100px
-  [[file:/Azure/images/azure_network_setup.png]]
+  [[file:/azure/images/azure_network_setup.png]]
 
   On the right hand side can see the resources required for our lab:
 
