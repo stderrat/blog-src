@@ -31,11 +31,11 @@
             <div id="breadcrumbs" class="display-inline float-unset" itemscope="" itemtype="http://schema.org/BreadcrumbList">
                 <span id="sidebar-toggle-span">
                     <a href="#" id="sidebar-toggle" data-sidebar-toggle="">
-                      <i class="fas fa-bars"></i>
+                      <i class="fas fa-bars">Toc</i>
                     </a>
                 </span>
               {{ if $toc }}
-                <span id="toc-menu"><i class="fas fa-list-alt"></i></span>
+                <span id="toc-menu"><i class="fas fa-list-alt"><span class="hidden-toc">Toc</span></i></span>
               {{ end }}
               <span class="links">
               {{$showBreadcrumb := (and (not .Params.disableBreadcrumb) (not .Site.Params.disableBreadcrumb))}}
