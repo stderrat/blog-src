@@ -19,7 +19,7 @@ aliases: [
 ] 
 ---
 
-:imagesdir: /GitOpsCollection/images/
+:imagesdir: /gitopscollection/images/
 :icons: font
 :toc:
 

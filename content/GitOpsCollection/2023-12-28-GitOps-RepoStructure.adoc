@@ -22,7 +22,7 @@ aliases: [
 ] 
 ---
 
-:imagesdir: /GitOpsCollection/images/2_repostructure
+:imagesdir: /gitopscollection/images/2_repostructure
 :icons: font
 :toc:
 
