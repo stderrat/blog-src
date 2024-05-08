@@ -236,7 +236,7 @@ vector --> GCS
 
 #+end_src
 
-[[file://openshift/images/falco/falco-pipeline.png]]
+[[file:/openshift/images/falco/falco-pipeline.png]]
 
 * Tips and Tricks
 
