@@ -2,7 +2,7 @@
 {{ if or (eq .Kind "taxonomy") (eq .Kind "term") }}
 {{else}}
 		<h2 class="flex-none recentlist">
-		  {{ $.Param "recent_copy" | default (i18n "recentTitle" .) }}
+		  <em class="gradient-header">{{ $.Param "recent_copy" | default (i18n "recentTitle" .) }}</em>
 		</h2>
 {{end}}
 

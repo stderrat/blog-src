@@ -45,11 +45,13 @@
    {{$showPrevNext := (and (not .Params.disableNextPrev) (not .Site.Params.disableNextPrev))}}
 
    {{if $showPrevNext}}
+   {{ if and (ne .Kind "taxonomy") (ne .Kind "term") }}
     {{with ($.Scratch.Get "prevPage")}}
       <a class="nav-prev btn btn-default" href="{{.RelPermalink}}" title="{{.Title}}"> <i class="fa fa-chevron-left btn-bottom-prev"></i><span class="btn-bottom-text">Previous: </span> {{.Title}}</a>
     {{end}}
     {{with ($.Scratch.Get "nextPage")}}
       <a class="nav-next btn btn-default" href="{{.RelPermalink}}" title="{{.Title}}" style="margin-right: 0px;"><i class="fa fa-chevron-right btn-bottom-next"></i><span class="btn-bottom-text">Next:</span> {{.Title}}</a>
+    {{end}}
     {{end}}
   {{end}}
     </div>

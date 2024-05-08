@@ -21,8 +21,8 @@
 
 	{{/* Use $section_name to get the section title. Use "with" to only show it if it exists */}}
 	 {{ with .Site.GetPage "section" $section_name }}
-		<h1 class="flex-none recentlist">
-		  {{ $.Param "recent_copy" | default (i18n "summaryTitle" .) }}
+		<h1 class="flex-none recentlist gradient-header article">
+			<em class="gradient-header">{{ $.Param "recent_copy" | default (i18n "summaryTitle" .) }}</em>
 		</h1>
 	  {{ end }}
 	{{/* fix n_post to 10000 since we want to show ALL on the summary page */}}

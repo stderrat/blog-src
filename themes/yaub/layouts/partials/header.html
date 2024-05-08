@@ -111,12 +111,14 @@
       {{ if not .Params.chapter }}
         {{$showPrevNext := (and (not .Params.disableNextPrev) (not .Site.Params.disableNextPrev))}}
           {{if $showPrevNext}}
+          {{ if and (ne .Kind "taxonomy") (ne .Kind "term") }}
             {{with ($.Scratch.Get "prevPage")}}
               <a class="nav-prev" href="{{.RelPermalink}}" title="{{.Title}}"> <i class="fa fa-chevron-left"></i></a>
             {{end}}
             {{with ($.Scratch.Get "nextPage")}}
               <a class="nav-next" href="{{.RelPermalink}}" title="{{.Title}}" style="margin-right: 0px;"><i class="fa fa-chevron-right"></i></a>
             {{end}}
+            {{ end }}
           {{end}}
           </div>
         </aside>
@@ -243,18 +245,17 @@
      
             <div id="head-tags">
             <!-- Do not show on home page -->
-{{ if .Sections}}
-{{else}}
-
-        {{ partial "tags.html" . }}
-{{end}}
-        </div>
+            {{ if .Sections}}
+            {{else}}
+              {{ partial "tags.html" . }}
+            {{end}}
+            </div>
         {{ if .Params.chapter }}
           <div id="chapter">
         {{ end }}
         <div id="body-inner">
           {{if and (not .IsHome) (not .Params.chapter) }}
-            <h1>
+            <h1 class="gradient-header article">
               {{ if or (eq .Kind "taxonomy") (eq .Kind "term") }}
                 <!-- {{.Data.Singular}} :: -->
               {{ end }}
