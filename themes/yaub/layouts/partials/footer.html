@@ -44,13 +44,26 @@
 
    {{$showPrevNext := (and (not .Params.disableNextPrev) (not .Site.Params.disableNextPrev))}}
 
+
    {{if $showPrevNext}}
    {{ if and (ne .Kind "taxonomy") (ne .Kind "term") }}
     {{with ($.Scratch.Get "prevPage")}}
-      <a class="nav-prev btn btn-default" href="{{.RelPermalink}}" title="{{.Title}}"> <i class="fa fa-chevron-left btn-bottom-prev"></i><span class="btn-bottom-text">Previous: </span> {{.Title}}</a>
+      <a class="readme-a margin-right-5 margin-bottom-2 inline-flex relative no-highlight" href="{{.RelPermalink}}" title="{{.Title}}">
+        <div class="w-100 h-100 readmore-btn transition-transform hover:translate-x-2 hover:translate-y-2">
+          <i class="fa fa-chevron-left btn-bottom-prev"></i>
+          <span class="btn-bottom-text">Previous: </span> {{.Title}}
+        </div>
+        <div class="absolute w-100 h-100 top-2 left-2 to-beta from-alpha via-alpha btn-gradient-background"></div>
+      </a>
     {{end}}
     {{with ($.Scratch.Get "nextPage")}}
-      <a class="nav-next btn btn-default" href="{{.RelPermalink}}" title="{{.Title}}" style="margin-right: 0px;"><i class="fa fa-chevron-right btn-bottom-next"></i><span class="btn-bottom-text">Next:</span> {{.Title}}</a>
+      <a class="readme-a inline-flex relative no-highlight" href="{{.RelPermalink}}" title="{{.Title}}" style="margin-right: 0px;">
+        <div class="w-100 h-100 readmore-btn transition-transform hover:translate-x-2 hover:translate-y-2">
+          <i class="fa fa-chevron-right btn-bottom-next"></i>
+          <span class="btn-bottom-text">Next:</span> {{.Title}}
+        </div>
+        <div class="absolute w-100 h-100 top-2 left-2 to-beta from-alpha via-alpha btn-gradient-background"></div>
+      </a>
     {{end}}
     {{end}}
   {{end}}
