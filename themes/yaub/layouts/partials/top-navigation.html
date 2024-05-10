@@ -11,9 +11,27 @@
                 {{ $disableShortcutsTitle := .Site.Params.DisableShortcutsTitle}}
                 {{with .Site.Menus.shortcuts}}
                   {{ range sort . "Weight"}}
+
+{{if .HasChildren}}
+<li class="dropdown list-horizontal {{ .Params.class }} padding-left-15 padding-right-15">
+  <div class="submenu left static inline-block">
+    {{.Pre}}<a class="padding-topnav" href="{{.URL | absLangURL }}">{{safeHTML .Name}}{{.Post}}</a>
+
+    <div class="absolute submenu-div">
+      {{ range sort .Children "Weight" }}
+        <a href="{{ .URL }}" class="submenu-style submenu-link display-block"><i class='{{ .Pre }}'></i>{{default .Name}}</a>
+      {{ end }}
+    </div>
+  </div>
+</li>
+
+{{else}}
+
                       <li class="list-horizontal {{ .Params.class }} padding-left-15 padding-right-15">
                           {{.Pre}}<a class="padding-topnav" href="{{.URL | absLangURL }}">{{safeHTML .Name}}</a>{{.Post}}
                       </li>
+
+{{end}}
                   {{end}}
                 {{end}}
 
@@ -25,17 +43,17 @@
 
 
 
-<div class="sub-top-nav">
+        <div class="sub-top-nav">
 
-            {{$toc := (and (not .Params.disableToc) (not .Params.chapter))}}
+           {{$toc := (and (not .Params.disableToc) (not .Params.chapter))}}
             <div id="breadcrumbs" class="display-inline float-unset" itemscope="" itemtype="http://schema.org/BreadcrumbList">
                 <span id="sidebar-toggle-span">
                     <a href="#" id="sidebar-toggle" data-sidebar-toggle="">
-                      <i class="fas fa-bars">Toc</i>
+                      <i class="fas fa-bars">&nbsp;navigation</i>
                     </a>
                 </span>
               {{ if $toc }}
-                <span id="toc-menu"><i class="fas fa-list-alt"><span class="hidden-toc">Toc</span></i></span>
+                <span id="toc-menu"><i class="fas fa-list-alt"><span class="hidden-toc"> navigation</span></i></span>
               {{ end }}
               <span class="links">
               {{$showBreadcrumb := (and (not .Params.disableBreadcrumb) (not .Site.Params.disableBreadcrumb))}}

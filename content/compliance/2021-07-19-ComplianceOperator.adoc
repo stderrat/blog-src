@@ -402,9 +402,9 @@ The resulted html files are too big to be show here, but some snippets should gi
 
 To view the html output as an example I have linked the html files: 
 
-* link:/compliance/images/ocp4-cis-api-checks.html[OCP4 - CIS]
-* link:/compliance/images/ocp4-cis-node-master-master-0.html[Example Master Node Results]
-* link:/compliance/images/ocp4-cis-node-worker-compute-0.html[Example Worker Node Results]
+* link:/files/ocp4-cis-api-checks.html[OCP4 - CIS]
+* link:/files/ocp4-cis-node-master-master-0.html[Example Master Node Results]
+* link:/files/ocp4-cis-node-worker-compute-0.html[Example Worker Node Results]
 
 Overall Scoring of the result: 
 
