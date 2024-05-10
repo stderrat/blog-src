@@ -1,5 +1,0 @@
-{{ $_hugo_config := `{ "version": 1 }` }}
-<div class="notices {{ .Get 0 }}" {{ if len .Params | eq 2 }} id="{{ .Get 1 }}" {{ end }}>{{ .Inner }}</div>
-
-{{ $_hugo_config := `{ "version": 1 }` }}
-<div class="admonitionblock {{ .Get 0 }}" {{ if len .Params | eq 2 }} id="{{ .Get 1 }}" {{ end }}><table><tbody><tr><td class="icon"><i class="fa icon-{{ .Get 0 }}" title="{{ .Get 0 }}"></i></td><td class="content">{{ .Inner }}</td></tr></tbody></table></div>

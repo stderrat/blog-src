@@ -19,12 +19,12 @@
         {{ if .Params.categories }}
         <div class="catagories">    
           {{range .Params.categories}}
-              <a id="textElement" class="category-link no-highlight" href="{{ "/categories/" | relLangURL }}{{ . | urlize }}">{{ . }}</a>
+              <a id="{{ "category-" }}{{ . | urlize }}-{{ $.Title | urlize }}" class="category-link no-highlight" href="{{ "/categories/" | relLangURL }}{{ . | urlize }}">{{ . }}</a>
             {{end}}
         </div>
         {{end}}
 
-
+        
         <h2 class="recentlist">
           <a href="{{.RelPermalink}}" class="recentlist">
             <em class="gradient-header post-header">{{ .Title }}</em>
