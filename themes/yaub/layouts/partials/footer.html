@@ -175,11 +175,17 @@
           document.documentElement.scrollTop = 0; // For Chrome, Firefox, IE and Opera
         }
 
-        // disabled because it returns the first link of the summary-box which would be the first catagory
-//        $(".summary-box").click(function() {
+        $(".article-box").click(function() {
 //            window.location = $(this).find("a").attr("href");
-//            return false;
-//          });
+            window.location = $(this).attr('href');
+            // stopPropagation is required, since there are multiple links inside the DIV
+            $this.stopPropagation();
+            return false;
+            
+
+
+
+          });
     </script>
 
     <script>
