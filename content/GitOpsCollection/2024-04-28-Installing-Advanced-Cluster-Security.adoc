@@ -6,7 +6,7 @@ doctype: book
 
 authors: [Thomas Jungbauer]
 type: post
-draft: true
+draft: false
 categories:
    - OpenShift
    - GitOps
@@ -289,15 +289,92 @@ rhacs-setup:
 ----
 <1> Create the Namespace **stackrox** and install the ACS resources there.
 <2> Enable the Central during Syncwave 3 and set the connectivityPolicy to Online
-<3> The Central DB and its configuration. Here the resource requests are modified to allow a small installation on the DEMO environment. Also tolerations might be set here, as well a PVCs etc.
+<3> The Central DB and its configuration. Here the resource requests are modified to allow a small installation on the DEMO environment. Also, tolerations might be set here, as well a PVCs etc.
 <4> Settings for the Scanner and its databases. Again, tolerations might be configurated here, but also, not shown in this example, resource limits and requests and other settings. Since I am configuring for a DEMO environment, I disabled the autoscaler and set the replica to 1.
-<5> The SecuredCluster is the 2nd CRD the is provided by ACS Operator. It is installed after the Central (thus a higher Syncwave). The most important setting here is the clustername. In our "local" example, the name is set to **local-cluster**.
+<5> The SecuredCluster is the 2nd CRD that is provided by ACS Operator. It is installed after the Central (thus a higher Syncwave). The most important setting here is the clustername. In our "local" example, the name is set to **local-cluster**.
 <6> Some basic settings, that will configure the OpenShift authentication and the minimum role for authenticated users (None)
 <7> Some default settings for Jobs that are started by this Helm chart. 
 <8> The Job that initializes the creation of the init-bundle
 <9> The Job and its configuration to generate a direct link to ACS in the OpenShift UI. 
 
-With this ACS is about to be installed on the cluster.
+With this ACS is about to be installed on the cluster. Let's see what will happen during the synchronization.
+
+== Deploying Advanced Cluster Security (ACS)
+
+Let's hit the sync button inside OpenShift GitOps. This will start the whole process, walking through the syncwaves and the hooks that have been defined.
+
+.Syncing Argo CD
+image::setup_acs/syncing-argocd.png?width=720px[Syncing Argo CD]
+
+WARNING: Since hooks are used, you must sync the whole Argo CD Application. As you can see inside Argo CD, the hooks are not shown, because they will only appear when their time has come (and will disappear afterward again). This means, that if you perform a selective sync, Argo CD does not know when it should start such a hook and they are never triggered.
+
+The Operator installation is now started. At the moment the Operator has the status **Installing**. Currently, no CRDs (Central or SecuredCluster) are available yet. If we would just let Argo CD continue, it would try to create the Central configuration, based on a CRD which does not yet exist. Thus, the syncing process will fail and therefore the **status-checker** is going to verify if the installation was truly successful.
+
+.Operator is installed
+image::setup_acs/installing-operator.png?width=720px[Operator is installed]
+
+The Status Checker is a simple Pod that is triggered by a Kubernetes Job. If waits until the status of the Operator is **Succeeded**. Until this is the case, Argo CD waits before it continues with the synchronization. (It waits until the hook ends the Job)
+
+.Status Checker
+image::setup_acs/status-checker.png?width=720px[Status Checker]
+
+In the logs file of the Pod, we can see that the Operator is ready.
+
+.Status Checker Logs
+image::setup_acs/status-checker-logs.png?width=720px[Status Checker Logs]
+
+And indeed, the status of the Operator is now **Succeeded**. Now it is time for Argo CD to continue the synchronization.
+
+.Operator Ready
+image::setup_acs/operator-ready.png?width=720px[Operator Ready]
+
+The next step is to create the Central CRD. This will deploy the UI of ACS and the local Scanner. You can also see two other Jobs that have been created by the Helm Charts **create_cluster_link** and **create_cluster_init_bundle**. They will finish when the Central becomes ready. 
+
+WARNING: Until the Central becomes ready, these two additional Jobs may show errors. Do not worry, OpenShift will reschedule them.
+
+.Installing Central
+image::setup_acs/installing-central.png?width=720px[Installing Central]
+
+You can also see two other Jobs that have been created by the Helm Charts **create_cluster_link** and **create_cluster_init_bundle**. They will finish when the Central becomes ready. 
+
+WARNING: Until the Central becomes ready, these two additional Jobs may show errors. Do not worry, OpenShift will reschedule them.
+
+.Init Job is waiting for Central
+image::setup_acs/init-job-waits.png?width=720px[Init Job is waiting for Central]
+
+Once the Central has been deployed, the second CRD **SecuredCluster** will be added. This will trigger the installation of the Collectors and other components.
+
+.Installing SecuredCluster
+image::setup_acs/installing-securedcluster.png?width=720px[Installing Secured Cluster]
+
+Eventually, all Pods are running at the end. The additional Jobs are completed and ACS is ready to take care of the cluster security. 
+
+.All Pods running
+image::setup_acs/acs-all-pods-running.png?width=720px[All Pods running]
+
+We can now use the console link that was created.
+
+.ACS ConsoleLink
+image::setup_acs/acs-consolelink.png?width=720px[ACS ConsoleLink]
+
+NOTE: If you disabled the creation of the ConsoleLink you would need to find the Route that ACS Operator created. Honestly, I do not know why the Operator does not create such ConsoleLink out of the box.
+
+Since I am lazy I created another Job that automatically configures authentication via OpenShift for ACS. This way, we can simply use our OpenShift credentials to login.
+
+.ACS Login
+image::setup_acs/acs-login.png?width=720px[ACS Login]
+
+And that's it, we can now use ACS, which was deployed fully automatically.
+
+.Advanced Cluster Security
+image::setup_acs/acs.png?width=720px[Advanced Cluster Security]
 
 == Conclusion
 
+As you can see Advanced Cluster Security was completely installed. This included the Operator, the Central, the creation and installation of an init-bundle, the creation of a ConsoleLink, the configuration of the SecuredCluster CRD and the initial configuration of the auth provider inside ACS. You can now start using ACS or add additional clusters. 
+
+NOTE: Speaking of additional clusters: The create-cluster-init-bundle created three certificates: collector-tls, sensor-tls and admission-control-tls. They are required so that the SecuredClusters can communicate with the Central. You could now create a separate init-bundle for each SecuredCluster, which is not really easy to automate, or you simply take these created secrets and put them into your GitOps and re-use them for any other SecuredCluster.
+
+All these steps and configurations seem quite complicated but honestly, it is straightforward. I install any Operator using https://github.com/tjungbauer/helm-charts/tree/main/charts/helper-operator[Helper Operator^] and in most cases. I also use https://github.com/tjungbauer/helm-charts/tree/main/charts/helper-status-checker[Helper Operator Status Checker^] to find additional possible configurations. Both require simple configuration only, which you would need to know anyway when you create the Subscription object manually. Once done, you can repeat this for any other Operator. 
+
+The real magic happens when the Operator is configured at the same time because this is very individual to the Operator. 
