@@ -1,9 +1,24 @@
-{{ $related := .Site.RegularPages.Related . | first 5 }}
-{{ with $related }}
-<h3>See Also</h3>
-<ul>
- {{ range . }}
- <li><a href="{{ .RelPermalink }}">{{ .LinkTitle }}</a></li>
- {{ end }}
-</ul>
+{{- range first 1 (where (where .Site.Pages ".Params.categories" "intersect" .Params.categories) "Permalink" "!=" .Permalink) -}}
+    {{- $.Scratch.Set "has_related" true -}}
+{{- end -}}
+
+{{ if $.Scratch.Get "has_related" }}
+<hr class="related" />
+    <div class="related-content">
+        <h3>See Also:</h3>
+        <ul>
+            {{- $num_to_show := .Site.Params.related_content_limit | default 5 -}}
+            {{ range first $num_to_show (where (where .Site.Pages ".Params.categories" "intersect" .Params.categories) "Permalink" "!=" .Permalink) }}
+            <li class="related">
+                <a href="{{ .RelPermalink }}">{{ .Title }}</a>
+                &ndash; 
+                <time datetime="{{ .Date.UTC.Format "2006-01-02T15:04:05-0700" }}">
+                    <i>{{ .Date.Format "Jan 2, 2006" }}</i>
+                </time>
+                <br /> 
+                <small><p class="related">{{ .Summary | plainify | htmlUnescape }}</p></small>
+            </li>
+          {{ end }}
+        </ul>
+    </div>
 {{ end }}
