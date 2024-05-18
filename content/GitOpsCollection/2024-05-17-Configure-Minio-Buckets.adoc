@@ -1,0 +1,479 @@
+--- 
+title: "Configure Buckets in MinIO using GitOps"
+description: "Configure Buckets in MinIO using a GitOps approach."
+date: "2024-05-17"
+doctype: book
+
+authors: [Thomas Jungbauer]
+type: post
+draft: false
+categories:
+   - OpenShift
+   - GitOps
+tags: ["MinIO", "OpenShift", "OCP", "GitOps", "Argo CD", "Storage", "S3", "Object Storage"] 
+
+aliases: [ 
+	 "/posts-output/2024-05-17-configure-minio-bucket/",
+] 
+---
+
+:imagesdir: /gitopscollection/images/
+:icons: font
+:toc:
+
+https://min.io/[MinIO^] is a simple, S3-compatible object storage, built for high-performance and large-scale environments. It can be installed as an Operator to Openshift. In addition, to a command line tool, it provides a WebUI where all settings can be done, especially creating and configuring new buckets. Currently, this is not possible in a declarative GitOps-friendly way. 
+Therefore, I created the Helm chart https://github.com/tjungbauer/helm-charts/tree/main/charts/minio-configurator[minio configurator^], that will start a Kubernetes Job, which will take care of the configuration. 
+
+Honestly, when I say I have created it, the truth is, that it is based on an existing https://github.com/bitnami/charts/tree/main/bitnami/minio[MinIO Chart by Bitnami^], that does much more than just set up a bucket. I took out the bucket configuration part, streamlined it a bit and added some new features, which I required. 
+
+This article shall explain how to achieve this.
+
+<!--more--> 
+
+== Prerequisites 
+
+. Argo CD (OpenShift GitOps) deployed
+. MinIO including a deployed tenant that is waiting for buckets
+
+== Introduction
+
+After MinIO and the Tenant have been deployed, we can **configure and update** a bucket, users, policies and more. Since I do not want to do this manually, the Helm Chart that will be described here creates a Kubernetes Job that leverages the **mc command line tool** to execute certain tasks automatically. The chart will take care of:
+
+. creating a lifecycle policy
+. creating an access policy
+. creating a new user/group. User credentials might be added directly to the values file or, better, are imported as a secret
+. attaching policies to a user/group
+. creating a bucket
+. set a quota for a bucket
+. set tags for a bucket
+. enable versioning for a bucket
+. enable object locking for a bucket (**be aware** that this can only be enabled during the bucket creation)
+. enable bucket replication to a target cluster/bucket
+. execute possible extra commands that are configured in the values file
+
+To perform all these tasks Bitnami released a container image: **docker.io/bitnami/minio:2024.5.1-debian-12-r0**
+They are updating this image regularly. 
+
+NOTE: Actually, the image can be used to deploy the minio server. At this moment, we are interested in the command line tool only. Bitnami also managing a _minio-client_ image, that can be tested and used. However, I left the original image, which is working very well. 
+
+== The Values
+
+NOTE: All settings are explained in more detail at: https://github.com/tjungbauer/helm-charts/tree/main/charts/minio-configurator
+
+CAUTION: The Job and everything that is required, are executed inside the Tenant namespace. In the following examples, this will be **minio-tenant-namespace**
+
+=== Basic Settings
+
+The basic settings are the following. They will define the namespace of the Tenant, the name of the ServiceAccount, the URL of the tenant, Argo CD Hook settings and the image that shall be used for the deployment.
+
+[source,yaml]
+----
+name: minio-provisioner <1>
+namespace: minio-tenant-namespace <2>
+synwave: 5 <3>
+
+argoproj: <4>
+  hook: Sync
+  hook_delete_policy: HookSucceeded
+
+image:
+  url: docker.io/bitnami/minio:2024.5.1-debian-12-r0 <5>
+
+# Information of the Minio Cluster 
+miniocluster: <6>
+  url: minio-tenant-api-url
+  port: 443
+
+skip_tls_verification: true <7>
+
+# Specifies whether a ServiceAccount should be created
+serviceAccount: <8>
+  create: true
+  name: "minio-provisioner"
+----
+<1> Name of the Kubernetes provisioner Job resource.
+<2> Namespace of the MinIO Tenant.
+<3> Syncwave of the provisioner Job.
+<4> Possible Argo CD hook configuration.
+<5> The container image the provisioner Job will use.
+<6> The URL of the minio console. This will be used to set the "alias" for the mc command
+<7> Skip verification of TLS for the mc command. This will disable the TLS check for any mc command the Job will execute.
+<8> Information about the ServiceAccount
+
+=== Authentication Settings
+
+To be able to authenticate against MinIO credentials must be provided. This happens, typically, in the form of a Secret:
+
+[source,yaml]
+----
+auth:
+  useCredentialsFiles: true <1>
+  secretName: minio-provisioner <2>
+----
+<1> Shall a secret mounted as a file be used (preferred)
+<2> Name of the Secret
+
+The Secret itself requires specific keys and should look like the following:
+
+[source,yaml]
+----
+kind: Secret
+apiVersion: v1
+metadata:
+  name: minio-provisioner <1>
+  namespace: minio-tenant-namespace <2>
+data:
+  root-password: <base64 string> <3>
+  root-user: <base64 string> <4>
+type: Opaque
+----
+<1> Name of the Secret as mentioned in the minio-configurator values files
+<2> Name of the Namespace as mentioned in the minio-configurator values files
+<3> Password to access MinIO
+<4> User to access MinIO
+
+CAUTION: The Secret must exist upfront and is not created by the Helm Chart. Either pick it from a Vault or create a Sealed Secret to be able to store it in Git.
+
+NOTE: The credentials are called **root-**. Any user that has permission to configure buckets is sufficient here. Still, the keys must be named that way.
+
+=== Creating MinIO Policies
+
+MinIO uses Policy-Based Access Control to define which actions can be performed on certain resources by an authenticated user. 
+A policy can be created by the command **mc admin policy**. Our Kubernetes Job will take the configuration from the values file and mount the information as a JSON file, that will be imported into MinIO.
+
+The following specification shows the example for OpenShift Logging:
+
+[source,yaml]
+----
+provisioning:
+  enabled: true <1>
+  
+  policies:
+    - name: openshift-logging-access-policy <2>
+      statements:
+        - resources: <3>
+            - "arn:aws:s3:::openshift-logging"
+            - "arn:aws:s3:::openshift-logging/*"
+          effect: "Allow" <4>
+          actions:
+            - "s3:*" <5>
+----
+<1> In general, enable the provisioning or not
+<2> Name of the policy. Multiple can be defined and assigned to a user or group.
+<3> Define the resources the policy should manage access to.
+<4> Define the effect: Allow or Deny (default)
+<5> The actions that are allowed. Here: any s3: action
+
+Multiple policies can be defined in the values file, and it is very important to exactly define the resources, the effect and the actions.
+The above configuration will allow the user that has the policy assigned:
+
+. All s3 actions to the bucket openshift-logging and everything inside this bucket (thus two resources)
+
+All actions are defined at: https://min.io/docs/minio/linux/administration/identity-access-management/policy-based-access-control.html#minio-policy[MinIO Access Management^].
+
+Another example would be the following:
+
+[source,yaml]
+----
+  policies:
+    - name: custom-bucket-specific-policy
+      statements:
+        - resources:
+            - "arn:aws:s3:::my-bucket"
+          actions:
+            - "s3:GetBucketLocation"
+            - "s3:ListBucket"
+            - "s3:ListBucketMultipartUploads"
+        - resources:
+            - "arn:aws:s3:::my-bucket/*"
+          effect: "Allow"
+          actions:
+            - "s3:AbortMultipartUpload"
+            - "s3:DeleteObject"
+            - "s3:GetObject"
+            - "s3:ListMultipartUploadParts"
+            - "s3:PutObject"
+----
+
+This policy defines the actions in a fine granular way: 
+
+. To the bucket **my-bucket** we have three allowed actions (GetBucketLocation, ListBucket and ListBucketMultipartUploads)
+. To everything inside the bucket (/*) we can also Delete, Get, Put objects etc.
+
+=== Creating a User
+
+The policy that has been created must be assigned to a user (or a group) to be effective. Such a user requires a username, a password and a list of policies that shall be assigned. 
+
+The required information can be added directly to the values file like this: 
+
+CAUTION: **This is NOT the recommended way!**
+
+[source,yaml]
+----
+  # users:
+  #   - username: test-username <1>
+  #     password: test-password <2>
+  #     disabled: false <3>
+  #     policies: <4>
+  #       - readwrite
+  #       - consoleAdmin
+  #       - diagnostics
+  #     # When set to true, it will replace all policies with the specified.
+  #     # When false, the policies will be added to the existing.
+  #     setPolicies: false
+  # @default -- []
+----
+<1> Username
+<2> clear text password
+<3> Shall the user be created or not
+<4> List of policies that shall be assigned
+
+As mentioned above: Defining a list of users directly in the values file is **not recommended** as it would mean that the passwords are stored in clear text.
+
+Instead, a list of Secrets can be defined:
+
+[source,yaml]
+----
+  usersExistingSecrets:
+    - minio-users  
+----
+
+The defined Secrets require a specific structure and can be encrypted and stored in Git or a Vault.
+
+The data structure is the following:
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio-users <1>
+type: Opaque
+stringData:
+  username1: | <2>
+    username=username <3>
+    password=password <4>
+    disabled=false <5>
+    policies=openshift-logging-access-policy,readwrite,consoleAdmin,diagnostics <6>
+    setPolicies=false <7>
+----
+<1> Name of the Secret as referenced in the values file.
+<2> List of users, distinguished by the key "username1", "username2", etc.
+<3> Username
+<4> Password
+<5> Enabled or disabled
+<6> List of policies to assign to the user
+<7> Replace or add the policies to an (existing) user.
+
+==== Built-In Policies
+
+MinIO provides several https://min.io/docs/minio/linux/administration/identity-access-management/policy-based-access-control.html#built-in-policies[Built-In Policies^] that can be attached to a user or group. 
+
+The following policies will always exist: (Please verify the official documentation for further information)
+
+**consoleAdmin**
+
+Grants complete access to all S3 and administrative API operations against all resources on the MinIO deployment.
+
+- s3:*
+- admin:*
+
+**readonly**
+
+Grants read-only permissions on any object on the MinIO deployment. The GET action must apply to a specific object without requiring any listing.
+
+- s3:GetBucketLocation
+- s3:GetObject
+
+**readwrite**
+
+Grants read and write permissions for all buckets and objects on the MinIO server.
+
+- s3:*
+
+**diagnostics**
+
+Grants permission to perform diagnostic actions on the MinIO deployment.
+
+- admin:ServerTrace
+- admin:Profiling
+- admin:ConsoleLog
+- admin:ServerInfo
+- admin:TopLocksInfo
+- admin:OBDInfo
+- admin:BandwidthMonitor
+- admin:Prometheus
+
+**writeonly**
+
+Grants write-only permissions to any namespace (bucket and path to object) the MinIO deployment. 
+
+- s3:PutObject
+
+=== Provisioning Groups
+
+Users can be combined into groups and instead of assigning policies to individual users, we can assign them to a whole group.
+The idea is the same as for users, except, that we define a list of members for that group:
+
+[source,yaml]
+----
+  groups
+    - name: test-group <1>
+      disabled: false <2>
+      members: <3>
+        - username
+      policies: <4>
+        - readwrite
+      # When set to true, it will replace all policies with the specified.
+      # When false, the policies will be added to the existing.
+      setPolicies: false <5>
+----
+<1> Name of the group.
+<2> Enabled or disabled.
+<3> List of users that are members of this group.
+<4> List of policies that are assigned to this group.
+<5> Replace or add the policies to an (existing) user.
+
+=== Configure the Bucket
+
+Finally, we can configure the bucket itself. A bucket will have a specific configuration, a lifecycle a quota etc.
+A list of buckets with different configurations can be defined in the values files. 
+
+NOTE: The only mandatory information is the name of the bucket. It is not required to configure a lifecycle or quota etc.
+
+Let us analyse the following example, which tries to cover all possible settings:
+
+[source,yaml]
+----
+  buckets:
+    - name: mybucket <1>
+      region: my-region <2>
+      versioning: Versioned <3>
+      withLock: false <4>
+      bucketReplication: <5>
+        enabled: true
+        targetClusterUrl: replication-target-cluster
+        targetClusterPort: 443
+        targetBucket: replication-target-bucket
+        replicationSettings: <6>
+           - existing-objects
+        credSecretName: replication-credentials <7>
+      lifecycle: 
+        - id: name-of-lifecycle <8>
+          prefix: test-prefix <9>
+          disabled: false
+          expiry: <10>
+            days: 30 # or date
+            nonconcurrentDays: 10
+        - id: name-of-second-lifecycle
+          disabled: false
+          expiry:
+            deleteMarker: true
+            nonconcurrentDays: 10
+      quota: <11>
+        type: set
+        size: 1024Gib
+      tags: <12>
+        key1: value1
+----
+<1> Name of the bucket.
+<2> Region of the bucket
+<3> Enable versioning (https://docs.min.io/docs/minio-client-complete-guide.html#ilm). Allowed options are: Versioned, Suspended or Unchanged.
+<4> Enable object Locking
+<5> Configure bucket replication to a target cluster and a target bucket
+<6> Define the settings for the bucket replication can be: delete, delete-marker or existing-objects: https://min.io/docs/minio/linux/administration/bucket-replication/enable-server-side-one-way-bucket-replication.html
+<7> Name of the Secret that stores the credentials for the replication
+<8> Define a list of lifecycle policies for the bucket: https://min.io/docs/minio/linux/administration/object-management/object-lifecycle-management.html
+<9> A prefix that can be defined
+<10> Define the expiration. This can be defined as **days** OR as a **date**, for example "2021-11-11T00:00:00Z"
+<11> Set a quota for the bucket: https://docs.min.io/docs/minio-admin-complete-guide.html#bucket
+<12> Define additional tags for the bucket https://docs.min.io/docs/minio-client-complete-guide.html#tag
+
+==== Replication Secret
+
+The definition above defines a bucket replication. To authenticate at the target cluster, we need to provide a username and a password. This is stored inside a secret:
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: replication-user
+type: Opaque
+stringData:
+    username: username
+    password: password
+----
+
+This defines a whole bunch of settings. Except for the bucket name, none is mandatory.
+
+==== Example OpenShift-Logging Bucket
+
+The following is a more realistic example, for defining a bucket used for OpenShift Logging:
+
+It defines the bucket name, with a lifecycle of 4 days and a quota of 1TB:
+
+[source,yaml]
+----
+    buckets:
+      - name: openshift-logging
+        lifecycle:
+          - id: logging-retention
+            disabled: false
+            expiry:
+                days: 4
+        quota:
+          type: set
+          size: 1024GiB
+----
+
+=== Additional Settings
+
+Finally, there are some additional settings, I would like to mention here. They are completely optional, but might be interesting:
+
+Automatically clean up the provisioning job after it has finished:
+[source,yaml]
+----
+  cleanupAfterFinished:
+    enabled: false
+    seconds: 600
+----
+
+Define resources for the provisioning job. For example:
+
+[source,yaml]
+----
+resources:
+  requests:
+    cpu: 2
+    memory: 512Mi
+  limits:
+    cpu: 3
+    memory: 1024Mi
+----
+
+NOTE: Typically, I leave this to **resources: {}**
+
+Take care of the pod placement and define a nodeSelector and tolerations, for example:
+
+[source,yaml]
+----
+  nodeSelector: {}
+  tolerations:
+    - effect: NoSchedule
+      key: infra
+      operator: Equal
+      value: reserved
+    - effect: NoExecute
+      key: infra
+      operator: Equal
+      value: reserved
+----
+
+== Conclusion
+
+With this Helm chart by Bitnami, with a little modification from my side, it is possible to **create and update** buckets, policies, users etc. There is no need, to perform any modification manually in the MinIO WebUI. 
+
+I am currently using this chart for several bucket configurations, with sometimes more and sometimes fewer settings in the values file. Keep in mind, that many settings, especially for the bucket itself, are completely optional and are not required to create a new bucket. (For example, lifecycle). Please check out the source of the Helm Chart and the values file to get further information: https://github.com/tjungbauer/helm-charts/tree/main/charts/minio-configurator[minio configurator^]. 
+
+If you have any feedback or miss something, feel free to create a pull request or an issue :)
