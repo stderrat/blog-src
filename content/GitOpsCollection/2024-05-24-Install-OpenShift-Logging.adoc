@@ -43,7 +43,7 @@ All steps will be done automatically. In case you have S3 storage available, or 
 . OpenShift Data Foundation (ODF) deployed and ready to provide object storage. 
 . Enough available compute resources to deploy LokiStack. Verify the official https://docs.openshift.com/container-platform/4.15/observability/logging/log_storage/installing-log-storage.html[OpenShift Logging documentation^] to see which option might need which resources. 
 
-NOTE: For ODF it would be enough to deploy object storage only, instead of the full storage stack based on Ceph. In this case, the so **MultiCloudGateway** option is used, which creates (virtualizes) object storage on top of an existing StorageClass
+NOTE: For ODF it would be enough to deploy object storage only, instead of the full storage stack based on Ceph. In this case, the so called **MultiCloudGateway** option is used, which creates (virtualizes) object storage on top of an existing StorageClass
 
 == Introduction
 
