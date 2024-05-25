@@ -44,6 +44,7 @@ This series includes the following articles:
 . link:/gitopscollection/2024-04-25-installing-compliance-operator/[Setup Compliance Operator]
 . link:/gitopscollection/2024-04-28-installing-advanced-cluster-security/[Setup & Configure Advanced Cluster Security using GitOps]
 . link:/gitopscollection/2024-05-17-configure-minio-buckets/[Configure Buckets in MinIO using GitOps]
+. link:/gitopscollection/2024-05-19-install-openshift-logging/[Installing OpenShift Logging using GitOps]
 
 
 
