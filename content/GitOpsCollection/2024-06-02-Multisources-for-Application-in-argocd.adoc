@@ -1,0 +1,206 @@
+--- 
+title: "Multiple Sources for Applications in Argo CD"
+description: "Using Multiple Sources for Applications in Argo CD"
+date: "2024-06-02"
+doctype: book
+
+authors: [Thomas Jungbauer]
+type: post
+draft: false
+categories:
+   - OpenShift
+   - GitOps
+tags: ["Application", "OpenShift", "OCP", "GitOps", "Argo CD", "ApplicationSet", "Multiple Sources"] 
+
+aliases: [ 
+	 "/posts-output/2024-06-01-multiple-sources-for-application/",
+] 
+---
+
+:imagesdir: /gitopscollection/images/
+:icons: font
+:toc:
+
+Argo CD or OpenShift GitOps uses Applications or ApplicationSets to define the relationship between a source (Git) and a cluster. Typically, this is a 1:1 link, which means one Application is using one source to compare the cluster status. This can be a limitation. For example, if you are working with Helm Charts and a Helm repository, you do not want to re-build (or re-release) the whole chart just because you made a small change in the values file that is packaged into the repository. You want to separate the configuration of the chart with the Helm package. 
+
+The most common scenarios for multiple sources are (see: https://argo-cd.readthedocs.io/en/stable/user-guide/multiple_sources/[Argo CD documentation^]):
+
+* Your organization wants to use an external/public Helm chart
+* You want to override the Helm values with your own local values
+* You don't want to clone the Helm chart locally as well because that would lead to duplication and you would need to monitor it manually for upstream changes.
+
+This small article describes three different ways with a working example and tries to cover the advantages and disadvantages of each of them. They might be opinionated but some of them proved to be easier to use and manage.
+
+<!--more--> 
+
+== Option 1: Multisource by Argo CD
+
+CAUTION: Specifying multiple sources for an application is a **beta feature**.
+
+The first option I would like to demonstrate is the "official way" by Argo CD. It was introduced in Argo CD version 2.6 and while this option is still in the Beta phase, it is one of the most requested features and was added to the release candidate of version 2.11. The https://blog.argoproj.io/argo-cd-v2-11-release-candidate-b83ba3008ba5[article by Argo CD^] gives more details of this release. The official documentation by Argo CD can be found https://argo-cd.readthedocs.io/en/stable/user-guide/multiple_sources/[here^]
+
+In my https://github.com/tjungbauer/openshift-clusterconfig-gitops/blob/main/base/init_app_of_apps/[repository^] I am using this option as an example to create the App-of-Apps. The App-of-Apps created an Application, that uses multiple sources.
+
+1. The values files from https://github.com/tjungbauer/openshift-clusterconfig-gitops/blob/main/base/argocd-resources-manager/values.yaml
+2. The Helm Chart **helper-argocd** from https://charts.stderr.at/
+
+Let's see the working example:
+
+[source,yaml]
+----
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd-resources-manager
+  namespace: openshift-gitops
+spec:
+  destination:
+    namespace: openshift-gitops
+    server: 'https://kubernetes.default.svc'
+  info:
+    - name: Description
+      value: >-
+        This is the starting point which will initialize all applicationsets or
+        argocd applications
+  project: default
+  sources: <1>
+    - chart: helper-argocd <2>
+      helm:
+        valueFiles: <3>
+          - $values/base/argocd-resources-manager/values.yaml
+      repoURL: 'https://charts.stderr.at/' <4>
+      targetRevision: 2.0.28 <5>
+    - ref: values <6>
+      repoURL: 'https://github.com/tjungbauer/openshift-clusterconfig-gitops'
+      targetRevision: main
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+----
+<1> Using **sources** instead of singular source
+<2> I want to use the Helm Chart **https://github.com/tjungbauer/helm-charts/tree/main/charts/helper-argocd[helper-argocd^]**
+<3> The chart will use the values file(s) from github.com/tjungbauer/openshift-clusterconfig-gitops/base/argocd-resources-manager/values.yaml. $value (can only be specified at the beginning of the path) resolves to the root of the values file repository
+<4> The URL of the Helm Chart repository
+<5> The version of the Helm chart helper-argocd
+<6> The reference to the values file, defining the repository URL and target revision.
+
+WARNING: Argo CD does not currently support using another Helm chart as a source for value files.
+
+With this option, it is possible to separate the values files from the Helm Chart itself. Whenever I want to change something in the configuration, I simply change the values file without being required to release a new Chart version. 
+
+**Advantages**
+
+* Allows easily to define an Application with multiple sources, using Argo CD features.
+* No additional tool (see other options below) is required
+* Was added to the release candidate of Argo CD v2.11 
+
+**Disadvantages**
+
+* Currently a Beta feature and thus is not supported and has some limitations, such as lacking support of CLI and UI.
+* Does not allow using additional local specifications. At least as far as I know.
+* Can be complex to configure and manage
+
+== Option 2: Wrapper Helm Chart
+
+With this option, which I extensively use, a wrapper Helm Chart is used to define local values files while calling additional (sub) Helm Charts as a dependency. This wrapper could simply define the values files and nothing else (being link:/gitopscollection/2024-04-25-installing-compliance-operator/#_why_empty_helm_charts/[empty instead^]) or even define additional files, such as Sealed Secrets or things that are not provided by the sub-charts. 
+
+* An example of an empty chart would be: https://github.com/tjungbauer/openshift-clusterconfig-gitops/tree/main/clusters/management-cluster/setup-acs[setup-acs^]
+* An example of a chart that defines additional local files would be: https://github.com/tjungbauer/openshift-clusterconfig-gitops/tree/main/clusters/management-cluster/generic-clusterconfig[generic-clusterconfig^]
+
+The first one is using sub-charts to build the required specifications:
+
+[source,yaml]
+----
+dependencies:
+  - name: rhacs-setup
+    version: ~1.0.0
+    repository: https://charts.stderr.at/
+  - name: helper-operator
+    version: ~1.0.23
+    repository: https://charts.stderr.at/
+  - name: helper-status-checker
+    version: ~4.0.0
+    repository: https://charts.stderr.at/
+    condition: helper-status-checker.enabled
+----
+
+The https://github.com/tjungbauer/openshift-clusterconfig-gitops/blob/main/clusters/management-cluster/setup-acs/values.yaml[values file^] specifies the configuration for these sub-charts.
+
+The second example also uses sub-charts, but additionally defines local files such as a SealedSecret for htpasswd.
+
+As you can see throughout my https://github.com/tjungbauer/openshift-clusterconfig-gitops/tree/main/clusters/management-cluster[repository^] I am using this option almost all the time. It proved to be quite simple, especially if you prefer working with Helm Charts such as I do. 
+However, you must take care of the settings in the values file. Specifications you would like to be presented in a sub-chart must be put into the correct place. 
+
+For example:
+
+Everything underneath 
+
+[source,yaml]
+----
+helper-operator:
+  operators:
+    rhacs-operator:
+[...]
+----
+
+will be used by the chart **helper-operator**. While everything underneath:
+
+[source,yaml]
+----
+helper-status-checker:
+  enabled: true
+----
+
+will be used by the chart **helper-status-checker**.
+
+**Advantages**
+
+* Easy to use, at least for myself
+* Allows defining additional, local files that are not provided by the sub-charts
+
+**Disadvantages**
+
+* A wrapper Chart must be created, that at least defines: Chart.yaml, templates folder and values.yaml
+* The configuration must be done correctly and all settings for a sub-chart must be forwarded to the sub-chart.
+
+== Option 3: Using Kustomize with Helm enabled
+
+The third option I would like to show is using Kustomize. This tool can be used to call a Helm Chart when the option **--enable-helm** is activated in Argo CD. I am using one example for the https://github.com/tjungbauer/openshift-clusterconfig-gitops/tree/main/clusters/management-cluster/ingresscontroller[IngressController^]. 
+
+Here the values file is placed into the local folder and the Kustomize.yaml is configured as:
+
+[source,yaml]
+----
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+helmCharts:
+- name: ingresscontroller
+  repo: https://charts.stderr.at
+  valuesFile: values.yaml
+----
+
+This simply defines the use of the chart **ingresscontroller** from the Helm repository with the local values file. 
+
+Unlike Option #2 you do not need to take care about the settings for sub-charts and which settings are passed to which chart. Like Option #2 you can also define additional files that shall be rendered using out-of-the-box Kustomize possibilities. 
+
+**Advantages**
+
+* Easy to use
+* Allows defining additional, local files that are not provided by the sub-charts
+* No need to take care of sub-charts and correctly pass the settings to a sub-chart
+
+**Disadvantages**
+
+* combines two different tools, which might become confusing
+* requires specific option to be enabled **--enable-helm**
+
+== Conclusion
+
+As this short article demonstrates, there are multiple ways to work with multiple sources and therefore to separate the values file from the actual Helm Chart. There might be even more options, but these are the ones I was seeing at customers. 
+
+Which one do I use? When you look at my https://github.com/tjungbauer/openshift-clusterconfig-gitops[repository^] you see that I mainly use Option #2. Actually, I completely moved from Option #3 to Option #2 a few months ago, because this proved to be clearer for customers, especially when they are new to Kustomize and Helm. That way, only one tool is used and must be managed. Option #3 proved to be more complex in such a case. 
+
+What about Option #1? While I am using it to showcase this feature it is still in a TechPreview phase. However, I do not think that it will completely replace the other options, because it is more complex to configure.
+
+However, in the end, it is all about personal preferences. Use the tool that you feel most comfortable with :).

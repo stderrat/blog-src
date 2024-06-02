@@ -45,6 +45,8 @@ All steps will be done automatically. In case you have S3 storage available, or 
 
 NOTE: For ODF it would be enough to deploy object storage only, instead of the full storage stack based on Ceph. In this case, the so-called **MultiCloudObjectGateway** option is used, which creates (virtualizes) object storage on top of an existing StorageClass
 
+CAUTION: If ODF object storage based on Noobaa should be used, then it makes sense to think about the data retention process, which will take care of removing old data from the storage. It is recommended to configure this directly on the object storage, because this is much more compute-friendly, then letting OpenShift Logging take care of that. The configuration depends on the object storage vendor. In the case of Noobaa, I have prepared a separate article: link:/openshift/2024/02/openshift-data-foundation-noobaa-bucket-data-retention-lifecycle/[Noobaa Bucket Data Retention Lifecycle]
+
 == Introduction
 
 The main resources of OpenShift Logging are the three custom resources: **ClusterLogging**, **ClusterLogForwarder** and **LokiStack**. The first two are provided by the OpenShift Logging Operator, the last one is provided by the Loki Operator. ClusterLogForwarder is an optional configuration. It allows us to forward logs to external destinations, such as Splunk, or to forward the OpenShift audit logs to Loki. (They are not stored by default). The LokiStack resource requires an available object storage to be able to start its workloads. 
@@ -295,7 +297,7 @@ helper-objectstore:
 ----
 <1> Syncwave to create the BackingStore.
 <2> Name of the Backingstore.
-<3> Size of the BackingStore. 700Gi is good enough for testing Logging. Keep in mind that data retention must be configured separately for Noobaa.
+<3> Size of the BackingStore. 700Gi is good enough for testing Logging. Keep in mind that data retention should be configured separately for link:/openshift/2024/02/openshift-data-foundation-noobaa-bucket-data-retention-lifecycle/[Noobaa].
 <4> Limit for CPU and Memory for the Noobaa (BackingStore) pod. They might need to be adjusted since the original ones are quite small for bigger buckets.
 <5> Pool of Persistent Volumes. Currently **pv-pool** is supported by the chart only.
 <6> The basic storage class that shall be used to virtualize ODF object storage on.
