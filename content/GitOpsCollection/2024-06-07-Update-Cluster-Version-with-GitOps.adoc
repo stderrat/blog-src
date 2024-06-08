@@ -1,0 +1,188 @@
+--- 
+title: "Update Cluster Version using GitOps approach"
+description: "Update an OpenShift cluster using a GitOps approach."
+date: "2024-06-07"
+doctype: book
+
+authors: [Thomas Jungbauer]
+type: post
+draft: false
+categories:
+   - OpenShift
+   - GitOps
+tags: ["Application", "OpenShift", "OCP", "GitOps", "Argo CD", "ApplicationSet", "Multiple Sources", "Cluster Update"] 
+
+aliases: [ 
+	 "/posts-output/2024-06-07-update-clusterversion/",
+] 
+---
+
+:imagesdir: /gitopscollection/images/
+:icons: font
+:toc:
+
+
+During a GitOps journey at one point, the question arises, how to update a cluster? Nowadays it is very easy to update a cluster using CLI or WebUI, so why bother with GitOps in that case? The reason is simple: Using GitOps you can be sure that all clusters are updated to the correct, required version and the version of each cluster is also managed in Git. 
+
+All you need is the **channel** you want to use and the desired cluster **version**. Optionally, you can define the exact image SHA. This might be required when you are operating in a restricted environment. 
+
+<!--more--> 
+
+== Overview
+
+Since OpenShift 4 it is very easy to update a cluster. It can either be done using the Web UI **Administration -> Cluster Settings** or via the command line using the command `oc adm upgrade`. 
+
+There are 2 main configurations for an upgrade: 
+
+1. **channel**: This declares the update strategy tied to versions of OpenShift. 
+2. The **desired version**: This is the target version the cluster should be updated to.
+
+To get the current clusterversion you can use the following command:
+
+[source,bash]
+----
+❯ oc get clusterversion
+NAME      VERSION   AVAILABLE   PROGRESSING   SINCE   STATUS
+version   4.14.1    True        False         4m38s   Cluster version is 4.14.1
+----
+
+Here we can see that the version is currently **4.14.1** and no upgrade is currently progressing. 
+
+Now we want to update to the latest possible version.
+
+
+== Where to find the available updates?
+
+Before you start the update, you will need to fetch the possible available updates. 
+
+This information can be gathered with the command `oc adm upgrade` or `oc get clusterversion/version -o yaml`. 
+
+The output will look like the following:
+
+[source,yaml]
+----
+Cluster version is 4.14.1 
+Upstream is unset, so the cluster will use an appropriate default.
+Channel: stable-4.14 (available channels: candidate-4.14, eus-4.14, fast-4.14, stable-4.14, candidate-4.15, fast-4.15, stable-4.15) <1>
+Recommended updates: <2>
+  VERSION     IMAGE
+  4.14.27     quay.io/openshift-release-dev/ocp-release@sha256:4d30b359aa6600a89ed49ce6a9a5fdab54092bcb821a25480fdfbc47e66af9ec
+  4.14.26     quay.io/openshift-release-dev/ocp-release@sha256:4fe7d4ccf4d967a309f83118f1a380a656a733d7fcee1dbaf4d51752a6372890
+  [...]
+----
+<1> Current Channel and available channels
+<2> List of available updates
+
+The command describes the current channel (stable-4.14) and a list of possible updates. 
+(The list is much longer). 
+
+The latest available version is **4.14.27** and the list of possible channels is all the 4.14 channels, but also 4.15 channels. This means we could change the channel here as well.
+
+CAUTION: It is your responsibility to find the **correct and supported upgrade paths**. Not all upgrades to any version are supported. Also, do not rely on consecutive path numbers, some versions were never available.
+
+=== Channels
+
+Channels help users to define the timing and level of support for their environment. The following channels typically exist:
+
+. **fast**: This channel is fully supported but not yet fully tested and can be used to quickly update to the latest GA release. For example, when a certain bug is triggered in the current version.
+. **stable**: This is the latest stable version. Versions here are added after enough data points have been collected and therefore have some delay. 
+. **candidate**: This channel offers **unsupported** early access to specific versions.
+. **eus**: All even-numbered versions offer an Externed Update Support (EUS) channel. They allow EUS-to-EUS updates and have a longer support phase. 
+
+== Helm Chart - update-clusterversion
+
+Now we want to update the version to the latest of the current channel **4.14.27** and change the channel to **stable-4.15**. 
+The Helm Chart https://github.com/tjungbauer/helm-charts/tree/main/charts/update-clusterversion[update-clusterversion^] has been created to help with a cluster update. 
+
+It will modify the clusterversion resource. 
+
+The required values are quite simple: 
+
+[source,yaml]
+----
+channel: stable-4.15
+desiredVersion: 4.14.27
+image: ''
+----
+
+CAUTION: Be sure that you choose the correct and available updates.
+
+This is everything we need. As soon as this is synchronized into the cluster, the update process will be started by the cluster.
+
+== GitOps Synchronization
+
+When we verify the current version in the OpenShift UI, we will see the possibility of an upgrade:
+
+.Cluster before the update process starts
+image::clusterversion.png?width=720px[Cluster before the update process starts]
+
+In OpenShift GitOps we have the Application to start the update process:
+
+.Syncing new version
+image::clusterversion-sync.png?width=720px[Syncing new version]
+
+After a few seconds OpenShift will start with the update:
+
+.Progressing Cluster Update
+image::clusterversion-update-progressing.png?width=720px[Progressing Cluster Update]
+
+This can also be verified via the command line
+
+[source,bash]
+----
+❯ oc get clusterversion
+NAME      VERSION   AVAILABLE   PROGRESSING   SINCE   STATUS
+version   4.14.1    True        True          95s     Working towards 4.14.27: 116 of 860 done (13% complete), waiting on etcd, kube-apiserver
+----
+
+Eventually, the cluster update process finishes successfully. We are now on version **4.14.27** and using the channel **stable-4.15**.
+
+We can see that the next upgrade with be to version 4.15.15. This means we can directly upgrade to this version. This is possible because we switched the channel to stable-4.15.
+
+Other channels, like candidate-4.15 might offer different, but not recommended, versions.
+
+[source,bash]
+----
+❯ oc adm upgrade
+Cluster version is 4.14.27
+
+Upstream is unset, so the cluster will use an appropriate default.
+Channel: stable-4.15 (available channels: candidate-4.14, candidate-4.15, eus-4.14, fast-4.14, fast-4.15, stable-4.14, stable-4.15)
+
+Recommended updates:
+
+  VERSION     IMAGE
+  4.15.15     quay.io/openshift-release-dev/ocp-release@sha256:bb1182cd9001d6811dea8c5823235c17b9a316cce3bb13c51325250c14b46787
+----
+
+=== What about the SHA for the image? 
+
+The SHA for the image field in the ClusterVersion resource is required in certain scenarios to provide a precise reference to the container image that represents the OpenShift version you want to update to. 
+
+Such scenarios could be for example: 
+
+. Offline or Restricted Networks
+In environments where clusters are running in offline or restricted network conditions, specifying the exact image SHA ensures that the cluster updates to a specific, known image that has been pre-pulled and is available within the network.
+
+. Precise Version Control
+Using the SHA ensures that the exact image version is used for the update, providing a higher level of precision and control.
+
+. Custom or Private Registries
+If you are using custom or private container registries, specifying the image SHA can help avoid ambiguities and ensure that the correct image is pulled from the correct registry.
+
+. Specific Compliance or Security Requirements
+Some regulations might require precise specification of container images, including SHAs, to ensure traceability and verifiability of the software components being deployed.
+
+
+== Conclusion
+
+With this very simple method, it is easy to manage the version of multiple clusters via GitOps. Especially, where there is a bigger cluster fleet it will become essential to ensure which cluster has which version. 
+Disconnected environments can also use the **image** setting to specify the exact SHA of an available update. 
+
+The current Helm Chart is very small and limited. It was created to quickly show the main use case: a simple and straightforward cluster upgrade.
+
+Other possible options that might be required in the future. If you find anything missing, please let me know.
+
+Please note, to always verify which version and channel is available and always consult the official documentation before an upgrade to find the latest release notes.
+
+. References: https://docs.openshift.com/container-platform/4.15/updating/understanding_updates/intro-to-updates.html[Updating Clusters^]
