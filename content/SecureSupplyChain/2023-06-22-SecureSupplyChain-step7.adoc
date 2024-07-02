@@ -178,7 +178,7 @@ spec:
 spec:
   params:
     ...
-   - name: CYCLONEDX_HOST_URL <1>
+    - name: CYCLONEDX_HOST_URL <1>
       type: string
   tasks:
   ...
