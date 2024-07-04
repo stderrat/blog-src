@@ -46,7 +46,8 @@ This series includes the following articles:
 . link:/gitopscollection/2024-05-17-configure-minio-buckets/[Configure Buckets in MinIO using GitOps]
 . link:/gitopscollection/2024-05-19-install-openshift-logging/[Installing OpenShift Logging using GitOps]
 . link:/gitopscollection/2024-06-02-multisources-for-application-in-argocd/[Multiple Sources for Applications in Argo CD]
-
+. link:/gitopscollection/2024-06-07-update-cluster-version-with-gitops/[Update Cluster Version]
+. link:/gitopscollection/2024-07-04-managing-certificates-with-gitops/[Managing Certificates]
 
 
 WARNING: In this series, I will focus on cluster configuration.

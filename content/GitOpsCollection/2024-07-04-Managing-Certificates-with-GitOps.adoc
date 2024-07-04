@@ -1,0 +1,369 @@
+--- 
+title: "Managing Certificates using GitOps approach"
+description: "Managing Certificates using a GitOps approach."
+date: "2024-07-04"
+doctype: book
+
+authors: [Thomas Jungbauer]
+type: post
+draft: false
+categories:
+   - OpenShift
+   - GitOps
+tags: ["Application", "OpenShift", "OCP", "GitOps", "Argo CD", "ApplicationSet", "Cert-Manager", "Certificates", "Route53"] 
+
+aliases: [ 
+	 "/posts-output/2024-07-04-manage-certificate/",
+] 
+---
+
+:imagesdir: /gitopscollection/images/
+:icons: font
+:toc:
+
+The article https://blog.stderr.at/openshift/2023/02/ssl-certificate-management-for-openshift-on-aws/[SSL Certificate Management for OpenShift on AWS] explains how to use the *Cert-Manager Operator* to request and install a new SSL Certificate. 
+This time, I would like to leverage the GitOps approach using the Helm Chart https://github.com/tjungbauer/helm-charts/tree/main/charts/cert-manager[cert-manager^] I have prepared to deploy the Operator and order new Certificates. 
+
+I will use an ACME Letsencrypt issuer with a DNS challenge. My domain is hosted at AWS Route 53. 
+
+However, any other integration can be easily used.
+
+<!--more--> 
+
+== Before we start
+
+WARNING: Before we start, be sure that Route 53 is configured correctly. The required settings and commands are described at https://blog.stderr.at/openshift/2023/02/ssl-certificate-management-for-openshift-on-aws/#_configure_an_aws_user_for_accessing_route_53[Configure an AWS User for Accessing Route 53^]
+
+== Deploy the Operator
+
+The first step is to deploy the Operator to our cluster. This is done using GitOps and the Helm Chart is located at my Helm repository: https://github.com/tjungbauer/openshift-clusterconfig-gitops/tree/main/clusters/management-cluster/cert-manager
+
+The configuration looks like below. It takes care to:
+
+. Deploy the Operator *cert-manager-operator*
+. Verify if the Operator has been deployed successfully
+. Configure Cert-Manager
+.. Create a ClusterIssuer using route53 integration. (You can configure any other configuration too)
+.. Patch the Operator with "overrideArgs". This is required for AWS Route 53 where we need to define which DNS resolvers shall be used.
+
+All these settings are handed over to the appropriate sub-charts. Like https://github.com/tjungbauer/helm-charts/tree/main/charts/helper-operator[helper-operator^], https://github.com/tjungbauer/helm-charts/tree/main/charts/helper-status-checker[helper-status-checker^] and https://github.com/tjungbauer/helm-charts/tree/main/charts/cert-manager[cert-manager^]
+
+[source,yaml]
+----
+# Install Operator Compliance Operator
+# Deploys Operator --> Subscription and Operatorgroup
+# Syncwave: 0
+helper-operator: <1>
+  operators:
+    compliance-operator:
+      enabled: true
+      syncwave: '0'
+      namespace:
+        name: cert-manager-operator
+        create: true
+      subscription:
+        channel: stable-v1
+        approval: Automatic
+        operatorName: openshift-cert-manager-operator
+        source: redhat-operators
+        sourceNamespace: openshift-marketplace
+      operatorgroup:
+        create: true
+        notownnamespace: false
+
+helper-status-checker: <2>
+  enabled: true
+
+  checks:
+    - operatorName: cert-manager-operator
+      namespace:
+        name: cert-manager-operator
+      serviceAccount:
+        name: "status-checker-cert-manager"
+
+cert-manager: <3>
+  certManager:
+    enable_patch: true
+
+    overrideArgs: <4>
+      - '--dns01-recursive-nameservers-only'
+      - --dns01-recursive-nameservers=ns-362.awsdns-45.com:53,ns-930.awsdns-52.net:53
+
+  issuer: <5>
+    - name: letsencrypt-prod
+      type: ClusterIssuer
+      enabled: true
+      syncwave: 20
+
+      acme:
+        email: tjungbau@redhat.com
+
+        solvers:
+          - dns01: <6>
+              route53:
+                accessKeyIDSecretRef:
+                  key: access-key-id
+                  name: prod-route53-credentials-secret
+                region: us-west-1
+                secretAccessKeySecretRef:
+                  key: secret-access-key
+                  name: prod-route53-credentials-secret
+            selector:
+              dnsZones:
+                - aws.ispworld.at
+----
+<1> Installing the Operator
+<2> Verify if the Operator has been successfully deployed
+<3> Configure the Cert-Manager Operator
+<4> Override the DNS resolver args
+<5> Configure the ClusterIssuer
+<6> Use the solver dns01.route53.
+
+NOTE: Verify the README of the Helm Chart https://github.com/tjungbauer/helm-charts/tree/main/charts/cert-manager[cert-manager^] for additional possibilities in the configuration.
+
+One additional piece is missing before we can finally start the deployment. 
+
+As you can see in the values file above the *accessKey* and *secretAccessKey* are stored in the secret named _prod-route53-credentials-secret_.
+
+This means, that a secret is required with the keys that have been provided by AWS when you configured the Route 53 access:
+
+[source,yaml]
+----
+kind: Secret
+apiVersion: v1
+metadata:
+  name: prod-route53-credentials-secret
+  namespace: cert-manager <1>
+data:
+  access-key-id: <AccessKey>
+  secret-access-key: <Secret Access Key>
+type: Opaque
+----
+<1> Namespace of the Secret, here the Operator is managing the Certificate Controller.
+
+I stored this Secret as SealedSecret and put it into the https://github.com/tjungbauer/openshift-clusterconfig-gitops/tree/main/clusters/management-cluster/cert-manager[cluster configuration folder^]. From here, Argo CD will pick it up and deploy it.
+
+CAUTION: Never, never ever store a Secret object directly in Git. Secret objects are not encrypted but encoded. Everybody could decode the data. With Sealed Secrets or any other Secret Management, you are able to prepare these objects and store or retrieve them.
+
+Finally, with these settings, the Operator can be deployed. This is managed by OpenShift GitOps (Argo CD). As soon as the Operator is ready, we can start requesting certificates as we automatically created the *ClusterIssuer* (letsencrypt-prod)
+
+.Deploying and Configuring Cert-Manager Operator
+image::cert-manager.png?width=640px[Deploying and Configuring Cert-Manager Operator]
+
+Two certificates are of special interest :
+
+. Default IngressController of OpenShift
+. OpenShift's API
+
+Therefore, let's request and configure them. 
+
+== Requesting a Certificate
+
+The chart https://github.com/tjungbauer/helm-charts/tree/main/charts/cert-manager[cert-manager^] can render a Certificate resource as well. I tried to support any possible setting. However, not everything, especially the non-stable ones, is available yet. 
+
+The official Cert-Manager documentation explains how to create such https://cert-manager.io/docs/usage/certificate/[Certificate Resource^].
+
+The chart https://github.com/tjungbauer/helm-charts/blob/main/charts/cert-manager/values.yaml#L112-L269[README^] explains which settings are supported by the chart. 
+
+Not every setting is required and some will set default values. The minimum parameters are: name, namespace, secretName, dnsNames and reference to an issuer. 
+
+=== Requesting IngressController Certificate
+
+The default IngressController of OpenShift listens on the wildcard domain *.apps.clustername.basedomain. In my examples, you will see *.apps.ocp.aws.ispworld.at
+
+The IngressController configuration must be modified to reference the Secret object the cert-manager will generate once the Certificate has been successfully requested. The cluster configuration https://github.com/tjungbauer/openshift-clusterconfig-gitops/blob/main/clusters/management-cluster/ingresscontroller/values.yaml[Ingresscontroller^] defines the required parameters:
+
+[source,yaml]
+----
+---
+# -- Define ingressControllers
+# Multiple might be defined.
+ingresscontrollers: <1>
+    # -- Name of the IngressController. OpenShift initial IngressController is called 'default'.
+  - name: default
+
+    # -- Enable the configuration
+    # @default -- false
+    enabled: true
+
+    # -- Number of replicas for this IngressController
+    # @default -- 2
+    replicas: 3
+
+    # -- The name of the secret that stores the certificate information for the IngressController
+    # @default -- N/A
+    defaultCertificate: router-certificate <2>
+
+    # -- Bind IngressController to specific nodes
+    # Here as example for Infrastructure nodes.
+    # @default -- empty
+    #nodePlacement:
+
+      # NodeSelector that shall be used.
+    #  nodeSelector: <3>
+    #    key: node-role.kubernetes.io/infra
+    #    value: ''
+
+    #  # -- Tolerations, required if the nodes are tainted.
+    #  tolerations:
+    #    - effect: NoSchedule
+    #      key: node-role.kubernetes.io/infra
+    #      operator: Equal
+    #      value: reserved
+    #    - effect: NoExecute
+    #      key: node-role.kubernetes.io/infra
+    #      operator: Equal
+    #      value: reserved
+
+certificates:
+  enabled: true
+
+  # List of certificates
+  certificate: <4>
+    - name: router-certificate
+      enabled: true
+      namespace: openshift-ingress
+      syncwave: "0"
+      secretName: router-certificate <5>
+
+      dnsNames: <5>
+        - apps.ocp.aws.ispworld.at
+        - '*.apps.ocp.aws.ispworld.at'
+
+      # Reference to the issuer that shall be used.
+      issuerRef: <6>
+        name: letsencrypt-prod
+        kind: ClusterIssuer
+----
+<1> Configuration for the IngressController
+<2> Reference to the Secret that will store the Certificate
+<3> Optional tolerations that can be configured for the IngressController
+<4> List of Certificates to order
+<5> List of domainnames for the IngressController. Here 2 are used, the wildcard domain and the base domain of that wildcard.
+<6> Reference to the issuer (in this case ClusterIssuer) 
+
+
+This will request the Certificate:
+
+[source,yaml]
+----
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: router-certificate
+  namespace: openshift-ingress
+spec:
+  dnsNames:
+    - apps.ocp.aws.ispworld.at
+    - '*.apps.ocp.aws.ispworld.at'
+  duration: 2160h0m0s
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-prod
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS1
+    rotationPolicy: Always
+  secretName: router-certificate
+----
+
+NOTE: It may take a while until the Certificate request is approved.
+
+The IngressController will update the reference to the secret and restart the ingress pods:
+
+[source,yaml]
+----
+apiVersion: operator.openshift.io/v1
+kind: IngressController
+metadata:
+  name: default
+  namespace: openshift-ingress-operator
+spec:
+[...]
+  defaultCertificate:
+    name: router-certificate
+----
+
+Once all pods have been successfully restarted, open a new browser, or reload or open a private window to verify the certificate that is provided by the application. 
+
+
+=== Requesting APIServer Certificate
+
+Requesting the certificate for the OpenShift API follows the same rules as for the IngressController. 
+The example can be found at: https://github.com/tjungbauer/openshift-clusterconfig-gitops/blob/main/clusters/management-cluster/clusterconfig-apiserver/values.yaml[Clusterconfig APIServer^]
+
+The values file may look like the following for example:
+
+NOTE: In this case, not only the Certificate is requested but the ETCD encryption is also enabled. The reason for that is, that both settings are done in the same Kubernetes resource (apiserver). If we split this up into 2 Argo CD Applications one of them will always show a warning that the same resource is managed by another Argo CD Application.
+
+[source,yaml]
+----
+---
+# -- Using subchart generic-cluster-config
+generic-cluster-config:
+  apiserver: <1>
+    enabled: true
+
+    # audit configuration
+    audit:
+      profile: Default
+
+    # Configure a custom certificate for the API server
+    custom_cert:
+      enabled: true
+
+      cert_names: <2>
+        - api.ocp.aws.ispworld.at
+
+      secretname: api-certificate <3>
+
+    etcd_encryption: <4>
+      enabled: true
+      encryption_type: aesgcm <5>
+
+      # -- Namespace where Job is executed that verifies the status of the encryption
+      namespace: kube-system
+
+      serviceAccount:
+        create: true
+        name: "etcd-encryption-checker" <6>
+
+cert-manager: <7>
+  enabled: true
+
+  certificates:
+    enabled: true
+
+    # List of certificates
+    certificate:
+      - name: api-certificate
+        enabled: true
+        namespace: openshift-config
+        syncwave: "0"
+        secretName: api-certificate
+
+        dnsNames:
+          - api.ocp.aws.ispworld.at
+
+        # Reference to the issuer that shall be used.
+        issuerRef:
+          name: letsencrypt-prod
+          kind: ClusterIssuer
+----
+<1> Settings for the APIServer object.
+<2> The name of the domain the certificate will be responsible for.
+<3> Reference to the Secret that will store the Certificate
+<4> Enable ETCD encryption
+<5> Tpee of encryption
+<6> Service Account that will be created and used by a Job that will verify when and if the encryption has been finished successfully.
+<7> Settings for the Certificate. Similar to the settings of the IngressController.
+
+The configuration is more or less similar to the IngressController. Again the APIServer will restart and once done, the Certificate is used by the cluster.
+
+== Conclusion
+
+With this, very short, article I have tried to easily explain how to deploy the Cert-Manager Operator and request Certificates. Different Helm Charts are used, but the main one is https://github.com/tjungbauer/helm-charts/tree/main/charts/cert-manager[cert-manager^]. 
+
+The cluster configuration repository https://github.com/tjungbauer/openshift-clusterconfig-gitops then use this chart to configure the required resources. 
+
+With the support of this Helm Chart anybody in the Cluster can request Certificates which are then managed by the Cert-Manager Operator.
