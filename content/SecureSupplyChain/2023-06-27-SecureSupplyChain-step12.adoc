@@ -72,7 +72,7 @@ spec:
         quay.io/placeholder/test:latest
       name: image
       type: string
-    - default: 'quay.io/tjungbau/pipeline-tools:v1.0.0'
+    - default: 'quay.io/tjungbau/pipeline-tools:v1.1.0'
       name: pipelinetoolsImage
       type: string
   steps:
