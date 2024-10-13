@@ -260,7 +260,7 @@ patches:
 This 2nd patch will completely remove the /spec/path from the Route object named _my-route_.
 
 == Further information: 
-* Example, which was the base of my patch: https://github.com/gitops-examples/argocd-operator-customization/tree/main/plugin-sidecar[Plugin Sidecar]
+* Example, which was the base of my patch: https://github.com/gitops-examples/argocd-operator-customization/tree/main/plugin-sidecar[Plugin Sidecar^]
 * G.Nunn's tools image (Thanks for everything):  https://quay.io/repository/gnunn/tools 
  
 
