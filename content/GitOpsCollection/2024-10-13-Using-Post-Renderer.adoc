@@ -71,10 +71,11 @@ This injection is usually a good idea, since we do not want to define certificat
 apiVersion: route.openshift.io/v1 
 kind: Route 
 metadata: 
-  annotations: 
+  annotations: <1>
     cert-manager.io/cluster-issuer: my-issuer 
     cert-utils-operator.redhat-cop.io/certs-from-secret: my-certificate 
 ----
+<1> Two annotations shall be added to the Route object.
 
 NOTE: In this example certificates have to be ordered. No wildcard certificate is available.
 
@@ -94,19 +95,22 @@ kind: Kustomization
 namespace: my-namespace 
  
 resources: 
-  - ./all.yaml 
+  - ./all.yaml <1>
  
 patches: 
   - patch: | 
-      - op: add 
+      - op: add  <2>
         path: /metadata/annotations 
         value: 
           cert-manager.io/cluster-issuer: my-issuer 
           cert-utils-operator.redhat-cop.io/certs-from-secret: my-certificate 
     target: 
       kind: Route 
-      name: my-route 
+      name: my-route <3>
 ----
+<1> The all.yaml file will be created by the helm template command.
+<2> Add the annotations to the Route object.
+<3> The name of the Route object.
 
 This will patch the Route object. You can test this locally by execute the command:
 *helm template . > all.yaml && kustomize build && rm all.yaml* 
@@ -129,17 +133,21 @@ data:
     apiVersion: argoproj.io/v1alpha1 
     kind: ConfigManagementPlugin 
     metadata: 
-      name: my-cmp-plugin 
+      name: my-cmp-plugin <1>
     spec: 
       version: v1.0 
-      init: 
+      init: <2>
         command: [sh, -c, 'echo "Initializing my-plugin-cmp..."', 'helm dependency build || true'] 
-      generate: 
+      generate: <3>
         command: [sh, -c, "helm template . --name-template $ARGOCD_APP_NAME --namespace $ARGOCD_APP_NAMESPACE --include-crds > all.yaml && kustomize build"] 
-      discover: 
+      discover: <4>
         find: 
           glob: "**/my-cmp-plugin" 
 ----
+<1> The name of the plugin.
+<2> The init command will be executed once, when the plugin is loaded.
+<3> The generate command will be executed every time the plugin is called.
+<4> The discovery command will be executed to find the plugin.
 
 This will execute the command to generate a helm template, pipe the output into all.yaml and let Kustomize patch the output.  
 The "discovery" part is looking for a specific file in the repository. I thought this might be useful to pin down this plugin to specific repositories only.  
@@ -163,20 +171,20 @@ metadata:
 spec: 
 [...] 
   repo: 
-    - configMap: 
+    - configMap: <1>
         name: my-cmp-plugin 
       name: my-cmp-plugin 
-    sidecarContainers: 
+    sidecarContainers: <2>
       - name: my-cmp-plugin 
         command: [/var/run/argocd/argocd-cmp-server] 
         env: 
           - name: APP_ENV 
             value: prod 
-        image: quay.io/gnunn/tools:latest 
+        image: quay.io/gnunn/tools:latest <3>
         imagePullPolicy: Always 
         securityContext: 
           runAsNonRoot: true 
-        volumeMounts: 
+        volumeMounts: <4>
           - mountPath: /var/run/argocd 
             name: var-files 
           - mountPath: /home/argocd/cmp-server/plugins 
@@ -186,7 +194,16 @@ spec:
           - mountPath: /home/argocd/cmp-server/config/plugin.yaml 
             subPath: plugin.yaml 
             name: my-cmp-plugin 
+    volumes: <5>
+      - configMap:
+          name: cloudbees-cmp-plugin
+        name: cloudbees-cmp-plugin
 ----
+<1> The name of the ConfigMap that was created in step 2.
+<2>  The sidecar container specification.
+<3>  The image that is used for the sidecar container.
+<4>  The volume mounts for the sidecar container.
+<5>  The volumes for the sidecar container.
 
 As soon as the repo Pod has been patched a 2nd container inside the Pod will be started as a sidecar. This will take the ConfigMap that was created in step 2 and mount it. As soon as a repo is found where this patch shall be executed, Argo CD will perform the actions defined in the ConfigMap, resulting in the output of the helm template and the patched output of Kustomize.
 
@@ -198,7 +215,7 @@ kind: Route
 metadata: 
   name: my-route 
   namespace: my-namespace 
-  annotations:
+  annotations: <1>
     cert-manager.io/cluster-issuer: my-issuer 
     cert-utils-operator.redhat-cop.io/certs-from-secret: my-certificate 
 spec: 
@@ -214,6 +231,7 @@ spec:
     weight: 100 
   wildcardPolicy: None 
 ----
+<1> The annotations that are added to the Route.
 
 This is it; this will patch our resource. Such post-renderer can be used for other patches as well. For example, to remove certain items from an object.  
 
@@ -250,12 +268,13 @@ patches:
         value: 
           cert-manager.io/cluster-issuer: my-issuer 
           cert-utils-operator.redhat-cop.io/certs-from-secret: my-certificate 
-      - op: remove 
+      - op: remove <1>
         path: /spec/path 
     target: 
       kind: Route 
       name: my-route 
 ----
+<1> The patch that removes the path.
 
 This 2nd patch will completely remove the /spec/path from the Route object named _my-route_.
 
