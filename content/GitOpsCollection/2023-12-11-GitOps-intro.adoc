@@ -48,7 +48,7 @@ This series includes the following articles:
 . link:/gitopscollection/2024-06-02-multisources-for-application-in-argocd/[Multiple Sources for Applications in Argo CD]
 . link:/gitopscollection/2024-06-07-update-cluster-version-with-gitops/[Update Cluster Version]
 . link:/gitopscollection/2024-07-04-managing-certificates-with-gitops/[Managing Certificates]
-
+. link:/gitopscollection/2024-10-13-using-post-renderer/[Using Kustomize to post render a Helm Chart]
 
 WARNING: In this series, I will focus on cluster configuration.
 

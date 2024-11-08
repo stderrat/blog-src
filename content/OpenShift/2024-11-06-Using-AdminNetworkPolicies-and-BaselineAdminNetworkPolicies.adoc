@@ -1,0 +1,516 @@
+--- 
+title: "Introducting AdminNetworkPolicies"
+description: "Introducting AdminNetworkPolicies"
+date: "2024-11-06"
+doctype: book
+
+authors: [Thomas Jungbauer]
+type: post
+draft: false
+categories:
+   - OpenShift
+   - Security
+   - Network
+tags: ["OpenShift", "OCP", "Security", "NetworkPolicies", "Helm", "AdminNetworkPolicy", "BaselineAdminNetworkPolicy"] 
+
+aliases: [ 
+	 "/posts-output/2024-11-06-anp-and-banp/",
+] 
+---
+
+:imagesdir: /openshift/images/
+:icons: font
+:toc:
+
+
+Classic Kubernetes/OpenShift offer a feature called NetworkPolicy that allows users to control the traffic to and from their assigned Namespace.
+NetworkPolicies are designed to give project owners or tenants the ability to protect their own namespace. Sometimes, however, I worked with customers where the 
+cluster administrators or a dedicated (network) team need to enforce these policies.
+
+Since the NetworkPolicy API is namespace-scoped, it is not possible to enforce policies across namespaces. The only solution was to create custom (project) admin and edit 
+roles, and remove the ability of creating, modifying or deleting NetworkPolicy objects. Technically, this is possible and easily done. But shifts the whole network security to cluster administrators.
+
+Luckily, this is where *AdminNetworkPolicy* (ANP) and *BaselineAdminNetworkPolicy* (BANP) comes into play.
+
+<!--more--> 
+
+## AdminNetworkPolicy (ANP) and BaselineAdminNetworkPolicy (BANP)
+
+NOTE: This article demonstrates the configuration of the new AdminNetworkPolicy and BaselineAdminNetworkPolicy objects using the Helm Chart https://github.com/tjungbauer/helm-charts/tree/main/charts/admin-networkpolicies[admin-networkpolicies^]. The NetworkPolicy object is not covered in this article.
+
+ANP and BANP are designed for cluster administrators to protect the entire cluster by creating **cluster-scoped policies**. They are not replacing NetworkPolicies, 
+but instead create a tier model and can be used together. Administrators can use ANPs to enforce non-overridable policies that take precedence over NetworkPolicy objects. 
+Administrators can use BANP to set up and enforce optional cluster-scoped network policy rules that are overridable by users using NetworkPolicy objects when necessary. 
+When used together, ANP, BANP, and network policy can achieve full multi-tenant isolation that administrators can use to secure their cluster.
+
+The three resources create a 3-Tier Access Control List (ACL) that is evaluated in descending order: 
+
+* Tier 1 - AdminNetworkPolicy (ANP): If the traffic matches an **allow** or **deny** rule, then any existing 
+NetworkPolicy and BaselineAdminNetworkPolicy (BANP) objects in the cluster are skipped from evaluation. If a **pass** rule is matched, then the evaluation is handed over to
+the next tier (NetworkPolicy). This means, that Cluster Administrators can enforce policies that cannot be overwritten by users (allow/deny rules) or pass the evaluation to the Network Policy, 
+where the project owners can decide further.
+
+* Tier 2 - NetworkPolicy (NP): If the traffic passed the ANP then the NetworkPolicy is evaluating the traffic. The NetworkPolicy resources are controlled by the project owners by default.
+
+* Tier 3 - BaselineAdminNetworkPolicy (BANP): If the traffic passed the ANP and the NetworkPolicy, then the BANP is evaluating the traffic. 
+These objects are controlled by the cluster administrators again and are cluster scoped. There can only be one BANP (named "default") configured on the cluster.
+
+## AdminNetworkPolicy
+
+An AdminNetworkPolicy (ANP) is a cluster-scoped resource, that allow cluster administrators to secure the network traffic **before** NetworkPolicies in the namespaces are evaluated. 
+These rules cannot be overwritten by project owners or developers and allow the administrators to enforce the security. Use cases could be, for example:
+
+* You want to enforce only specific egress endpoints (e.g. only allow traffic to the specific database servers)
+* You want to be sure that traffic from OpenShift monitoring is always allowed
+* You want to allow the management of NetworkPolicies to project owners and do not want to take care for them or during the onboarding.
+
+The ANP allows cluster administrators to define:
+
+* A priority value that determines the order of its evaluation. The lower the value the higher the precedence.
+* A set of pods that consists of a set of namespaces or namespace on which the policy is applied.
+* A list of ingress rules to be applied for all ingress traffic towards the subject.
+* A list of egress rules to be applied for all egress traffic from the subject.
+
+
+## AdminNetworkPolicy Actions for Rules
+
+The AdminNetworkPolicy allows three actions for the rules: 
+
+* *Allow*: The traffic is allowed, and no further rules are evaluated.
+* *Deny*: The traffic is denied, and no further rules are evaluated.
+* *Pass*: The traffic is passed to the next tier (NetworkPolicy).
+
+## Subject of a Policy
+
+In any ANP (or BANP) a **subject** can be defined and they specify the pods to which this AdminNetworkPolicy applies. (Note that host-networked pods are not included in subject.selection.) There are two ways to define the subject:
+
+. *namespaces*: The namespaces block is used to select pods via namespace selectors. Here, *matchLabels* or *matchExpressions* can be used to limit the namespaces.
+. *pods*: The Pods-Array is used to select pods via namespace AND pod selectors. Here *namespaceSelector* and *podSelector* can be set to limit the Pods.
+
+If **subject** is not defined, the policy applies to all pods and namespaces in the cluster.
+
+In my Helm chart the options are supported like the following snippets show:
+
+### Select Namespaces with matchExpressions
+
+Values in the Helm Chart:
+
+[source,yaml]
+----
+anp:
+  - name: sample-anp-rule-1
+    enabled: true
+    priority: 50
+
+    subject:
+      matchNamespaces: <1>
+        matchExpressions: <2>
+          - key: kubernetes.io/metadata.name
+            operator: NotIn
+            values:
+              - kube-system
+              - openshift*
+              - default
+              - kubde-info
+----
+<1> matchNamespaces is used to select namespaces
+<2> matchExpressions is used to select namespaces with *matchExpressions*. In this example all namespaces that do not match (operator == NotIn) the values, so all namespaces except "kube-system, kube-info, default and openshift*" are selected.
+
+This will result in the following AdminNetworkPolicy snippet:
+
+[source,yaml]
+----
+  subject:
+    namespaces:
+      matchExpressions:    
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values:
+            - "kube-system"
+            - "openshift*"
+            - "default"
+            - "kubde-info"
+----
+
+### Select Namespaces with matchLabels
+
+Values in the Helm Chart:
+
+[source,yaml]
+----
+anp:
+  - name: sample-anp-rule-1
+    enabled: true
+    priority: 5
+
+    subject:
+      matchNamespaces: <1>
+        matchLabels: <2>
+          apps: my-apps
+          tenant: my-tenant
+----
+<1> matchNamespaces is used to select namespaces
+<2> *matchLabels* is used to select namespaces based on labels. In this example, all namespaces that have the labels "apps: my-apps" and "tenant: my-tenant" are selected.
+
+This will result in the following AdminNetworkPolicy snippet:
+
+[source,yaml]
+----
+spec:
+  priority: 5
+  subject:
+    namespaces:    
+      matchLabels:
+        apps: "my-apps"
+        tenant: "my-tenant"
+----
+
+### Select Pods with podSelectors and namespaceSelectors
+
+Values in the Helm Chart:
+
+[source,yaml]
+----
+anp:
+  - name: sample-anp-rule-1
+    enabled: true
+    priority: 5
+
+    subject:
+      matchPods:
+        - pods: <1>
+            namespaceSelector: <2>
+              labels:
+                kubernetes.io/metadata.name: openshift-dns
+            podSelector: <3>
+              labels:
+                app: dns
+----
+<1> matchPods is used to select pods. Here a list of pods can be defined.
+<2> *namespaceSelector* is used to select namespaces based on labels. In this example all namespaces that have the label "kubernetes.io/metadata.name: openshift-dns" are selected.
+<3> *podSelector* is used to select pods based on labels. In this example all pods that have the label "app: dns" are selected.
+
+This will result in the following AdminNetworkPolicy snippet:
+
+[source,yaml]
+----
+  subject:
+    - pods:
+        namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: openshift-dns
+        podSelector:
+          matchLabels:
+            app: dns
+----
+
+## BaselineAdminNetworkPolicy
+
+BaselineAdminNetworkPolicy (BANP) is a cluster-scoped resource, that allow cluster administrators to secure the network traffic **after** NetworkPolicies in the namespaces have been evaluated. These rules can be overwritten by project owners or developers using NetworkPolicies.
+
+CAUTION: BANP is a singleton resource, meaning it can be defined only one time. Therefore, its name must be **default**. Moreover, the **priority** field is not required here.
+
+Use cases could be, for example:
+
+* Creating default rules, such as blocking any intra-cluster traffic by default. Users will need to explicitly use NetworkPolicy objects to allow known traffic.
+
+A BANP allows administrators to specify:
+
+* A subject that consists of a set of namespaces or namespace.
+* A list of ingress rules to be applied for all ingress traffic towards the subject.
+* A list of egress rules to be applied for all egress traffic from the subject.
+
+## BaselineAdminNetworkPolicy Actions for Rules
+
+The BaselineAdminNetworkPolicy allows two actions for the rules. They are like the AdminNetworkPolicy, except for the **pass** action, which does not make sense here as BANP is the last tier (nowhere to pass).
+
+* *Allow*: The traffic is allowed, and no further rules are evaluated.
+* *Deny*: The traffic is denied, and no further rules are evaluated.
+
+## Examples Examples Examples
+
+The following examples are taken directly from https://network-policy-api.sigs.k8s.io/blog/2024/01/30/getting-started-with-the-adminnetworkpolicy-api/[Kubernetes Blog: Getting started with the AdminNetworkPolicy API^] and https://docs.openshift.com/container-platform/4.16/networking/network_security/network-policy-apis.html[Official OpenShift Documentation^]. Verify the values-file of the https://github.com/tjungbauer/helm-charts/tree/main/charts/admin-networkpolicies[Helm Chart^] for the further examples.
+
+WARNING: I will show, how to configure them using the Helm Chart https://github.com/tjungbauer/helm-charts/tree/main/charts/admin-networkpolicies[admin-networkpolicies^] and the actual result. The chart is already configured with these examples and prepared to be used with GitOps/Argo CD.
+
+### Example 1: Allow all traffic from the OpenShift monitoring namespace
+
+Typically, it makes sense to allow the traffic from OpenShift Monitoring to all namespaces. After all, monitoring is useful :)
+The following example shows the possible configuration for the Helm Chart, which will render a valid ANP resource for us. It will allow ALL (including OpenShift internal Namespaces) traffic from the OpenShift monitoring namespace (labeled as `kubernetes.io/metadata.name: monitoring`).
+
+[source,yaml]
+----
+---
+anp:
+  - name: sample-anp-rule-1 <1>
+    enabled: true <2>
+    syncwave: 10
+    priority: 5 <3>
+
+    subject: {} <4>
+    ingress: <5>
+      - name: allow-ingress-from-monitoring <6>
+        enabled: true <7>
+        action: Allow <8>
+        peers: <9>
+          - type: namespaces
+            labels:
+              kubernetes.io/metadata.name: monitoring
+----
+<1> Name of the ANP
+<2> Enable or disable the ANP. If disabled, the ANP will not be created. (Default is `false`)
+<3> Priority of the ANP. The lower the value the higher the precedence. (Default is `50`)
+<4> Subject of the ANP. In this case, it is empty, which means all namespaces including OpenShift internal namespaces.
+<5> Ingress rules of the ANP. Here a list of ingress rules for this ANP can be defined
+<6> Name of the ingress rule
+<7> Enable or disable the ingress rule. If disabled, the particular ingress rule will not be created. (Default is `false`)
+<8> Action of the ingress rule. In this case, it is `Allow`, which means all traffic from the OpenShift monitoring namespace will be allowed. Other options are described at <<AdminNetworkPolicy Actions for Rules>>.
+<9> Peers of the ingress rule. In this case, all namespaces labeled as `kubernetes.io/metadata.name: monitoring` are allowed to access all namespaces.
+
+The ANP that will be created is the following. It is a valid ANP resource and can be applied to the cluster. (Typically applied by Argo CD)
+As described above it will allow incoming access from the OpenShift monitoring namespace to all namespaces.
+
+[source,yaml]
+----
+---
+apiVersion: policy.networking.k8s.io/v1alpha1
+kind: AdminNetworkPolicy
+metadata:
+  name: "sample-anp-rule-1"
+  labels:
+    helm.sh/chart: admin-networkpolicies-1.0.2
+    app.kubernetes.io/name: admin-networkpolicies
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  priority: 5
+  subject:
+    namespaces: {}
+  ingress:
+    - name: "allow-ingress-from-monitoring" 
+      action: "Allow"
+      from:    
+      - namespaces:    
+          matchLabels:
+            kubernetes.io/metadata.name: "monitoring"
+----
+
+### Example 2: Allow all traffic from labeled namespaces
+
+As a second example, we want to allow all traffic from namespaces that are labeled with `tenant: restricted` to all namespaces that are labeled with `anp: cluster-control-anp`.
+This is useful, if you want to restrict access to certain namespaces. However, the rule action is configured as **Pass** which means that the traffic will be allowed but might be further restricted by a NetworkPolicy in the tenant namespace.
+
+[source,yaml]
+----
+---
+anp:
+  - name: sample-anp-rule-2
+    enabled: true
+    priority: 5
+
+    subject:
+      matchNamespaces: <1>
+        matchLabels:
+          anp: cluster-control-anp <2> 
+
+    ingress:
+      - name: pass-from-restricted-tenants
+        enabled: true
+        action: Pass <3>
+        peers:
+          - type: namespaces <4>
+            labels:
+              tenant: restricted
+----
+<1> Subject of the ANP. In this case, we select based on labels.
+<2> Label selector for the namespaces. In this case, all namespaces that are labeled with `anp: cluster-control-anp` are subject of this ANP.
+<3> Action of the ingress rule. In this case, it is `Pass`, which means the traffic is allowed, but might be restricted by NetworkPolicies in the tenant namespace. Other options are described at <<AdminNetworkPolicy Actions for Rules>>.
+<4> Peers of the ingress rule. In this case, all namespaces labeled as `tenant: restricted` are allowed to access all namespaces.
+
+[source,yaml]
+----
+---
+apiVersion: policy.networking.k8s.io/v1alpha1
+kind: AdminNetworkPolicy
+metadata:
+  name: "sample-anp-rule-2"
+  labels:
+    helm.sh/chart: admin-networkpolicies-1.0.2
+    app.kubernetes.io/name: admin-networkpolicies
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  priority: 5
+  subject:
+    namespaces:    
+      matchLabels:
+        anp: "cluster-control-anp"
+  ingress:
+    - name: "pass-from-restricted-tenants" 
+      action: "Pass"
+      from:    
+      - namespaces:    
+          matchLabels:
+            tenant: "restricted"
+----
+
+### Example 3: Show possible peers settings
+
+The most important settings for the rules are the `peers` settings. The following examples show the snippets of possible peers. 
+For further information, please refer to the example in the values file: https://github.com/tjungbauer/helm-charts/blob/main/charts/admin-networkpolicies/values.yaml[Helm Chart Values with further examples^]
+
+NOTE: The following rules are examples of **EGRESS** rules.
+
+. Allow egress traffic *to namespaces labeled* splunk on ports 80 and 443:
+
+[source,yaml]
+----
+        peers:
+          - type: namespaces
+            labels:
+              tenant: splunk
+        ports:
+          - protocol: TCP
+            portNumber: 80
+          - portName: https
+----
+
+[start=2]
+. Allow egress traffic *to nodes* where the key "node-role.kubernetes.io/control-plane" exists *on the port 6443*:
+
+[source,yaml]
+----
+        peers:
+          - type: nodes
+            expr:
+              - key: node-role.kubernetes.io/control-plane
+                operator: Exists
+        ports:
+          - protocol: TCP
+            portNumber: 6443
+----
+
+[start=3]
+. Allow egress traffic *to pods* labeled "app: dns" *in the namespace* openshift-dns *on the port 53 and 5353*:
+
+[source,yaml]
+----
+        peers:
+          - type: pods
+            namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: openshift-dns
+            podSelector:
+              matchLabels:
+                app: dns
+
+        ports:
+          - protocol: TCP
+            port: 5353
+          - protocol: TCP
+            port: 53
+          - protocol: UDP
+            port: 53
+          - protocol: UDP
+            port: 5353
+----
+
+[start=4]
+. Allow egress traffic *to a list of IPs*:
+
+[source,yaml]
+----
+        peers:
+          - type: networks
+            ips:
+              - 172.29.0.0/30
+              - 10.0.54.0/19
+              - 10.0.56.38/32
+              - 10.0.69.0/24
+----
+
+[start=5]
+. Allows egress traffic *to a list of domain names* (*.kubernetes.io and kubernetes.io)
+
+[source,yaml]
+----
+        peers:
+          - type: domainNames
+            domains:
+              - '*.kubernetes.io'
+              - kubernetes.io
+----
+
+[start=6]
+. *Deny all egress traffic*. This should be the last rule when full egress traffic shall be disabled. This might also be put into the BANP.
+
+[source,yaml]
+----
+      - name: default-deny
+        enabled: true
+        action: Deny
+        peers:
+          - type: networks
+            ips:
+              - 0.0.0.0/0
+----
+
+### Example 4: BaselineAdminNetworkPolicy
+
+The BANP is more or less identical to ANP, except that you cannot define a "name" and a "priority". The following example creates a BANP that allows incoming and outgoing traffic to namespaces labeled "tenant-1".
+
+[source,yaml]
+----
+banp: <1> 
+  - enabled: true <2>
+    syncwave: 10
+
+    subject:
+      matchNamespaces:
+        matchLabels:
+          kubernetes.io/metadata.name: example.name
+
+    ingress:
+      - name: "deny-all-ingress-from-tenant-1"
+        enabled: true
+        action: Deny
+        peers:
+          - type: pods
+            namespaceSelector:
+              matchLabels:
+                custom-banp: tenant-1
+
+            podSelector:
+              matchLabels:
+                custom-banp: tenant-1
+
+    egress:
+      - name: allow-all-egress-to-tenant-1
+        enabled: true
+        action: Allow
+        peers:
+          - type: pods
+            namespaceSelector:
+              matchLabels:
+                custom-banp: tenant-1
+
+            podSelector:
+              matchLabels:
+                custom-banp: tenant-1
+----
+<1> Using the key *banp* (instead of *anp*)
+<2> No *name* or *priority* are defined here.
+
+## Further Information
+* https://github.com/tjungbauer/helm-charts/blob/main/charts/admin-networkpolicies/values.yaml[Helm Chart Values with further examples^]
+* https://docs.openshift.com/container-platform/4.16/networking/network_security/network-policy-apis.html[Official OpenShift Documentation^]
+* https://network-policy-api.sigs.k8s.io/blog/2024/01/30/getting-started-with-the-adminnetworkpolicy-api/[Kubernetes Blog: Getting started with the AdminNetworkPolicy API^]
+* https://network-policy-api.sigs.k8s.io/reference/spec/#policy.networking.k8s.io/v1alpha1.AdminNetworkPolicyEgressPeer[Kubernetes API Documentation^]
+
+
