@@ -1,6 +1,6 @@
 --- 
-title: "Introducting AdminNetworkPolicies"
-description: "Introducting AdminNetworkPolicies"
+title: "Introducing AdminNetworkPolicies"
+description: "Introducing AdminNetworkPolicies"
 date: "2024-11-06"
 doctype: book
 
