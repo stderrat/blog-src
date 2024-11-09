@@ -15,6 +15,7 @@ tags: ["OpenShift", "OCP", "Security", "NetworkPolicies", "Helm", "AdminNetworkP
 
 aliases: [ 
 	 "/posts-output/2024-11-06-anp-and-banp/",
+   "/openshift/2024/11/introducting-adminnetworkpolicies/",
 ] 
 ---
 
