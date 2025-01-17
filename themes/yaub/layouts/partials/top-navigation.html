@@ -5,7 +5,7 @@
               <section id="homelinks" class="text-align-center">
                 <ul class="list-no-style margin-0 padding-0 overflow-hidden text-align-left vertical-align-middle">
                   <li class="list-horizontal padding-left-15 padding-right-15">
-                    <a class="padding-topnav" href='{{ (cond (and (ne .Site.Params.landingPageURL nil) (.Site.IsMultiLingual)) .Site.Params.landingPageURL "/") }}'>{{ safeHTML (cond (ne .Site.Params.landingPageName nil) .Site.Params.landingPageName "<i class='fas fa-home'></i> Home") }}</a>
+                    <a class="padding-topnav" href='{{ (cond (and (ne .Site.Params.landingPageURL nil) (hugo.IsMultilingual)) .Site.Params.landingPageURL "/") }}'>{{ safeHTML (cond (ne .Site.Params.landingPageName nil) .Site.Params.landingPageName "<i class='fas fa-home'></i> Home") }}</a>
                   </li>
 
                 {{ $disableShortcutsTitle := .Site.Params.DisableShortcutsTitle}}
@@ -83,7 +83,7 @@
                 </div>
               </a>
                   {{ end }}
-            
+
                   <!-- Twitter -->
                   {{ if .Site.Params.social.share.twitter }}
               <a href="https://twitter.com/intent/tweet?hashtags=codingnconcepts&amp;url={{ .Permalink }}&amp;text={{ .Title }}" class="twitter no-highlight" aria-label="share on Twitter">
@@ -94,8 +94,8 @@
                 </div>
               </a>
                   {{ end }}
-            
-            
+
+
                   <!-- LinkedIn -->
                   {{ if .Site.Params.social.share.linkedin }}
               <a href="https://www.linkedin.com/shareArticle?mini=true&amp;url={{ $url }}&amp;source={{ $url }}&amp;title={{ $title }}&amp;summary={{ $title }}" class="linkedin no-highlight" aria-label="share on Linkedin">
@@ -106,7 +106,7 @@
                 </div>
               </a>
                   {{ end }}
-            
+
                   <!-- WhatsApp -->
                   {{ if .Site.Params.social.share.whatsapp }}
               <a href="whatsapp://send?text={{ $body }}" class="whatsapp  no-highlight" aria-label="share on Whatsapp">
@@ -117,7 +117,7 @@
                 </div>
               </a>
                   {{ end }}
-            
+
                   <!-- Email -->
                   {{ if .Site.Params.social.share.email }}
               <a href="mailto:?subject={{ .Site.Title }} - {{ $title }}.&amp;body={{ $body }}" class="email  no-highlight" aria-label="share on Email">
@@ -143,7 +143,7 @@
 
 
             </div>
-            
+
         </div>
 
 
