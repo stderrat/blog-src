@@ -1,4 +1,4 @@
---- 
+---
 title: "Introducing AdminNetworkPolicies"
 description: "Introducing AdminNetworkPolicies"
 date: "2024-11-06"
@@ -11,54 +11,53 @@ categories:
    - OpenShift
    - Security
    - Network
-tags: ["OpenShift", "OCP", "Security", "NetworkPolicies", "Helm", "AdminNetworkPolicy", "BaselineAdminNetworkPolicy"] 
+tags: ["OpenShift", "OCP", "Security", "NetworkPolicies", "Helm", "AdminNetworkPolicy", "BaselineAdminNetworkPolicy"]
 
-aliases: [ 
+aliases: [
 	 "/posts-output/2024-11-06-anp-and-banp/",
    "/openshift/2024/11/introducting-adminnetworkpolicies/",
-] 
+]
 ---
 
 :imagesdir: /openshift/images/
 :icons: font
 :toc:
 
-
 Classic Kubernetes/OpenShift offer a feature called NetworkPolicy that allows users to control the traffic to and from their assigned Namespace.
-NetworkPolicies are designed to give project owners or tenants the ability to protect their own namespace. Sometimes, however, I worked with customers where the 
+NetworkPolicies are designed to give project owners or tenants the ability to protect their own namespace. Sometimes, however, I worked with customers where the
 cluster administrators or a dedicated (network) team need to enforce these policies.
 
-Since the NetworkPolicy API is namespace-scoped, it is not possible to enforce policies across namespaces. The only solution was to create custom (project) admin and edit 
+Since the NetworkPolicy API is namespace-scoped, it is not possible to enforce policies across namespaces. The only solution was to create custom (project) admin and edit
 roles, and remove the ability of creating, modifying or deleting NetworkPolicy objects. Technically, this is possible and easily done. But shifts the whole network security to cluster administrators.
 
 Luckily, this is where *AdminNetworkPolicy* (ANP) and *BaselineAdminNetworkPolicy* (BANP) comes into play.
 
-<!--more--> 
+<!--more-->
 
 ## AdminNetworkPolicy (ANP) and BaselineAdminNetworkPolicy (BANP)
 
 NOTE: This article demonstrates the configuration of the new AdminNetworkPolicy and BaselineAdminNetworkPolicy objects using the Helm Chart https://github.com/tjungbauer/helm-charts/tree/main/charts/admin-networkpolicies[admin-networkpolicies^]. The NetworkPolicy object is not covered in this article.
 
-ANP and BANP are designed for cluster administrators to protect the entire cluster by creating **cluster-scoped policies**. They are not replacing NetworkPolicies, 
-but instead create a tier model and can be used together. Administrators can use ANPs to enforce non-overridable policies that take precedence over NetworkPolicy objects. 
-Administrators can use BANP to set up and enforce optional cluster-scoped network policy rules that are overridable by users using NetworkPolicy objects when necessary. 
+ANP and BANP are designed for cluster administrators to protect the entire cluster by creating **cluster-scoped policies**. They are not replacing NetworkPolicies,
+but instead create a tier model and can be used together. Administrators can use ANPs to enforce non-overridable policies that take precedence over NetworkPolicy objects.
+Administrators can use BANP to set up and enforce optional cluster-scoped network policy rules that are overridable by users using NetworkPolicy objects when necessary.
 When used together, ANP, BANP, and network policy can achieve full multi-tenant isolation that administrators can use to secure their cluster.
 
-The three resources create a 3-Tier Access Control List (ACL) that is evaluated in descending order: 
+The three resources create a 3-Tier Access Control List (ACL) that is evaluated in descending order:
 
-* Tier 1 - AdminNetworkPolicy (ANP): If the traffic matches an **allow** or **deny** rule, then any existing 
+* Tier 1 - AdminNetworkPolicy (ANP): If the traffic matches an **allow** or **deny** rule, then any existing
 NetworkPolicy and BaselineAdminNetworkPolicy (BANP) objects in the cluster are skipped from evaluation. If a **pass** rule is matched, then the evaluation is handed over to
-the next tier (NetworkPolicy). This means, that Cluster Administrators can enforce policies that cannot be overwritten by users (allow/deny rules) or pass the evaluation to the Network Policy, 
+the next tier (NetworkPolicy). This means, that Cluster Administrators can enforce policies that cannot be overwritten by users (allow/deny rules) or pass the evaluation to the Network Policy,
 where the project owners can decide further.
 
 * Tier 2 - NetworkPolicy (NP): If the traffic passed the ANP then the NetworkPolicy is evaluating the traffic. The NetworkPolicy resources are controlled by the project owners by default.
 
-* Tier 3 - BaselineAdminNetworkPolicy (BANP): If the traffic passed the ANP and the NetworkPolicy, then the BANP is evaluating the traffic. 
+* Tier 3 - BaselineAdminNetworkPolicy (BANP): If the traffic passed the ANP and the NetworkPolicy, then the BANP is evaluating the traffic.
 These objects are controlled by the cluster administrators again and are cluster scoped. There can only be one BANP (named "default") configured on the cluster.
 
 ## AdminNetworkPolicy
 
-An AdminNetworkPolicy (ANP) is a cluster-scoped resource, that allow cluster administrators to secure the network traffic **before** NetworkPolicies in the namespaces are evaluated. 
+An AdminNetworkPolicy (ANP) is a cluster-scoped resource, that allow cluster administrators to secure the network traffic **before** NetworkPolicies in the namespaces are evaluated.
 These rules cannot be overwritten by project owners or developers and allow the administrators to enforce the security. Use cases could be, for example:
 
 * You want to enforce only specific egress endpoints (e.g. only allow traffic to the specific database servers)
@@ -75,7 +74,7 @@ The ANP allows cluster administrators to define:
 
 ## AdminNetworkPolicy Actions for Rules
 
-The AdminNetworkPolicy allows three actions for the rules: 
+The AdminNetworkPolicy allows three actions for the rules:
 
 * *Allow*: The traffic is allowed, and no further rules are evaluated.
 * *Deny*: The traffic is denied, and no further rules are evaluated.
@@ -123,7 +122,7 @@ This will result in the following AdminNetworkPolicy snippet:
 ----
   subject:
     namespaces:
-      matchExpressions:    
+      matchExpressions:
         - key: kubernetes.io/metadata.name
           operator: NotIn
           values:
@@ -160,7 +159,7 @@ This will result in the following AdminNetworkPolicy snippet:
 spec:
   priority: 5
   subject:
-    namespaces:    
+    namespaces:
       matchLabels:
         apps: "my-apps"
         tenant: "my-tenant"
@@ -291,10 +290,10 @@ spec:
   subject:
     namespaces: {}
   ingress:
-    - name: "allow-ingress-from-monitoring" 
+    - name: "allow-ingress-from-monitoring"
       action: "Allow"
-      from:    
-      - namespaces:    
+      from:
+      - namespaces:
           matchLabels:
             kubernetes.io/metadata.name: "monitoring"
 ----
@@ -315,7 +314,7 @@ anp:
     subject:
       matchNamespaces: <1>
         matchLabels:
-          anp: cluster-control-anp <2> 
+          anp: cluster-control-anp <2>
 
     ingress:
       - name: pass-from-restricted-tenants
@@ -349,21 +348,21 @@ metadata:
 spec:
   priority: 5
   subject:
-    namespaces:    
+    namespaces:
       matchLabels:
         anp: "cluster-control-anp"
   ingress:
-    - name: "pass-from-restricted-tenants" 
+    - name: "pass-from-restricted-tenants"
       action: "Pass"
-      from:    
-      - namespaces:    
+      from:
+      - namespaces:
           matchLabels:
             tenant: "restricted"
 ----
 
 ### Example 3: Show possible peers settings
 
-The most important settings for the rules are the `peers` settings. The following examples show the snippets of possible peers. 
+The most important settings for the rules are the `peers` settings. The following examples show the snippets of possible peers.
 For further information, please refer to the example in the values file: https://github.com/tjungbauer/helm-charts/blob/main/charts/admin-networkpolicies/values.yaml[Helm Chart Values with further examples^]
 
 NOTE: The following rules are examples of **EGRESS** rules.
@@ -468,7 +467,7 @@ The BANP is more or less identical to ANP, except that you cannot define a "name
 
 [source,yaml]
 ----
-banp: <1> 
+banp: <1>
   - enabled: true <2>
     syncwave: 10
 
@@ -513,5 +512,3 @@ banp: <1>
 * https://docs.openshift.com/container-platform/4.16/networking/network_security/network-policy-apis.html[Official OpenShift Documentation^]
 * https://network-policy-api.sigs.k8s.io/blog/2024/01/30/getting-started-with-the-adminnetworkpolicy-api/[Kubernetes Blog: Getting started with the AdminNetworkPolicy API^]
 * https://network-policy-api.sigs.k8s.io/reference/spec/#policy.networking.k8s.io/v1alpha1.AdminNetworkPolicyEgressPeer[Kubernetes API Documentation^]
-
-
