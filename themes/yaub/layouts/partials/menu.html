@@ -29,7 +29,7 @@
     </section>
   {{end}}
   -->
-  
+
     <div class="highlightable">
     <ul class="topics">
 
@@ -61,11 +61,11 @@
     -->
     <!-- Shortcuts moved to top navigation bar -->
 
-    {{ if or .Site.IsMultiLingual $showvisitedlinks }}
+    {{ if or hugo.IsMultilingual $showvisitedlinks }}
     <section id="prefooter">
       <hr/>
       <ul>
-      {{ if and .Site.IsMultiLingual (not .Site.Params.DisableLanguageSwitchingButton)}}
+      {{ if and hugo.isMultilingual (not .Site.Params.DisableLanguageSwitchingButton)}}
         <li>
           <a class="padding">
             <i class="fas fa-language fa-fw"></i>

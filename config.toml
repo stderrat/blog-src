@@ -30,7 +30,7 @@ home = [ "HTML", "RSS", "JSON"]
   #editURL = "https://github.com/stderrat/stderrat.github.io/"
   # Author of the site, will be used in meta information
   # Shows a checkmark for visited pages on the menu
-  showVisitedLinks = false 
+  showVisitedLinks = false
   disableInlineCopyToClipBoard = false
   description = "TechBlog about OpenShift/Ansible/Satellite and much more"
   author = "Toni Schmidbauer & Thomas Jungbauer"
@@ -134,7 +134,7 @@ staticDir = ['themes/hugo-theme-learn/static', 'static']
 [security]
   enableInlineShortcodes = false
   [security.exec]
-    allow = ['^dart-sass-embedded$', '^go$', '^npx$', '^postcss$', '^asciidoctor$']
+    allow = ['^dart-sass-embedded$', '^go$', '^npx$', '^postcss$', '^asciidoctor$', '^git$']
     osEnv = ['(?i)^(PATH|PATHEXT|APPDATA|TMP|TEMP|TERM)$']
 
   [security.funcs]
