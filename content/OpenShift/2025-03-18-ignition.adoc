@@ -1,0 +1,251 @@
+---
+title: "Understanding ignition"
+description: "This post tries to explain how the Red Hat CoreOS igntion boot process works"
+date: "2025-03-18"
+doctype: book
+
+authors: [Toni Schmidbauer]
+type: post
+draft: true
+categories:
+   - OpenShift
+   - Igintion
+   - CoreOS
+tags: ["OpenShift", "OCP", "Ignition", "CoreOS"]
+
+aliases: [
+	 "/posts-output/2025-01-25-scc-and-psp/",
+	 "/openshift/2025/01/overview-openshift-security/",
+]
+---
+
+:imagesdir: /openshift/images/
+:icons: font
+:toc:
+
+Working with OpenShift Virtualization and adding virtualized worker nodes to clusters made us think about how this process could be automated.
+
+// XXX add links
+Officially this is only supported by either modifying the boot ISO file or by doing PXE installations. But as Red Hat CoreOS also supports customizing the installation on first boot, we were curious if we could leverage igntion for this.
+
+<!--more-->
+
+## The basics about the ignition process
+
+So whats ignition? To quote the upstream documentaion:
+
+[quote]
+Ignition is a utility created to manipulate disks during the initramfs.
+
+It uses an ignition config file (similar to a kickstart file, if you are familiar with the Red Hat Enterprise Linux kickstart process).
+
+A very minimal example ignition configuration looks like this:
+
+[source,json]
+{
+  "ignition": {
+  "config": {},
+    "proxy": {},
+    "security": {},
+    "timeouts": {},
+    "version": "3.2.0"
+  },
+  "passwd": {
+    "users": [
+      {
+        "name": "coreos",
+        "sshAuthorizedKeys": [
+          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPL3axFGHI3db9iJWkPXVbYzD7OaWTtHuqmxLvj+DztB user@example"
+        ]
+      }
+    ]
+  },
+  "storage": {},
+  "systemd": {}
+}
+
+NOTE: Inition applys configuration only on the first machine boot. This is different to cloud-init. Cloud init apply configurations on every boot.
+
+See the https://coreos.github.io/ignition/rationale/#ignition-runs-only-on-the-first-boot[rational] for more information
+
+# The problem statement
+
+So we wanted to leverage ignition for customizing worker nodes running on OpenShift Virtualization (OCP-V). Basically we use it for network configuration and to point it to the OpenShift machine config server which provides an ignition configuration for adding machines to a running cluster.
+
+KubeVirt seems to https://kubevirt.io/user-guide/user_workloads/startup_scripts/#ignition-examples[support] specifying ignition config in a VirtualMachine object.
+
+We downloaded the qemu qcow2 https://mirror.openshift.com/pub/openshift-v4/amd64/dependencies/rhcos/4.18/latest/rhcos-qemu.x86_64.qcow2.gz[image], uploaded it to a KubeVirt DataVolume via
+
+[source]
+virtctl image-upload --force-bind  dv rhcos-4.17.17 --size=18Gi --image-path=rhcos-4.17.17-x86_64-qemu.x86_64.qcow2 --insecure
+
+Next we tried to create a VirtualMachine:
+
+[source]
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  labels:
+    app: rhcos
+  name: rhcos-vm
+  namespace: test-vms
+spec:
+  dataVolumeTemplates:
+    - apiVersion: cdi.kubevirt.io/v1beta1
+      kind: DataVolume
+      metadata:
+        name: rhcos-vm
+      spec:
+        source:
+          pvc:
+            name: rhcos-4.17.17 <1>
+            namespace: test-vms
+        storage:
+          resources:
+            requests:
+              storage: 100Gi
+  running: true
+  template:
+    spec:
+      accessCredentials:
+        - sshPublicKey:
+            propagationMethod:
+              noCloud: {}
+            source:
+              secret:
+                secretName: tonipub
+      architecture: amd64
+      domain:
+        cpu:
+          cores: 1
+          sockets: 1
+          threads: 1
+        devices:
+          disks:
+            - disk:
+                bus: virtio
+              name: rootdisk
+            - disk:
+                bus: virtio
+              name: cloudinitdisk
+          interfaces:
+            - bridge: {}
+              macAddress: '02:e0:d7:00:00:06'
+              model: virtio
+              name: nic-peach-crayfish-71
+          rng: {}
+        features:
+          acpi: {}
+          smm:
+            enabled: true
+        firmware:
+          bootloader:
+            efi: {}
+        machine:
+          type: pc-q35-rhel9.4.0
+        memory:
+          guest: 2Gi
+        resources: {}
+      networks:
+        - multus:
+            networkName: default/bridge-network
+          name: nic-peach-crayfish-71
+      terminationGracePeriodSeconds: 180
+      volumes:
+        - dataVolume:
+            name: rhcos-vm
+          name: rootdisk
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            userData: |-
+              {
+                "ignition": {
+                  "config": {},
+                  "proxy": {},
+                  "security": {},
+                  "timeouts": {},
+                  "version": "3.4.0"
+                },
+                "passwd": {
+                  "users": [
+                    {
+                      "name": "coreos",
+                      "sshAuthorizedKeys": [
+                        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIYhjnWzsArZVyyTa1E6sDbH06rUGDAhAF3bf3pmeBtm toni@stderr.at"
+                      ],
+                      "name": "toni",
+                      "sshAuthorizedKeys": [
+                        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIYhjnWzsArZVyyTa1E6sDbH06rUGDAhAF3bf3pmeBtm toni@stderr.at"
+                      ]
+                    }
+                  ]
+                },
+                "storage": {},
+                "systemd": {}
+              }
+
+
+
+
+<1> Use the uploaded image as a template for the new VM
+
+But after booting the VM we only saw
+
+[source]
+XXX message missing
+
+On the console
+
+The question is why did this not work?
+
+# Diving into ignition
+
+So it's time get a detailed understanding how the igintion process really works.
+
+We already now that ignition configuration is applied early in the boot process. This is done by including igntion in the initial ramdisk.
+
+So step one is to extract the ramdisk and take a look at what is going on.
+
+NOTE: Explain ramdisk
+
+## Extracting the RHCOS intial ramdisk from the qcow image
+
+First we need to somhow access the files in the qcow2 image. This is done via the following steps:
+
+[start=1]
+. Mount the qcow2 images as an network block device
+
+[source, bash]
+sudo modprobe nbd
+sudo qemu-nbd --connect /dev/nbd0 rhcos-qemu.x86_64.qcow2
+
+[start=2]
+. Lets see which partition we've got
+
+[source]
+sudo fdisk -l /dev/nbd0
+
+[start=3]
+. Mount the paratition to /mnt
+sudo mount -o ro /dev/nbd0p2 /mnt/
+
+[start=4]
+. Copy the initramfs file to a tmp location
+
+[start=5]
+. Unmount and disconnect the NBD device
+
+[source]
+sudo umount /mnt
+sudo qemu-nbd -d /dev/nbd0
+
+## Extracting the initramfs file
+
+CoreOS uses dracut for creating the initial ramdisk. So the file format is a little bit special.
+
+## Understanding the ignition configuration
+
+# Conclusio
+
+Depending on ignition provider ignition searches for a valid ocnfiguration.
+
