@@ -1,0 +1,241 @@
+--- 
+title: "Using ApplicationSet with Matrix Generator and define individual Namespaces"
+description: "Using ApplicationSet with Matrix Generator and define individual Namespaces."
+date: "2025-04-17"
+doctype: book
+
+authors: [Thomas Jungbauer]
+type: post
+draft: false
+categories:
+   - OpenShift
+   - GitOps
+tags: ["Application", "OpenShift", "OCP", "GitOps", "Argo CD", "Helm", "ApplicationSet", "Generator", "Matrix", "Git"] 
+
+aliases: [ 
+	 "/posts-output/2025-04-17-applicationsets-and-namespaces/",
+] 
+---
+
+:imagesdir: /gitopscollection/images/
+:icons: font
+:toc:
+
+During my day-to-day business, I am discussing the following setup with many customers: https://blog.stderr.at/gitopscollection/2024-04-02-configure_app_of_apps/[Configure App-of-Apps]. Here I try to explain how I use an ApplicationSet that watches over a folder in Git and automatically adds a new Argo CD Application whenever a new folder is found. This works great, but there is a catch: The ApplicationSet uses the same Namespace *default* for all Applications. This is not always desired, especially when you have different teams working on different Applications.
+
+Recently I was asked by the customer if this can be fixed and if it is possible to define different Namespaces for each Application. The answer is yes, and I would like to show you how to do this.
+ 
+<!--more--> 
+
+== The Current Situation
+
+Currently, I am (or was) using the following ApplicationSet to watch over a folder in Git. The ApplicationSet uses the Matrix Generator to create a new Argo CD Application for each folder found in the Git repository. It also uses the list operator to define the targetCluster: 
+
+[source,yaml]
+----
+    generatormatrix: 
+          # Git: Walking through the specific folder and take whatever is there.
+          - git: 
+              directories:
+                - path: clusters/management-cluster/*
+              repoURL: *repourl
+              revision: *branch
+          # List: simply define the targetCluster. The name of the cluster must be known by Argo CD
+          - list: 
+              elements:
+                  # targetCluster is important, this will define on which cluster it will be rolled out.
+                  # The cluster name must be known in Argo CD
+                - targetCluster: *mgmtclustername
+----
+
+This will create a new Application for any subfolder found in the *clusters/management-cluster/* folder any every Application in Argo CD will be configured with the same target namespace: *default*. 
+
+Technically, this is not a problem, as I define the exact namespace in the different Helm Charts, but it is not always desired.
+
+NOTE: I personally recommend defining the Namespace in the Helm Charts, since especially for the cluster configuration, sometimes there is no clear target Namespace or multiple Namespaces are modified.
+
+== What did not work
+The first idea was to use the *Matrix* generator and define the *targetNamespace* in list.elements and if the namespace is not defined, use a default one. So similar like this:
+
+[source,yaml]
+----
+    generatormatrix: 
+          # Git: Walking through the specific folder and take whatever is there.
+          - git: 
+              directories:
+                - path: clusters/management-cluster/*
+              repoURL: *repourl
+              revision: *branch
+          # List: simply define the targetCluster. The name of the cluster must be known by Argo CD
+          - list: 
+              elements:
+                  # targetCluster is important, this will define on which cluster it will be rolled out.
+                  # The cluster name must be known in Argo CD
+                - targetCluster: *mgmtclustername
+                  path: clusters/management-cluster/cert-manager
+                  targetNamespace: cert-manager
+                - targetCluster: *mgmtclustername
+                  path: clusters/management-cluster/*
+                  targetNamespace: default
+----
+
+To make is short: *This does not work*
+
+The matrix operator walks over all folders and creates a cartesian product of the elements. This means, it will create a new Application for each folder and each element in the list. So if you have 10 folders and 2 elements in the list, you will end up with 20 Applications.
+This is not what we want. We want to create a new Application for each folder and define the targetNamespace in the Git repository.
+
+The second test was the use of the *Merge* generator. This did not work as well, as it was not possible to define a default Namespace. 
+
+== The Solution
+The solution is to use the *Git FILES* generator and define the *targetNamespace* in the Git repository. This is done by creating a file called *config.json* in each subfolder. The content of the file is simple:
+
+[source,json]
+----
+{
+  "namespace": "default",
+  "environment": "in-cluster"
+}
+----
+
+The advantage is that it is possible to define multiple parameters in that file. However, the disadvantage is that this file must be created, otherwise the ApplicationSet will ignore the folder and will not create a new Application. 
+I think this is a small disadvantage, and the file is easy to maintain. 
+
+Bringing everything together now opens two possibilities:
+
+=== Option 1: Keep Matrix Generator and use Git File sub-generator
+
+The first option simply replaces the git directory generator with the git file generator. The rest of the ApplicationSet remains unchanged. 
+
+NOTE: I like this option somehow better than the second one, because I can keep everything as I had it before, the only thing is to create the *config.json* file in each subfolder and change two lines in the ApplicationSet.
+
+[source,yaml]
+----
+    # Switch to set the namespace to '.namespace' ... must be defined in config.json
+    use_configured_namespace: true <1>
+
+    # Definition of Matrix Generator. Only 2 generators are supported at the moment
+    generatormatrix:
+      # Git: Walking through the specific folder and take whatever is there.
+      - git:
+          files: <2>
+            - path: clusters/management-cluster/**/config.json <3>
+          repoURL: *repourl
+          revision: *branch
+      # List: simply define the targetCluster. The name of the cluster must be known by Argo CD
+      - list:
+          elements:
+              # targetCluster is important, this will define on which cluster it will be rolled out.
+              # The cluster name must be known in Argo CD
+            - targetCluster: *mgmtclustername
+----
+<1> Switch to use the configured namespace. This is important, otherwise the namespace is set to "default". This was added for backward compatibility.
+<2> The git file generator is used instead of the git directory generator.
+<3> The path is changed to the config.json file. The ** is important, as it defines to look into every subfolder.
+
+The config.json can be shortened to:
+[source,json]
+----
+{
+  "namespace": "default"
+}
+----
+
+=== Option 2: Switch to plain Git File Generator
+
+The second option is to switch to the plain Git generator. This removes the Matrix generator, but also requires defining the targetCluster in the config.json file. This is not a problem, as the config.json file can be used to define multiple parameters.
+
+[source,yaml]
+----
+    generatorgit: <1>
+      # Git: Walking through the specific folder and take whatever is there.
+      - files: 
+          - clusters/management-cluster/**/config.json
+        repourl: *repourl
+        revision: *branch
+----
+<1> No Matrix but Git generator instead.
+
+Here the full config.json file is required, otherwise the targetCluster is not defined:
+
+[source,json]
+----
+{
+  "namespace": "default",
+  "environment": "in-cluster"
+}
+----
+
+== Full working example
+Source: https://github.com/tjungbauer/openshift-clusterconfig-gitops/blob/main/base/argocd-resources-manager/values.yaml
+
+[source,yaml]
+----
+applicationsets:
+  ######################################
+  # MATRIX GENERATOR EXAMPLE Git Files #
+  ######################################
+  # The idea behind the GIT Generate (File) is to walk over a folder, for example /clusters/management-cluster and fetch a config.json from each folder.
+  # This is more or less similar as the Matrix generator (see below), but reqires a bit more configuration ... the config.json.
+  # The advantage is that you can configure individual namespaces for example in this config.json and provide an additional information
+  mgmt-cluster-matrix-gitfiles:
+    enabled: true
+
+    # Description - always usful
+    description: "ApplicationSet that Deploys on Management Cluster Configuration (using Git Generator)"
+    # Any labels you would like to add to the Application. Good to filter it in the Argo CD UI.
+    labels:
+      category: configuration
+      env: mgmt-cluster
+
+    # Using go text template. See: https://argo-cd.readthedocs.io/en/stable/operator-manual/applicationset/GoTemplate/
+    goTemplate: true
+    argocd_project: *mgmtclustername
+
+    environment: *mgmtclustername
+
+    # preserve all resources when the application get deleted. This is useful to keep that workload even if Argo CD is removed or severely changed.
+    preserveResourcesOnDeletion: true
+
+    # Switch to set the namespace to '.namespace' ... must be defined in config.json
+    use_configured_namespace: true
+
+    # Definition of Matrix Generator. Only 2 generators are supported at the moment
+    generatormatrix:
+      # Git: Walking through the specific folder and take whatever is there.
+      - git:
+          files:
+            - path: clusters/management-cluster/**/config.json
+          repoURL: *repourl
+          revision: *branch
+      # List: simply define the targetCluster. The name of the cluster must be known by Argo CD
+      - list:
+          elements:
+              # targetCluster is important, this will define on which cluster it will be rolled out.
+              # The cluster name must be known in Argo CD
+            - targetCluster: *mgmtclustername
+
+    syncPolicy:
+      autosync_enabled: false
+
+    # Retrying in case the sync failed.
+    retries:
+      # number of failed sync attempt retries; unlimited number of attempts if less than 0
+      limit: 5
+      backoff:
+        # the amount to back off. Default unit is seconds, but could also be a duration (e.g. "2m", "1h")
+        # Default: 5s
+        duration: 5s
+        # a factor to multiply the base duration after each failed retry
+        # Default: 2
+        factor: 2
+        # the maximum amount of time allowed for the backoff strategy
+        # Default: 3m
+        maxDuration: 3m
+----
+
+== Conclusion
+In this blog post I have shown you how to use the ApplicationSet with the Matrix generator and define individual Namespaces for each Application. This is done by using the Git File generator and defining a config.json file in each subfolder. The config.json file can be used to define multiple parameters, but it is required to create the file in each subfolder.
+This is a small disadvantage, but I think it is worth the effort. The advantage is that you can define individual Namespaces for each Application, and you can use the same ApplicationSet for all your Applications.
+
+I hope this blog post was helpful and you learned something new. If you have any questions or comments, please feel free to reach out to me.
+I am happy to help you.
