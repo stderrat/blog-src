@@ -102,6 +102,8 @@ I think this is a small disadvantage, and the file is easy to maintain.
 
 Bringing everything together now opens two possibilities:
 
+CAUTION: This will require https://github.com/tjungbauer/helm-charts/tree/main/charts/helper-argocd[helper-argocd] version 2.0.41 or higher.
+
 === Option 1: Keep Matrix Generator and use Git File sub-generator
 
 The first option simply replaces the git directory generator with the git file generator. The rest of the ApplicationSet remains unchanged. 
