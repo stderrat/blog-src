@@ -51,6 +51,8 @@ Modify the existing Console resource named cluster and add the logoutRedirect pa
 The important pieces of the logout URL are the **client_id** and the **post_logout_redirect_uri**. The client ID must be the same as the Keycloak client ID, and the post logout redirect URI must be the OpenShift logout URL.
 (Also change the <keycloakURL> and <realm> to your Keycloak URL and realm name.)
 
+CAUTION: Actually, instead of **client_id**, the **id_token_hint** should be used. But OpenShift does not store the token, so we are using the client ID instead.
+
 [source,yaml]
 ----
 apiVersion: config.openshift.io/v1
