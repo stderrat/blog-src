@@ -61,9 +61,9 @@ metadata:
   name: cluster
 spec:
   authentication:
-    logoutRedirect: 'https://<keycloakURL>/realms/<realm>/protocol/openid-connect/logout?client_id=<realm>&post_logout_redirect_uri=https://oauth-openshift.apps.<your-cluster-name>/logout' <1>
+    logoutRedirect: 'https://<keycloakURL>/realms/<realm>/protocol/openid-connect/logout?client_id=<realm>&post_logout_redirect_uri=https://console-openshift-console.apps.ocp.aws.ispworld.at' <1>
 ----
-<1> The logout URL for OpenShift. This is the URL that will be called when you log out from Keycloak. The URL must contain the client ID and the post logout redirect URI.
+<1> The logout URL for OpenShift. This is the URL that will be called when you log out from Keycloak. The URL must contain the client ID and the post logout redirect URI (console of OpenShift).
 
 Wait a few moments until the OpenShift Console Operator applies the new configuration.
 
