@@ -3,6 +3,15 @@
     {{ with .Title }}
     <h1 class="title is-2">{{ . }}</h1>
     {{ end }}
+
+    <h2>All Posts</h2>
+    <ul>
+      <li>
+        <a href="{{ "/" | relLangURL }}index.xml">Full site RSS feed (all posts)</a>
+      </li>
+    </ul>
+
+
     <div class="content">
       {{ with .Content }}{{ . }}{{ end }} 
       {{ range $taxonomyName, $taxonomy := .Site.Taxonomies }} 
