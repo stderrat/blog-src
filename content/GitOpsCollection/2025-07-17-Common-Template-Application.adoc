@@ -1,0 +1,292 @@
+--- 
+title: "Reusable Argo CD Application Helm Template"
+description: "Reusable Argo CD Application Helm Template"
+date: "2025-07-17"
+doctype: book
+
+authors: [Thomas Jungbauer]
+type: post
+draft: false
+categories:
+   - OpenShift
+   - GitOps
+tags: ["Application", "OpenShift", "OCP", "GitOps", "Argo CD", "Helm", "ApplicationSet", "Generator", "Matrix", "Git"] 
+
+aliases: [ 
+	 "/posts-output/2025-07-17-reusable-argocd-application-helm-template/",
+] 
+---
+
+:imagesdir: /gitopscollection/images/
+:icons: font
+:toc:
+
+When working with Argo CD at scale, you often find yourself creating similar Application manifests repeatedly. Each application needs the same basic structure but with different configurations for source repositories, destinations, and sync policies. Additionally, managing namespace metadata becomes tricky when you need to conditionally control whether Argo CD should manage namespace metadata based on sync options.
+
+In this article, I'll walk you through a reusable Helm template that solves these challenges by providing a flexible, DRY (Don't Repeat Yourself) approach to creating Argo CD Applications. This template is available in my public Helm Chart library and can easily be used by anyone.
+ 
+<!--more--> 
+
+== The Problem
+
+Traditional Argo CD Application manifests suffer from several issues:
+
+. **Repetitive Code**: Each application requires similar boilerplate YAML
+. **Configuration Validation**: Manual validation of required fields across multiple applications
+. **Maintenance Overhead**: Changes to common patterns require updates across multiple files
+
+== But I can do this manually, right?
+Of course, nobody prevents you from creating an Argo CD Application manifest manually or using the UI to enter the values there, but sometimes you just want to get things done faster or help your team with a consistent way to create Argo CD Applications. Often teams do not want to learn about a new tool like Argo CD and maybe you want to automate the creation by using a CI/CD pipeline.
+
+== The Solution: A Reusable Helm Template
+
+I already work with a common template library for all of my Helm Charts. The idea is to have repeatable snippets in my tpl charts and I can reuse them in all other charts. Recently, I started testing the templating of entire Kubernetes manifests. 
+
+To address the above issues, I've created a comprehensive Helm template that will render an Argo CD Application. But let's start with the end result. 
+Your team wants to create a new Argo CD Application. They can do this either via the UI, via the CLI, by creating the YAML file manually, or through pull request or CI/CD integration. Ultimately, the minimum required information is:
+
+* The name of the application
+* The namespace of the application
+* The source repository
+* The destination repository
+
+So something like this:
+
+[source,yaml]
+----
+argocd_applications:
+  my-app: <1>
+    namespace: "openshift-gitops" 
+    
+    source: <2>
+      repositoryURL: "https://github.com/argoproj/argocd-example-apps.git"
+      targetRevision: "HEAD"
+      path: "guestbook"
+
+    destination: <3>
+      server: "https://kubernetes.default.svc" <4>
+      namespace: "guestbook"
+    
+  my-second-app:
+    ....
+----
+<1> This key will become the name of the Application
+<2> The source repository, this is the repository that contains the Helm chart or the Kubernetes manifests
+<3> The destination, that defines the cluster and namespace where the application will be deployed
+<4> Either *server* or *name* must be set, but not both.
+
+With the above values multiple applications can be created at once.
+
+== Integrating the Template
+
+The values from the above example can be used to create the Application manifest.
+
+All the developers (or CI/CD pipelines) need to do is to define the values and create one template to include the source template.
+This will look like this:
+
+[source,yaml]
+----
+{{- if .Values.argocd_applications }}
+{{- range $name, $config := .Values.argocd_applications }} <1>
+{{- if $config.enabled | default false }} <2>
+---
+{{- include "tpl.argocdApplication" (dict "name" $name "spec" $config) -}} <3>
+{{- end }}
+{{- end }}
+{{- end }}
+----
+<1> Iterate over the applications, defining $name and $config
+<2> Only include the application if it is enabled
+<3> Include the template with the name of the application and the specification
+
+
+This is everything you need to do to create an Argo CD Application. Let's take a look at the template.
+
+== Key Features of the template
+
+=== 1. Flexible Destination Configuration
+
+The template supports both server URL and cluster name destinations with **validation**:
+
+[source,yaml]
+----
+destination:
+  {{- if and ($spec.destination.server) ($spec.destination.name) }}
+  {{ fail "destination.server and destination.name cannot be set at the same time" }}
+  {{- else }}
+  {{- if $spec.destination.server }}
+  server: {{ $spec.destination.server }}
+  {{- else if $spec.destination.name }}
+  name: {{ $spec.destination.name }}
+  {{- else }}
+  server: https://kubernetes.default.svc
+  {{- end }}
+  {{- end }}
+  namespace: {{ $spec.destination.namespace | required "destination.namespace is required" }}
+----
+
+=== 2. Comprehensive Sync Policy Support
+
+The template handles all Argo CD sync policy features:
+
+* Automated sync with prune, selfHeal, and allowEmpty options
+* Flexible sync options array
+* Retry configuration with backoff strategies
+* Conditional managed namespace metadata
+
+=== 3. Conditional Namespace Management
+
+The intelligent handling of `managedNamespaceMetadata`. The template only includes this section when it **CreateNamespace=** option is set to true:
+
+[source,yaml]
+----
+{{- if and $spec.syncPolicy.syncOptions (not (has "CreateNamespace=false" $spec.syncPolicy.syncOptions)) }}
+{{- if $spec.syncPolicy.managedNamespaceMetadata }}
+managedNamespaceMetadata:
+  {{- with $spec.syncPolicy.managedNamespaceMetadata.labels }}
+  labels:
+    {{- toYaml . | nindent 8 }}
+  {{- end }}
+  {{- with $spec.syncPolicy.managedNamespaceMetadata.annotations }}
+  annotations:
+    {{- toYaml . | nindent 8 }}
+  {{- end }}
+{{- end }}
+{{- end }}
+----
+
+=== 4. Other Features
+
+I created the template to be as flexible as possible. However, I did not include everything in this template, only the most important features (from my point of view). Currently, the following is possible:
+
+* Create a template for an Argo CD Application using Git
+* Create a template for an Argo CD Application using Helm defining all possible Helm parameters, like additional values files or other options. 
+* Using a *single* source
+* Set required annotations and labels
+
+=== 5. Not possible (currently)
+
+Along with the supported features, there are some features that are currently not possible:
+
+* Defining multiple sources
+* Configure Kustomize settings
+
+However, if you feel this needs to be added, please let me know and create an issue. I can then try to add it.
+
+
+== Why This Approach Works
+
+=== 1. DRY Principle
+Instead of repeating the same YAML structure across multiple applications, you define it once and reuse it everywhere.
+
+=== 2. Intelligent Defaults
+The template provides sensible defaults (like `openshift-gitops` namespace) while allowing customization when needed.
+
+=== 3. Validation
+Built-in validation ensures required fields are present and conflicting configurations are caught early.
+
+=== 4. Conditional Logic
+The template handles complex scenarios like namespace management automatically, reducing the chance of misconfigurations.
+
+=== Real-World Benefits
+
+In practice, this template has several advantages:
+
+1. **Consistency**: All applications follow the same pattern
+2. **Maintainability**: Changes to common patterns are made in one place
+3. **Safety**: Validation prevents common misconfigurations
+4. **Flexibility**: Supports the full range of Argo CD features
+5. **Development Guidelines**: Ensure all developers are using the same process
+
+== Real-World Examples
+
+=== 1. Define a UI Branding
+
+I would like to define a top banner in the OpenShift Console. 
+Everything is defined in the `clusters/management-cluster/branding` folder in my git repository.
+
+All I need to do is to define the following values:
+
+[source,yaml]
+----
+argocd_applications:
+  my-branding:
+
+    enabled: true
+    namespace: "openshift-gitops" 
+    
+    source:
+      repositoryURL: "https://github.com/tjungbauer/openshift-clusterconfig-gitops"
+      targetRevision: "main"
+      path: "clusters/management-cluster/branding"
+
+    destination:
+      name: in-cluster
+      namespace: "default"
+----
+
+=== 2. Define a UI Branding with custom Helm value
+
+Like above I would like to define a top banner in the OpenShift Console. This time I want to use a custom Helm value to define the background color of the banner.
+
+[source,yaml]
+----
+argocd_applications:
+  my-branding-custom-helm:
+
+    enabled: true
+    namespace: "openshift-gitops" 
+    
+    source:
+      repositoryURL: "https://github.com/tjungbauer/openshift-clusterconfig-gitops"
+      targetRevision: "main"
+      path: "clusters/management-cluster/branding"
+
+      helm:
+        parameters:
+          - name: generic-cluster-config.console.console_banners.topbanner.backgroundcolor
+            value: '#FF9843'
+
+    destination:
+      name: in-cluster
+      namespace: "default"
+----
+
+=== 3. Full-Blown Example
+
+A full example with all features can be found in my Git repository at: https://github.com/tjungbauer/helm-charts/blob/main/charts/tpl/values_example_ArgoCD-Application.yaml[values_example_ArgoCD-Application.yaml^]
+
+
+== What about Validation?
+
+Above I mentioned that the template is able to validate the values.
+This is true for the most important parts. 
+
+For example, try to define the following values:
+
+[source,yaml]
+----
+[...]
+    destination:
+      name: in-cluster
+      server: "https://kubernetes.default.svc"
+      namespace: "default"
+----
+
+**name** and **server** are not allowed to be set at the same time.
+
+Helm (and Argo CD which is using Helm) will validate the values and fail with an error.
+
+[source,yaml]
+----
+Error: destination.server and destination.name cannot be set at the same time
+----
+
+
+== Conclusion
+
+This Argo CD Application template demonstrates how Helm's templating capabilities can solve real-world GitOps challenges. By combining conditional logic, validation, and sensible defaults, we create a tool that's both powerful and easy to use.
+
+The conditional namespace management feature alone saves hours of debugging why Argo CD isn't behaving as expected with namespace metadata. When you combine this with the DRY benefits and built-in validation, you get a robust foundation for managing Argo CD applications at scale.
+
+Whether you're managing a few applications or hundreds, this template pattern will help you maintain consistency, reduce errors, and improve your team's GitOps experience.
