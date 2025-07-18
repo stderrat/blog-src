@@ -108,7 +108,7 @@ weight = 10
     class = "left"
 
 [[menu.shortcuts]]
-name = "<i class='fas fa-box padding-right-25rem'></i> Archive"
+name = "<i class='fas fa-box padding-right-25rem'></i> History"
 url = "/archive"
 weight = 11
   [menu.shortcuts.params]
