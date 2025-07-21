@@ -20,7 +20,6 @@
 
 		  <!-- 3. Feed the paginator with these sorted posts -->
 		  {{ $paginator := .Paginate $regularPosts }}
-	  
 		  <!-- 4. Loop through the posts -->
 		  {{ range $paginator.Pages }}
 		    <div class="summary-gradient relative flex-auto w-100 w-40-l mr3 mb3 ba b--moon-gray nested-copy-line-height weight-5">
