@@ -1,0 +1,86 @@
+---
+title: "A first look into the Kubernetes Gateway API on OpenShift"
+description: "A first look into the Kubernetes Gateway API on OpenShift"
+date: "2025-08-29"
+doctype: book
+
+featured_image: /openshift/images/gateway-api/gateway-api.png
+show_featured_image_summary: false
+show_featured_image_article: true
+
+authors: [Toni Schmidbauer]
+type: post
+draft: false
+categories:
+   - OpenShift
+   - Ingress
+   - Gateway-API
+   - Istio
+tags: ["OpenShift", "OCP", "Istio", "Gatway-API", "Ingress" ]
+
+aliases: [
+	 "/posts-output/2025-08-29-gateway-api/",
+   "/openshift/2025/08/gateway-api",
+]
+---
+
+:imagesdir: /openshift/images/gateway-api/
+:icons: font
+:toc:
+
+Introduction **bla**
+
+<!--more-->
+
+## Setting up Gateway API on OpenShift
+
+Before you begin, ensure you have the following:
+
+* OpenShift 4.19 or higher with cluster-admin access
+
+NOTE: bla
+
+CAUTION: bla
+
+## Another section
+
+Source: https://github.com/tjungbauer/openshift-clusterconfig-gitops/tree/main/clusters/management-cluster/cert-manager[Cert-Manager Deployment^]
+
+[source,yaml]
+----
+[...]
+  - name: cert-manager-approver-policy
+    version: v0.19.0
+    repository: https://charts.jetstack.io
+[...]
+----
+
+[source,yaml]
+----
+cert-manager:
+  certManager:
+    enable_patch: true <1>
+
+    unsupportedConfigOverrides:
+      controller:
+        args:
+          - '--controllers=*,-certificaterequests-approver' <2>
+----
+<1> This enables the patching of the CertManager resource, which tells the chart to overwrite (patch) the automatically generated CertManager resource with the custom configuration.
+<2> This disables the auto-approver Controller of the Cert-Manager.
+
+Expand it
+{{% expand %}}
+[source,yaml]
+----
+dfdf
+----
+{{% /expand %}}
+
+[source,console]
+----
+❯ oc get pods -n cert-manager | grep approver
+NAME                                            READY   STATUS    RESTARTS   AGE
+cert-manager-approver-policy-xxxxx   1/1   Running   0   XXm <1>
+----
+<1> The Pod `cert-manager-approver-policy-xxxxx` is the Pod that is responsible for processing the CertificateRequestPolicy resources.
