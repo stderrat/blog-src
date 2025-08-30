@@ -78,7 +78,7 @@ spec:
   controllerName: openshift.io/gateway-controller/v1 <1>
 ----------
 <1> The controller name needs to be exactly as shown. Otherwise the
-ingress controller will **NOT** manage the gateway an associated
+ingress controller will **NOT** manage the gateway and associated
 resources.
 
 This creates a new pod in the openshift-ingress namespace:
@@ -510,7 +510,7 @@ In this blog post we took a first look at the Kubernetes Gateway API
 and it's integration into OpenShift. We enabled the Gateway API via a
 `GatewayClass` resource, created a simple HTTP Gateway via a
 `Gateway`, deploy a Nginx pod and a Service and exposed the service
-via an `HTTPRoute` and a `ReferenceGrant`.
+via a `HTTPRoute` and a `ReferenceGrant`.
 
 Hopefully an upcoming blog post will cover how to
 
