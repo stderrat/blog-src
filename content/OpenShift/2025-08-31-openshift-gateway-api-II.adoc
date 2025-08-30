@@ -1,0 +1,458 @@
+---
+title: "A second look into the Kubernetes Gateway API on OpenShift"
+description: "A second look into the Kubernetes Gateway API on OpenShift"
+date: "2025-08-30"
+doctype: book
+
+featured_image: /openshift/images/gateway-api/gateway-api.png
+show_featured_image_summary: false
+show_featured_image_article: true
+
+authors: [Toni Schmidbauer]
+type: post
+draft: false
+categories:
+   - OpenShift
+   - Ingress
+   - Gateway-API
+   - Istio
+tags: ["OpenShift", "OCP", "Istio", "Gateway-API", "Ingress" ]
+
+aliases: [
+	 "/posts-output/2025-08-30-gateway-api-II/",
+   "/openshift/2025/08/gateway-api-II",
+]
+---
+
+:imagesdir: /openshift/images/gateway-api/
+:icons: font
+:toc:
+
+This is our second look into the Kubernetes Gateway API an it's
+integration into OpenShift. This post covers TLS configuration.
+
+The Kubernetes Gateway API is new implementation of the ingress, load
+balancing and service mesh API's. See
+https://gateway-api.sigs.k8s.io/[upstream^] for more information.
+
+Also the https://docs.redhat.com/en/documentation/openshift_container_platform/4.19/html/ingress_and_load_balancing/configuring-ingress-cluster-traffic#nw-ingress-gateway-api-overview_ingress-gateway-api[OpenShift documentation^] provides an overview of the Gateway API and it's integration.
+
+<!--more-->
+
+== References
+
+. link:/openshift/2025/08/gateway-api/[A first look into the Kubernetes Gateway API on OpenShift]
+
+== Adding TLS to our Nginx deployment
+
+In our fist post we simply exposed a Nginx web server via the
+Gateway API. We only enabled HTTP, so let's try to do the same with
+HTTPS now.
+
+Remember we use a DNS wildcard domain `*.gtw.ocp.lan.stderr.at` which
+points to our Gateway. The gateway is exposed via a _Service_ of type
+_LoadBalancer_. We use
+https://docs.redhat.com/en/documentation/openshift_container_platform/4.19/html/networking_operators/metallb-operator[MetalLB]
+for this.
+
+The first step is setting up a wildcard TLS certificate for our custom
+domain _*.gtw.ocp.lan.stderr.at_. We are using
+https://github.com/OpenVPN/easy-rsa[EasyRSA] here, but use whatever tool you like.
+
+Just for reference this is how we created a wildcard cert with EasyRSA:
+
+[source,console]
+----------
+$ EASYRSA_CERT_EXPIRE=3650 EASYRSA_EXTRA_EXTS="subjectAltName=DNS:*.gtw.ocp.lan.stderr.at" ./easyrsa gen-req gtw.ocp.lan.stderr.at
+$ EASYRSA_CERT_EXPIRE=3650 ./easyrsa sign-req serverClient gtw.ocp.lan.stderr.at
+----------
+
+EasyRSA stores the public key under _pki/issued/_ and the private key
+under _pki/private_. We copied the certificate and the private key to
+a temporary directory.
+
+Next we need to remove the private key passphrase and create a
+Kubernetes secret from the private and pubic key:
+
+[source,console]
+----------
+$ openssl rsa -in gtw.ocp.lan.stderr.at.key -out gtw.ocp.lan.stderr.at-insecure.key
+$ oc create secret tls gateway-api --cert=gtw.ocp.lan.stderr.at.crt --key=gtw.ocp.lan.stderr.at-insecure.key
+----------
+
+Now it's time to add a TLS listener to our _Gateway_ resource in the
+_openshift-ingress_ namespace. Remember for OpenShift _Gateways_ have
+to be deployed in the _openshift-ingress_ namespace.
+
+[source,yaml]
+----------
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: http-gateway
+  namespace: openshift-ingress
+spec:
+  gatewayClassName: openshift-default
+  listeners:
+  - name: http
+    protocol: HTTP
+    port: 80
+    hostname: "*.gtw.ocp.lan.stderr.at"
+  - name: https
+    protocol: HTTPS <1>
+    port: 443 <2>
+    hostname: "*.gtw.ocp.lan.stderr.at" <3>
+    tls:
+      mode: Terminate <4>
+      certificateRefs:
+        - name: gateway-api <5>
+    allowedRoutes: <6>
+      namespaces:
+        from: All
+
+----------
+<1> We want to support HTTPS
+<2> We use the default HTTPS port 443
+<3> The URL we support with this listener are the same as for HTTP
+<4> We use edge termination for now, this means HTTP traffic will only be encrypted up to the gateway. from the gateway to our pod we speak plain HTTP.
+<5> This is the name of the TLS secret we created above
+<6> We accept routes from all namespaces
+
+NOTE: Also remember from our first post that we created a
+_ReferenceGrant_ in the namespace where nginx is running. Otherwise
+HTTP routes will not be accepted.
+
+Finally lets try to access our Nginx pod via HTTPS:
+
+[source,console]
+----------
+$ curl -v https://nginx.gtw.ocp.lan.stderr.at
+* Host nginx.gtw.ocp.lan.stderr.at:443 was resolved.
+* IPv6: (none)
+* IPv4: 10.0.0.150
+*   Trying 10.0.0.150:443...
+* ALPN: curl offers h2,http/1.1
+* TLSv1.3 (OUT), TLS handshake, Client hello (1):
+*  CAfile: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+*  CApath: none
+* TLSv1.3 (IN), TLS handshake, Server hello (2):
+* TLSv1.3 (IN), TLS handshake, Encrypted Extensions (8):
+* TLSv1.3 (IN), TLS handshake, Certificate (11):
+* TLSv1.3 (IN), TLS handshake, CERT verify (15):
+* TLSv1.3 (IN), TLS handshake, Finished (20):
+* TLSv1.3 (OUT), TLS change cipher, Change cipher spec (1):
+* TLSv1.3 (OUT), TLS handshake, Finished (20):
+* SSL connection using TLSv1.3 / TLS_AES_256_GCM_SHA384 / x25519 / RSASSA-PSS
+* ALPN: server accepted h2
+* Server certificate:
+*  subject: CN=gtw.ocp.lan.stderr.at
+*  start date: Aug 30 10:01:33 2025 GMT
+*  expire date: Aug 28 10:01:33 2035 GMT
+*  subjectAltName: host "nginx.gtw.ocp.lan.stderr.at" matched cert's "*.gtw.ocp.lan.stderr.at"
+*  issuer: CN=tntinfra CA
+*  SSL certificate verify ok.
+*   Certificate level 0: Public key type RSA (2048/112 Bits/secBits), signed using sha256WithRSAEncryption
+*   Certificate level 1: Public key type RSA (2048/112 Bits/secBits), signed using sha256WithRSAEncryption
+* Connected to nginx.gtw.ocp.lan.stderr.at (10.0.0.150) port 443
+* using HTTP/2
+* [HTTP/2] [1] OPENED stream for https://nginx.gtw.ocp.lan.stderr.at/
+* [HTTP/2] [1] [:method: GET]
+* [HTTP/2] [1] [:scheme: https]
+* [HTTP/2] [1] [:authority: nginx.gtw.ocp.lan.stderr.at]
+* [HTTP/2] [1] [:path: /]
+* [HTTP/2] [1] [user-agent: curl/8.11.1]
+* [HTTP/2] [1] [accept: */*]
+> GET / HTTP/2
+> Host: nginx.gtw.ocp.lan.stderr.at
+> User-Agent: curl/8.11.1
+> Accept: */*
+>
+* Request completely sent off
+* TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
+* TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
+< HTTP/2 200
+< server: nginx/1.29.1
+< date: Sat, 30 Aug 2025 14:30:20 GMT
+< content-type: text/html
+< content-length: 615
+< last-modified: Wed, 13 Aug 2025 14:33:41 GMT
+< etag: "689ca245-267"
+< accept-ranges: bytes
+
+(output omitted)
+----------
+
+Yes, we can reach our Nginx via HTTPS, and the gateway presents the TLS certificate we created.
+
+NOTE: Be aware that we are still using the same _HTTPRoute_ from our previous blog post.
+
+Just for completeness here is the _HTTPRoute_:
+
+[source,yaml]
+----------
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: nginx-route
+spec:
+  parentRefs:
+  - name: http-gateway
+    namespace: openshift-ingress
+  hostnames: ["nginx.gtw.ocp.lan.stderr.at"]
+  rules:
+  - backendRefs:
+    - name: nginx
+      namespace: gateway-api-test
+      port: 8080
+----------
+
+NOTE: Also Remember that we are using a dedicated _Gateway_ and all
+_HTTPRoutes_ must be in the namespace _openshift-ingress_
+
+== Moving to a shared gateway
+
+Up until now we had to create all _HTTPRoute_ objects in the
+_openshift-ingress_ namespace. The Gateway API support two modes of
+operation:
+
+* Dedicated gateway: all _HTTPRoute_ object need to be in the same namespace as the gateway
+* Shared gateway: The gateway runs in the _openshift-ingress_
+  namespace and we allow _HTTPRoute_ objects from specific namespaces.
+
+The first step in creating a shared gateway is to modify the gateway resource:
+
+[source,yaml]
+----------
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: http-gateway
+  namespace: openshift-ingress
+spec:
+  gatewayClassName: openshift-default
+  listeners:
+  - name: http
+    protocol: HTTP
+    port: 80
+    hostname: "*.gtw.ocp.lan.stderr.at"
+    allowedRoutes: <1>
+      namespaces:
+        from: All
+----------
+<1> We now allow _HTTPRoute_ objects from all namespaces in the cluster
+
+Next we delete the existing _HTTPRoute_ for Nginx from the
+_openshift-ingress_ namespaces, and verify that we can't reach Nginx:
+
+[source,console]
+----------
+$  oc delete httproutes.gateway.networking.k8s.io -n openshift-ingress nginx-route
+httproute.gateway.networking.k8s.io "nginx-route" deleted
+$ curl -I http://nginx.gtw.ocp.lan.stderr.at
+HTTP/1.1 404 Not Found <1>
+date: Sat, 30 Aug 2025 15:02:23 GMT
+transfer-encoding: chunked
+----------
+<1> Our Nginx route stopped working
+
+Next we apply our modified _Gateway_ resource and the _HTTPRoute_ object.
+
+[source,console]
+----------
+$ oc apply -n gateway-api-test -f httproute.yaml <1>
+httproute.gateway.networking.k8s.io/nginx-route created
+$ curl -I http://nginx.gtw.ocp.lan.stderr.at
+HTTP/1.1 200 OK <2>
+server: nginx/1.29.1
+date: Sat, 30 Aug 2025 15:04:34 GMT
+content-type: text/html
+content-length: 615
+last-modified: Wed, 13 Aug 2025 14:33:41 GMT
+etag: "689ca245-267"
+accept-ranges: bytes
+
+----------
+<1> We create the _HTTPRoute_ in the gateway-api-test namespace
+<2> We can reach our Nginx pod again
+
+So our shared gateway seems to be working. But what if we want to more restrictive with which namespaces are allowed to create route objects?
+
+The Gateway API allows the following settings under _spec.listeners[].allowedRoutes.namespaces.from_ field
+
+* *All*: Allow from all namespaces
+* *Selector*: Specify a selector
+* *Same*: Only allow _HTTPRoutes_ in the same namespaces
+* *None*: Do not allow any routes to attach
+
+See API specification https://gateway-api.sigs.k8s.io/reference/spec/#fromnamespaces[FromNamespaces] for details.
+
+Let's try to use a more specific selector for our gateway:
+
+[source,yaml]
+----------
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: http-gateway
+  namespace: openshift-ingress
+spec:
+  gatewayClassName: openshift-default
+  listeners:
+  - name: http
+    protocol: HTTP
+    port: 80
+    hostname: "*.gtw.ocp.lan.stderr.at"
+    allowedRoutes:
+      namespaces:
+        from: Selector <1>
+        selector:
+          matchLabels:
+            kubernetes.io/metadata.name: gateway-api-test <2>
+----------
+<1> Now we are using the Selector option
+<2> Because we do not have a specific label on the namespace we would like to use, let's use the _metadata.name_ label Kubernetes created for use.
+
+We create a new yaml file _gateway-selector.yaml_ and applied the new configuration:
+
+[source,console]
+----------
+$ oc apply -f gateway-selector.yaml
+gateway.gateway.networking.k8s.io/http-gateway configured
+$ curl -I http://nginx.gtw.ocp.lan.stderr.at
+HTTP/1.1 200 OK
+server: nginx/1.29.1
+date: Sat, 30 Aug 2025 15:17:17 GMT
+content-type: text/html
+content-length: 615
+last-modified: Wed, 13 Aug 2025 14:33:41 GMT
+etag: "689ca245-267"
+accept-ranges: bytes
+----------
+
+All good, still working.
+
+NOTE: Just for testing we modified the namespace name in the Gateway definition to *NOT* match the namespace of our Nginx deployment and confirmed that we receive a _404_ not found response.
+
+== Implementing HTTP to HTTPS redirect
+
+As a last test for this post let's try to implement HTTP to HTTPS redirects.
+
+We deployed the following _Gateway_ configuration:
+
+[source,yaml]
+----------
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: http-gateway
+  namespace: openshift-ingress
+spec:
+  gatewayClassName: openshift-default
+  listeners:
+  - name: http
+    protocol: HTTP
+    port: 80
+    hostname: "*.gtw.ocp.lan.stderr.at"
+    allowedRoutes:
+      namespaces:
+        from: Selector
+        selector:
+          matchLabels:
+            kubernetes.io/metadata.name: gateway-api-test2
+  - name: https <1>
+    protocol: HTTPS
+    port: 443
+    hostname: "*.gtw.ocp.lan.stderr.at"
+    tls:
+      mode: Terminate
+      certificateRefs:
+        - name: gateway-api
+    allowedRoutes:
+      namespaces:
+        from: All
+----------
+<1> We added the HTTPS configuration back
+
+The https://gateway-api.sigs.k8s.io/guides/http-redirect-rewrite/[upstream] documentation contains an example on how to implements HTTP to HTTPS redirects. We created the following addtional _HTTPRoute_ object in the _gateway-api-test_ namespace:
+
+[source,yaml]
+----------
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: http-https-redirect
+spec:
+  parentRefs:
+  - name: http-gateway
+    namespace: openshift-ingress
+    sectionName: http
+  hostnames:
+  - nginx.gtw.ocp.lan.stderr.at
+  rules:
+  - filters:
+    - type: RequestRedirect
+      requestRedirect:
+        scheme: https
+        statusCode: 301
+----------
+
+Just for reference this is the _HTTPRoute_ object to expose Nginx:
+
+[source,yaml]
+----------
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: nginx-route
+spec:
+  parentRefs:
+  - name: http-gateway
+    namespace: openshift-ingress
+  hostnames: ["nginx.gtw.ocp.lan.stderr.at"]
+  rules:
+  - backendRefs:
+    - name: nginx
+      namespace: gateway-api-test
+      port: 8080
+----------
+
+[source,console]
+----------
+$ oc apply -f gateway-https-selector.yaml
+gateway.gateway.networking.k8s.io/http-gateway configured
+----------
+
+Let's try and verify if our redirect is working, we need to apply both routes:
+
+[source,console]
+----------
+$ oc apply -f httproute.yaml
+httproute.gateway.networking.k8s.io/nginx-route created
+$ oc apply -f http-https-redirect-route.yaml
+httproute.gateway.networking.k8s.io/http-https-redirect created
+----------
+
+And test with curl:
+
+[source,console]
+----------
+$ curl -I http://nginx.gtw.ocp.lan.stderr.at
+HTTP/1.1 200 OK <1>
+server: nginx/1.29.1
+date: Sat, 30 Aug 2025 15:37:20 GMT
+content-type: text/html
+content-length: 615
+last-modified: Wed, 13 Aug 2025 14:33:41 GMT
+etag: "689ca245-267"
+accept-ranges: bytes
+----------
+<1> hm, strange we still get 200 OK and *NOT* a redirect to HTTPS
+
+WARNING: route attaches to both http and https, need to be clear
