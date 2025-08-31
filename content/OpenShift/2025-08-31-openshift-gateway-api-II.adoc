@@ -1,7 +1,7 @@
 ---
 title: "A second look into the Kubernetes Gateway API on OpenShift"
 description: "A second look into the Kubernetes Gateway API on OpenShift"
-date: "2025-08-30"
+date: "2025-08-31"
 doctype: book
 
 featured_image: /openshift/images/gateway-api/gateway-api.png
@@ -19,7 +19,7 @@ categories:
 tags: ["OpenShift", "OCP", "Istio", "Gateway-API", "Ingress" ]
 
 aliases: [
-	 "/posts-output/2025-08-30-gateway-api-II/",
+	 "/posts-output/2025-08-31-gateway-api-II/",
    "/openshift/2025/08/gateway-api-II",
 ]
 ---
