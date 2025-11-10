@@ -1,6 +1,6 @@
 ---
 title: OpenShift Day-2
-weight: 1
+weight: 3
 chapter: true
 layout: summary
 ---
