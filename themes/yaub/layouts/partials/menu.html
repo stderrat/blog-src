@@ -1,14 +1,19 @@
 <nav id="sidebar" class="{{if $.Site.Params.showVisitedLinks }}showVisitedLinks{{end}}">
-
 {{ $currentNode := . }}
 {{ $showvisitedlinks := .Site.Params.showVisitedLinks }}
   <div id="header-wrapper">
-    <div id="header">
+  <!-- Sidebar Toggle Button -->
+  <button id="sidebar-toggle" class="sidebar-toggle-btn" title="Toggle Sidebar">
+    <i class="fas fa-bars"></i>
+  </button>
+
+  <div id="header">
       {{ partial "logo.html" . }}
     </div>
     {{if not .Site.Params.disableSearch}}
         {{ partial "search.html" . }}
     {{end}}
+
   </div>
 
   <!--
