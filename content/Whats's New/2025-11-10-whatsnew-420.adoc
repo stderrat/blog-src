@@ -1,0 +1,97 @@
+---
+title: "What's new in OpenShift, 4.20 Edition"
+description: "News in OCP 4.20 that tickles our fancy"
+date: "2025-11-10"
+doctype: book
+
+featured_image: /openshift/images/OpenShift-Teuferl.svg
+show_featured_image_summary: false
+show_featured_image_article: true
+
+authors: [Toni Schmidbauer, Thomas Jungbauer]
+type: post
+draft: false
+categories:
+   - OpenShift
+
+tags: ["OpenShift", "OCP" ]
+
+aliases: [
+   "/posts-output/2025-11-10-whatsnew-420/",
+   "/openshift/2025/11/whatsnew-420",
+]
+---
+
+:imagesdir: /openshift/images/
+:icons: font
+:toc:
+
+This article covers news and updates in the OpenShift 4.20 release. We focus on points that got our attention, this
+is *not* a complete summary of the https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html/release_notes/index[release notes].
+
+<!--more-->
+
+== Configuring a local arbiter node
+
+https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html-single/installing_an_on-premise_cluster_with_the_agent-based_installer/index#installing-ocp-agent-local-arbiter-node_installing-with-agent-based-installer[Configuring a local arbiter node] describes how to configure an OCP cluster with only two control plane (ETCD) nodes. Might be useful in a pure bare metal environment where three bare metal control plane nodes might be overkill.
+
+== Two node clusters with fencing
+
+https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html-single/installing_on_bare_metal/index#bmo-about-the-hostfirmwarecomponents-resource_bare-metal-postinstallation-configuration[Two-node with Fencing] still in tech preview. Useful for environments with only two active datacenters. Especially if you have bare metal control plane nodes. We got quite a few customers with only to data centers available.
+
+== About the HostFirmwareComponents resource
+
+https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html-single/installing_on_bare_metal/index#bmo-about-the-hostfirmwarecomponents-resource_bare-metal-postinstallation-configuration[About the HostFirmwareComponents]. When Metal3 is used it's now possible to update the NIC (Network interface card) firmware.
+
+== Boot image updates on Vmware
+
+https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html-single/machine_configuration/index#mco-update-boot-images[Boot image management] can be used to update the boot image for new nodes. Up until now
+when you installed you cluster on VMware with a certain boot image (let's say 4.15) it never got updates. New nodes were always booted from this old image and later updated to the current cluster release.
+
+== About on-cluster image mode
+
+https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html-single/machine_configuration/index#coreos-layering-configuring-on_mco-coreos-layering[About on-cluster image mode]. Image mode allows you to customize the node operating system image. You basically create a Containerfile, install custom RPM's or deploy custom configuration files in the Containerfile and OCP creates a layered image for you cluster. The image is automatically rolled out to the cluster with the Machine Config Operator. Fancy stuff....
+
+== Pinning images
+
+https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html-single/machine_configuration/index#machine-config-pin-preload-images_machine-config-operator[Pinning images]. If your internet connection is flaky, or you have reasons to not trust the availablity of Red Hat registries like quay.io or registry.redhat.io you can now pin images those images. They are pulled down immediately and will not be garbage collected (hopefully...).
+
+== BGP routing
+
+https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html-single/advanced_networking/index#about-bgp-routing[About BGP routing]. MetalLB had support for announcing IP's via BGP for a long time, but now it's also possible to announce UDN's or EgressIP. IMHO this is especially interesting for EgressIP because there were some nasty https://issues.redhat.com/browse/OCPBUGS-42303[bugs] around using https://wiki.wireshark.org/Gratuitous_ARP[GRAP (Gratuitous ARP)] for announcing IP's to switches.
+
+== Migrating a configured br-ex bridge to NMState
+
+https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html-single/installing_on_bare_metal/index#migrating-br-ex-bridge-nmstate_bare-metal-postinstallation-configuration[Migrating a configured br-ex bridge to NMState]. There's this ominous _configure-ovs.sh_ that reconfigures the public interface of a node an brings up br-ex. There was support for deploying an NMState-based configuration during cluster installation and not using _configure-ovs.sh_. Now it's also possible to get rid of the shell script *after* installation.
+
+== Configuration for a Bond CNI secondary network
+
+https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html-single/multiple_networks/index#nw-multus-bond-cni-object_configuring-additional-network-cni[Configuration for a Bond CNI secondary network]. Bond interface can now be created for interface in containers. This currently only supports SR-IOV virtual functions.
+
+== Manage secure signatures with sigstore
+
+https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html-single/nodes/index#nodes-sigstore-using[Manage secure signatures with sigstore]. Sigstore support can now be enabled on a cluster level or on an individual namespace level.
+
+== Running pods in Linux user namespaces
+
+https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html-single/nodes/index#nodes-pods-user-namespaces[Running pods in Linux user namespaces]. This is IMHO a big one. Linux user namespaces are finally supported in OpenShift! So it's possible to grant root inside a container and map the root UID to an unprivileged ID outside the container.
+
+== Adjust pod resource levels without pod disruption
+
+https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html-single/nodes/index#nodes-pods-adjust-resources-in-place[Adjust pod resource levels without pod disruption]. Resize CPU and memory resource without restarting a Pod!
+
+== Introducing the _oc adm upgrade recommend_ command (General Availability)
+
+https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html-single/updating_clusters/index#understanding-openshift-updates[Understanding OpenShift upgrades]. _oc_ know officially supports cluster upgrade from the command line. _oc adm upgrade recommended_ performs some pre-flight checks before upgrading a cluster.
+
+== Additional cluster latency requirements for etcd
+
+https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html-single/etcd/index#recommended-cluster-latency-etcd_etcd-practices[Cluster latency requirements for etcd]. ETCD latency requirements were updated in the documentation.
+
+== Sunset of the Red Hat Marketplace, operated by IBM
+
+https://access.redhat.com/articles/7130828[Sunset of the Red Hat Marketplace, operated by IBM]. It seems Red Hat Marktplace is now more...
+
+== How to use Changed Block Tracking (Dev Preview) in OpenShift 4.20
+
+https://access.redhat.com/solutions/7131061[How to use Changed Block Tracking (Dev Preview) in OpenShift 4.20]. Change block tracking for PV's is now in dev preview. Whatever this means exactly, needs more investigation.

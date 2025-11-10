@@ -1,6 +1,6 @@
 ---
 title: GitOps Episodes
-weight: 1
+weight: 2
 chapter: true
 layout: summary
 

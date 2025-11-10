@@ -1,6 +1,6 @@
 ---
 title: Service Mesh
-weight: 3
+weight: 10
 chapter: true
 layout: summary
 
