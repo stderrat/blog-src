@@ -26,7 +26,7 @@ aliases: [
 :icons: font
 :toc:
 
-This article covers news and updates in the OpenShift 4.20 release. We focus on points that got our attention, this
+This article covers news and updates in the OpenShift 4.20 release. We focus on points that got our attention, but this
 is *not* a complete summary of the https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html/release_notes/index[release notes].
 
 <!--more-->
@@ -90,7 +90,7 @@ https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html-
 
 == Sunset of the Red Hat Marketplace, operated by IBM
 
-https://access.redhat.com/articles/7130828[Sunset of the Red Hat Marketplace, operated by IBM]. It seems Red Hat Marktplace is now more...
+https://access.redhat.com/articles/7130828[Sunset of the Red Hat Marketplace, operated by IBM]. It seems Red Hat Marktplace is no more...
 
 == How to use Changed Block Tracking (Dev Preview) in OpenShift 4.20
 
