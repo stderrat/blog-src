@@ -29,9 +29,7 @@ aliases: [
 This article covers news and updates in the OpenShift 4.20 release. We focus on points that got our attention, this
 is *not* a complete summary of the https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html/release_notes/index[release notes].
 
-
 <!--more-->
-
 
 == Configuring a local arbiter node
 
@@ -65,3 +63,11 @@ https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html-
 == Migrating a configured br-ex bridge to NMState
 
 https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html-single/installing_on_bare_metal/index#migrating-br-ex-bridge-nmstate_bare-metal-postinstallation-configuration[Migrating a configured br-ex bridge to NMState]. There's this ominous _configure-ovs.sh_ that reconfigures the public interface of a node an brings up br-ex. There was support for deploying an NMState-based configuration during cluster installation and not using _configure-ovs.sh_. Now it's also possible to get rid of the shell script *after* installation.
+
+== Configuration for a Bond CNI secondary network
+
+https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html-single/multiple_networks/index#nw-multus-bond-cni-object_configuring-additional-network-cni[Configuration for a Bond CNI secondary network]. Bond interface can now be created for interface in containers. This currently only supports SR-IOV virtual functions.
+
+==
+
+https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html-single/nodes/index#nodes-sigstore-configure-parameters_nodes-sigstore-using[]
