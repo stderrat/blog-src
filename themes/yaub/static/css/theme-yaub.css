@@ -10,6 +10,8 @@
     --CATEGORY-acs: #e9e0fc;
     --CATEGORY-quay: #c4a484;
     --CATEGORY-font-black: #000;
+    --CATEGORY-grafana: #f5a800;
+    --CATEGORY-opentelemetry: #425cc6;
 
     /* DARK THEME COLORS */
     --MAIN-TEXT-color-DARK: #dedede;
@@ -1272,6 +1274,15 @@ span.divider {
 #body .catagories a.gitops {
     background-color: var(--CATEGORY-gitops) !important;
     color: var(--CATEGORY-font-black) !important;
+}
+
+#body .catagories a.grafana {
+    background-color: var(--CATEGORY-grafana) !important;
+    color: var(--CATEGORY-font-black) !important;
+}
+
+#body .catagories a.opentelemetry {
+    background-color: var(--CATEGORY-opentelemetry) !important;
 }
 
 #body .catagories a.ansible {

@@ -1,0 +1,2442 @@
+--- 
+title: "The Hitchhiker's Guide to Distributed Tracing with OpenTelemetry and TempoStack - Part 1"
+description: "Introduction to The Hitchhiker's Guide to Distributed Tracing with OpenTelemetry and TempoStack - Part 1"
+date: "2025-11-24"
+doctype: book
+
+featured_image: /day-2/images/observability/Logo_observability_1.png?width=640px
+show_featured_image_summary: false
+show_featured_image_article: true
+
+authors: [Thomas Jungbauer]
+type: post
+categories:
+   - OpenShift
+   - Observability
+   - Distributed Tracing
+   - OpenTelemetry
+   - Tempo
+   - Grafana
+
+tags: ["OCP", "Day-2", "OpenShift", "Observability", "Distributed Tracing", "Tempo", "Grafana", "OTL", "OTLP", "Logging", "Metrics"] 
+---
+
+:imagesdir: /day-2/images/observability/
+:icons: font
+:toc:
+
+In modern microservices architectures, understanding how requests flow through your distributed system is crucial for debugging, performance optimization, and maintaining system health. **Distributed tracing** provides visibility into these complex interactions by tracking requests as they traverse multiple services.
+
+With the method of distributed tracing you can follow this path of requests as it travels through services.
+
+With this article I like to summarize and, espeically, remember my setup. This is Part 1 of a series of articles that I split up so it is easier to read and understand and not too long.
+
+This whole guide demonstrates how to set up a distributed tracing infrastructure using 
+
+- **OpenShift** (4.16+) as base platform
+- **Red Hat Build of OpenTelemetry** - The observability framework based on https://opentelemetry.io/[OpenTelemetry^]
+- **TempoStack** - https://grafana.com/docs/tempo/latest/[Grafana's distributed^] tracing backend for Kubernetes
+- **Multi-tenant architecture** - Isolating traces by team or environment
+
+<!--more--> 
+
+## Thanks to
+
+This article would not have been possible without the help of https://www.linkedin.com/in/michaela-lang-900603b9/[Michaela Lang^]. Check our her articles on LinkedIn mainly discussing about TRacing and Service Mesh.
+
+## What is OpenTelemetry?
+
+https://opentelemetry.io/[OpenTelemetry^] is an observability framework and toolkit which aims to provide unified, standardized, and vendor-neutral telemetry data collection for traces, metrics and logs for cloud-native software.
+
+NOTE: In this article we will focus on traces only. 
+
+When it comes to Red Hat and OpenShift then the supported installation is based on the Operator **Red Hat Build or OpenTelemetry** it is based on the open source OpenTelemetry project and adds supportability
+
+### Core Features:
+_Source: https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html-single/red_hat_build_of_opentelemetry/index#otel-product-overview_otel-architecture[OpenShift OTEL Product Overview^]_
+
+The **OpenTelemetry Collector** can receive, process, and forward telemetry data in multiple formats, making it the ideal component for telemetry processing and interoperability between telemetry systems. The Collector provides a unified solution for collecting and processing metrics, traces, and logs.
+
+The core features of the OpenTelemetry Collector include:
+
+- **Data Collection and Processing Hub**
+It acts as a central component that gathers telemetry data like metrics and traces from various sources. This data can be created from instrumented applications and infrastructure.
+
+- **Customizable telemetry data pipeline**
+The OpenTelemetry Collector is customizable and supports various processors, exporters, and receivers.
+
+- **Auto-instrumentation features**
+Automatic instrumentation simplifies the process of adding observability to applications. Developers do not need to manually instrument their code for basic telemetry data.
+
+Here are some of the use cases for the OpenTelemetry Collector:
+
+- **Centralized data collection**
+In a microservices architecture, the Collector can be deployed to aggregate data from multiple services.
+
+- **Data enrichment and processing**
+Before forwarding data to analysis tools, the Collector can enrich, filter, and process this data.
+
+- **Multi-backend receiving and exporting**
+The Collector can receive and send data to multiple monitoring and analysis platforms simultaneously.
+You can use Red Hat build of OpenTelemetry in combination with Red Hat OpenShift Distributed Tracing Platform.
+
+## What is Grafana Tempo?
+
+https://grafana.com/oss/tempo/[Grafana Tempo^] is an open-source, easy-to-use, and high-scale distributed tracing backend. Tempo lets you search for traces, generate metrics from spans, and link your tracing data with logs and metrics.
+It is deepply integrated with other Grafana, Prometheus and Loki and can ingest traces from various sources, such as OpenTelemetry, Jaeger, Zipkin and more.
+
+### Core Features:
+
+_Source: https://grafana.com/oss/tempo/[Grafana Tempo^]_
+
+- **Built for massing scale**
+The only dependency is an object storage which provides affordable long term storage of traces.
+
+- **Cost-effective** 
+Not indexing the traces makes it possible to store orders of magnitude more trace data for the same cost
+
+- **Strong integration with open source tools** 
+Compatible with open source tracing protocols
+
+In addition, it is deeply integrated with **Grafana** allowing you to visualize the traces in a Grafana dashboard and link logs, metrics and traces together.
+
+## Use Case for this Article
+
+The use case that was tested in this article was the following:
+
+Several applications (team-a, team-b, ...) are hosted on an OpenShift namespace. 
+On each application namespace a **local** OpenTelemetry Collector (OTC) is configured to collect the traces from the application. These local OpenTelemetry Collectors will export the traces to a **central** OpenTelemetry Collector (hosted in the namespace *tempostack*). 
+The central Collector will then export the data to a TempoStack instance (also hosted in the namespace *tempostack*), which will store the traces on an object storage. The storage itself is provided by an S3-compatible storage, in this example OpenShift Data Foundation.
+
+For a more detailed view see the next section. 
+
+## Architecture Overview
+
+As described the implementation follows a **two-tier collector architecture** with multi-tenancy support:
+
+```mermaid
+graph TB
+    subgraph app["Application Layer"]
+        mockbin1["Mockbin #1<br/>(team-a namespace)<br/>(tenantA)"]
+        mockbin2["Mockbin #2<br/>(team-b namespace)<br/>(tenantB)"]
+    end
+    
+    subgraph local["Local OTC"]
+        otc_a["OTC-team-a<br/>• Add namespace<br/>• Batch processing<br/>• Forward to central"]
+        otc_b["OTC-team-b<br/>• Add namespace<br/>• Batch processing<br/>• Forward to central"]
+    end
+    
+    subgraph central["Central OTC (tempostack namespace)"]
+        otc_central["OTC-central<br/>• Receive from local collectors
+        <br/>• Add K8s metadata (k8sattributes)<br/>• Route by namespace (routing connector)
+        <br/>• Authenticate with bearer token
+        <br/>• Forward to TempoStack with tenant ID"]
+    end
+    
+    subgraph tempo["TempoStack (tempostack namespace)"]
+        tempostack["Multi-tenant Trace Storage<br/>• Tenants: tenantA, tenantB, ...<br/>• S3 backend storage<br/>• 48-hour retention"]
+    end
+    
+    mockbin1 -->|"OTLP"| otc_a
+    mockbin2 -->|"OTLP"| otc_b
+    
+    otc_a -->|"OTLP(with namespace)"| otc_central
+    otc_b -->|"OTLP(with namespace)"| otc_central
+    
+    otc_central -->|"OTLP<br/>(X-Scope-OrgID header)"| tempostack
+    
+    classDef appStyle fill:#e1f5ff,stroke:#0066cc,stroke-width:2px
+    classDef localStyle fill:#fff4e1,stroke:#ff9900,stroke-width:2px;
+    classDef centralStyle fill:#e8f5e9,stroke:#4caf50,stroke-width:2px
+    classDef tempoStyle fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px
+    
+    class mockbin1,mockbin2 appStyle
+    class otc_a,otc_b localStyle
+    class otc_central centralStyle
+    class tempostack tempoStyle
+```
+
+[source,bash]
+----
+             ┌────────────────────────────────┐
+             │      Application Layer         │
+             │  ┌────────── ┐  ┌────────── ┐  │
+             │  │ Todo App  │  │ Mockbin   │  │
+             │  │ (team-a)  │  │ (team-b)  │  │
+             │  │ (tenantA) │  │ (tenantB) │  │             
+             │  └────┬──── ─┘  └── ──┬─────┘  │
+             │       │ OTLP        │ OTLP     │
+             └───────┼─────────────┼──────────┘
+                     │             │   
+                     ▼             ▼    
+┌────────────────────────────────────────────────────────┐
+│             Local OpenTelemetry Collectors             │
+│  ┌─────────────────────┐      ┌─────────────────────┐  │
+│  │  OTC-team-a         │      │  OTC-team-b         │  │
+│  │  - Add namespace    │      │  - Add namespace    │  │
+│  │  - Batch processing │      │  - Batch processing │  │
+│  │  - Forward to       │      │  - Forward to       │  │
+│  │    central          │      │    central          │  │
+│  └─────────┬───────────┘      └──────────┬──────────┘  │
+└────────────┼─────────────────────────────┼─────────────┘
+             │                             │
+             │ OTLP (with namespace)       │ OTLP (with namespace)
+             └──────────────┬──────────────┘
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              Central OpenTelemetry Collector                    │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  OTC-central (tempostack namespace)                       │  │
+│  │  - Receive from local collectors                          │  │
+│  │  - Add K8s metadata (k8sattributes processor)             │  │
+│  │  - Route by namespace (routing connector)                 │  │
+│  │  - Authenticate with bearer token                         │  │
+│  │  - Forward to TempoStack with tenant ID                   │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             │ OTLP (with X-Scope-OrgID header)
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    TempoStack                                   │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  Multi-tenant Trace Storage (tempostack namespace)        │  │
+│  │  - Tenants: tenantA, tenantB, ...                         │  │
+│  │  - S3 backend storage                                     │  │
+│  │  - 48-hour retention                                      │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+----
+
+### Why Two-Tier Architecture?
+
+1. **Separation of Concerns**: Application namespaces handle local processing; central namespace handles routing and storage. The Central decides where and how to store. Application owners cannot overwrite this.
+2. **Resource Efficiency**: Lightweight collectors in app namespaces, heavy processing centralized
+3. **Security**: Applications don't need direct access to TempoStack
+4. **Scalability**: Each tier can scale independently
+5. **Multi-tenancy**: Central collector routes traces to appropriate tenants
+
+## Step-by-Step Implementation
+
+### Prerequisites
+
+Before starting, ensure you have (used versions in this article):
+
+- OpenShift or Kubernetes cluster (OpenShift v4.20)
+- Red Hat build of OpenTelemetry installed (v0.135.0-1)
+- Tempo Operator installed (v0.18.0-2)
+- S3-compatible storage (for TempoStack, based on OpenShift Data Foundation)
+
+NOTE: For all configurations I also created a proper GitOps implementation (of course :)) However, first I would like to show the actual configuration. The GitOps implemention can be found at the end.
+
+### Step 1: Deploy TempoStack
+
+TempoStack is the central trace storage backend. We are using the Tempo Operator here, which provides the TempoStack resource and a multi-tenancy possibility.
+
+CAUTION: Be sure that the S3-bucket is available and a Secret (here tempo-s3) with the following keys exist (valid for OpenShift Data Foundation): **access_key_id, access_key_secret, bucket, endpoint**. The layout of the Secret will look slightly different depending on the S3 storage backup you are using.
+
+**Create the TempoStack instance:**
+
+[source,yaml]
+----
+apiVersion: tempo.grafana.com/v1alpha1
+kind: TempoStack
+metadata:
+  name: simplest <1>
+  namespace: tempostack <2>
+spec:
+  managementState: Managed
+  replicationFactor: 1 <3>
+  
+  # Resource limits
+  resources: <4>
+    total:
+      limits:
+        cpu: "2"
+        memory: 2Gi
+  
+  # Trace retention
+  retention: <5>
+    global:
+      traces: 48h0m0s
+  
+  # S3 storage configuration
+  storage:
+    secret:
+      credentialMode: static <6>
+      name: tempo-s3 <7>
+      type: s3
+    tls:
+      enabled: false
+  storageSize: 500Gi
+  
+  # Multi-tenancy configuration
+  tenants:
+    mode: openshift
+    authentication: <8>
+      - tenantId: 1610b0c3-c509-4592-a256-a1871353dbfa
+        tenantName: tenantA
+      - tenantId: 1610b0c3-c509-4592-a256-a1871353dbfb
+        tenantName: tenantB
+      - tenantId: 1610b0c3-c509-4592-a256-a1871353dbfc
+        tenantName: tenantC
+  
+  # Gateway and UI
+  template: <9>
+    gateway:
+      enabled: true
+      component:
+        replicas: 1
+      ingress:
+        type: route
+        route:
+          termination: reencrypt
+    queryFrontend:
+      component:
+        replicas: 1
+      jaegerQuery:
+        enabled: true
+        servicesQueryDuration: 72h0m0s
+----
+<1> Name of the TempoStack instance
+<2> Namespace of the TempoStack instance
+<3> Integer value for the number of ingesters that must acknowledge the data from the distributors before accepting a span.
+<4> Defines resources for the TempoStack instance. Default is (limit only) 2 CPU and 2Gi memory.
+<5> Configuration options for retention of traces. The default value is 48h.
+<6> Credential mode for the S3 storage. Depends how the storage will be integrated. Default is static.
+<7> Secret name for the S3 storage.
+<8> Configuration options for the tenants. In this example for: tenantA, tenantB, tenantC. Contains of tenantName and tenantId, both can be defined by the user. 
+<9> Configuration options for the different Tempo components. In this example for: gateway, query-frontend. Other components could be: distributor, ingester, compactor or querier
+
+**Key Configuration Points:**
+
+- **Multi-tenancy**: Supports 3 tenants currently (tenantA, tenantB, tenantC)
+- **Retention**: Traces stored for 48 hours
+- **Storage**: Uses S3-compatible backend (requires separate secret)
+- **Gateway**: Exposes OTLP endpoint with TLS
+
+### Step 2: Configure RBAC for Trace Access read/write
+
+Set up ClusterRoles to control who can read and write traces.
+
+CAUTION: The ClusterRoles must be updated whenever a new tenant is configured in TempoStack. The name of the tenant must be added in the **resources** array. 
+
+**Traces Reader Role:**
+
+[source,yaml]
+----
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tempostack-traces-reader <1>
+rules:
+  - verbs: <2>
+      - get
+    apiGroups:
+      - tempo.grafana.com
+    resources:
+      - tenantA <3>
+      - tenantB
+      - tenantC
+    resourceNames:
+      - traces
+----
+<1> Name of the ClusterRole
+<2> Verbs for the ClusterRole. apiGroups: tempo.grafana.com
+- resources:
+    - List of Tenants
+    resourceNames:
+      - traces
+    verbs:
+      - get
+<3> List of tenants that are allowed to read the traces.
+
+**Bind Reader Role for Users:**
+
+[source,yaml]
+----
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tempostack-traces-reader
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: 'system:authenticated' <1>
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tempostack-traces-reader
+----
+<1> The Group that is allowed to read the traces. In this example: **system:authenticated**. This means all authenticated users will be able to read all the traces. (see warning below)
+
+WARNING: With this ClusterRoleBinding anybody who is authenticated (system:authenticated) will be able to see the traces for the defined tenants (A,B,C). This is for an easy show case in this article. If you want to know how to limit this access, please checkout the section "XXX LINK" down below.
+
+**Traces Writer Role:**
+
+This ClusterRole is used to write traces into TempoStack. Typically you will use this ClusterRole for the OpenTelemetry Collector, so it can write into TempoStack.
+
+[source,yaml]
+----
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tempostack-traces-write <1>
+rules:
+  - verbs:
+      - create <2>
+    apiGroups:
+      - tempo.grafana.com
+    resources: <3>
+      - tenantB
+      - tenantA
+      - tenantC
+    resourceNames:
+      - traces
+----
+<1> Name of the ClusterRoleBinding
+<2> This time the verb is **create**. This means the user will be able to write new traces into TempoStack.
+<3> List of tenants.
+
+**Bind Writer Role to Central Collector:**
+
+[source,yaml]
+----
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tempostack-traces
+subjects:
+  - kind: ServiceAccount
+    name: otel-collector <1>
+    namespace: tempostack <2>
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tempostack-traces-write
+----
+<1> The ServiceAccount that is allowed to write the traces. In this example: **otel-collector**.
+<2> The namespace of the ServiceAccount. In this example: **tempostack**.
+
+### Step 3: Configure RBAC for Central Collector
+
+For the OpenTelemetry Collector to function properly with the k8sattributes processor, it requires cluster-wide read access to Kubernetes resources. This is a common pattern for observability tools that need to correlate telemetry data with infrastructure metadata.
+
+Depending on the configuration of the central collector, you might need to configure different RBAC settings to allow the collector to perform specific things. The central collector in our example uses the **k8sattributes processor** and **resourcedetection processor** to enrich traces with Kubernetes and OpenShift metadata. These processors require read access to cluster resources.
+
+**Why These Permissions Are Needed:**
+
+The k8sattributes processor enriches telemetry data by querying the Kubernetes API to add metadata such as:
+- **Pod information**: Pod name, UID, start time
+- **Namespace details**: Namespace name and labels
+- **Deployment context**: ReplicaSet and Deployment names
+- **Node information**: Node name where the pod is running
+
+The resourcedetection processor detects the OpenShift environment by querying:
+- **Infrastructure resources**: Cluster name, platform type, region (from `config.openshift.io/infrastructures`)
+
+Without these permissions, traces would lack critical context needed for debugging and analysis.
+
+TIP: Always check the latest https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html-single/red_hat_build_of_opentelemetry/index#otel-collector-receivers_otel-configuration-of-otel-collector[documentation^] of the appropriate component to get the most up to date information. I prefer to use separate ClusterRoles for each processor to keep the permissions as granular as possible. However, that causes some overhead, so you might want to combine the permissions into a single ClusterRole.
+
+**Create ClusterRole for Kubernetes Attributes:**
+
+[source,yaml]
+----
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: k8sattributes-otel-collector
+rules:
+  # Permissions for k8sattributes processor
+  # Allows the collector to read pod, namespace, and replicaset information
+  # to enrich traces with Kubernetes metadata
+  - verbs:
+      - get
+      - watch
+      - list
+    apiGroups:
+      - '*'
+    resources:
+      - pods
+      - namespaces
+      - replicasets
+  
+  # Permissions for resourcedetection processor (OpenShift)
+  # Allows detection of OpenShift cluster information
+  # such as cluster name, platform type, and region
+  - verbs:
+      - get
+      - watch
+      - list
+    apiGroups:
+      - config.openshift.io
+    resources:
+      - infrastructures
+      - infrastructures/status
+----
+
+**Key Points:**
+
+1. **Read-Only Access**: The collector only needs `get`, `watch`, and `list` verbs (no write permissions)
+2. **Cluster-Wide Scope**: ClusterRole grants permissions across all namespaces, necessary for monitoring multi-tenant environments
+3. **Essential Resources**:
+   - `pods`: Source of trace context (which pod generated the span)
+   - `namespaces`: Namespace metadata and labels for routing
+   - `replicasets`: Determine the owning Deployment for better trace attribution
+4. **OpenShift Infrastructure**: Access to `config.openshift.io/infrastructures` allows detection of cluster-level properties
+
+**Create ClusterRoleBinding:**
+
+This binding grants the `otel-collector` ServiceAccount in the `tempostack` namespace the permissions defined in the ClusterRole.
+
+[source,yaml]
+----
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: k8sattributes-collector-tempo
+subjects:
+  - kind: ServiceAccount
+    name: otel-collector <1>
+    namespace: tempostack <2>
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: k8sattributes-otel-collector
+----
+<1> The ServiceAccount that is allowed to write the traces. In this example: **otel-collector**.
+<2> The namespace of the ServiceAccount. In this example: **tempostack**.
+
+**Security Note:**
+
+These permissions follow the **principle of least privilege**:
+
+- Only read operations are granted (no create, update, or delete)
+- Access is limited to specific resource types needed for metadata enrichment
+- The ServiceAccount is dedicated to the collector and not shared with other applications
+
+### Step 4: Deploy Central OpenTelemetry Collector
+
+The central collector receives traces from local collectors, enriches them with Kubernetes metadata, and routes them to appropriate TempoStack tenants. To be absolutely honest with you, this was the most difficult part to configure, but once you got it working, it is easy to extend and modify.
+
+**Create Service Account:**
+
+The ServiceAccount used by the OpenTelemetry Collector. This is the service account that will be used to authenticate to the TempoStack instance. Thus the Bindings created earlier, to write into TempoStack and to read from Kubernetes, will be required.
+
+NOTE: In this article we are installing the central Collector into the same namespace as the TempoStack instance. However, you might want to install it in a different namespace to keep the namespaces separated. Keep an eye on possible Network Policies that might be required to allow the communication between the namespaces.
+
+[source,yaml]
+----
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: otel-collector
+  namespace: tempostack
+----
+
+**Deploy Central Collector:**
+
+For the sake of simplicity, I have taken snippets from the whole Configuration manifest. At the end of this section you will find the whole manifest.
+
+#### Basic Configuration:
+
+The very basic settings of the OpenTelemetry Collector, are the amount of replicas, the ServiceAccount to use and the deployment mode.
+
+The Collector can be deployed in one of the following modes:
+
+- **Deployment** (default) - Creates a Deployment with the given numbers of replicas.
+- **StatefulSet** - Creates a StatefulSet with the given numbers of replicas. Useful for stateful workloads, for example when using the Collector’s File Storage Extension or Tail Sampling Processor.
+- **DaemonSet** - Creates a DaemonSet with the given numbers of replicas. Useful for scraping telemetry data from every node, for example by using the Collector’s Filelog Receiver to read container logs.
+- **Sidecar** - Injects the Collector as a sidecar into the pod. Useful for accessing log files inside a container, for example by using the Collector’s Filelog Receiver and a shared volume such as emptyDir.
+
+In the examples in this article we are using the modes: **deployment** and **sidecar**.
+
+[source,yaml]
+----
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: otel
+  namespace: tempostack
+spec:
+  mode: deployment <1>
+  replicas: 1 <2>
+  serviceAccount: otel-collector <3>
+[...]
+----
+<1> The deployment mode to use.
+<2> The number of replicas to use.
+<3> The ServiceAccount to use, created in the previous step.
+
+#### Receivers:
+
+The Receivers are the components that **receive** the traces from the local collectors. Receivers accept data in a specified format and translate it into the internal format. In our example we want to receive the traces from the local collectors. For our tests we are using the **oltp** Receiver, which is collecting traces, metrics and logs by using the OpenTelemetry Protocol (OTLP).
+
+The easiest configuration is:
+
+[source,yaml]
+----
+    receivers:
+      otlp: <1>
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317 <2>
+          http:
+            endpoint: 0.0.0.0:4318 <3>
+----
+<1> The name of the receiver.
+<2> The gRPC endpoint to receive.
+<3> The http endpoint to receive.
+
+NOTE: Besides the otlp receiver, there are other receivers available. For example: **Jaeger**, **Kubernetes Object Receiver**, **Kubelet Stats Receiver**, **Prometheus Receiver**, **Filelog Receiver**, **Journald Receiver**, **Kubernetes Events Receiver**, **Kubernetes Cluster Receiver**, **OpenCensus Receiver**, **Zipkin Receiver**, **Kafka Receiver**. Please check the https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html-single/red_hat_build_of_opentelemetry/index#otel-collector-receivers_otel-configuration-of-otel-collector[OpenShift OTEL Receivers^] documentationfor more details.
+
+#### Processors:
+
+The Processors are the components that **process** the data between it is received and exported. Processors are completely optional, but they are useful to transform, enrich, or filter traces. 
+
+WARNING: The order of processors matters.
+
+The example configuration is using the following processors:
+- **k8sattributes**: Can add Kubernetes metadata to the traces.
+- **resourcedetection**: Can detect OpenShift/K8s environment info.
+- **memory_limiter**: Periodically checks the Collector's memory usage and pauses data processing when the soft memory limit is reached.
+- **batch**: Batches the traces for efficiency. This is a very important processor to improve the performance of the Collector.
+
+NOTE: Additional processors are available. Please check the https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html-single/red_hat_build_of_opentelemetry/index#otel-collector-processors[OpenShift OTEL Processors^] documentation for more details.
+
+WARNING: Some processors will requires additional ClusterRole configuration.
+
+[source,yaml]
+----
+    # Processors - enrich and batch traces
+    processors:
+      # Add Kubernetes metadata
+      k8sattributes: {}
+      
+      # Detect OpenShift/K8s environment info
+      resourcedetection:
+        detectors:
+          - openshift
+        timeout: 2s
+      
+      # Memory protection
+      memory_limiter:
+        check_interval: 1s
+        limit_percentage: 75
+        spike_limit_percentage: 15
+      
+      # Batch for efficiency
+      batch:
+        send_batch_size: 10000
+        timeout: 10s
+----
+
+#### Connectors:
+
+A Connector is able to join two pipelines. It consumes data as an exporter at the end of one pipeline and emits data as a receiver at the start of another pipeline. It can consume and emit data of the same or different data type. It can generate and emit data to summarize the consumed data, or it can merely replicate or route data.
+
+Several Connectors are available:
+
+- **Count Connector**: Counts traces spans, trace span events, metrics, metric data points, and log records.
+- **Routing Connector**: Routes the traces to different pipelines.
+- **Forward Connector**: Merges two pipelines of the same type.
+- **Spanmetrics Connector**: Aggregates Request, Error, and Duration (R.E.D) OpenTelemetry metrics from span data.
+
+The https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html-single/red_hat_build_of_opentelemetry/index#otel-collector-connectors[OpenShift OTEL Connectors^] documentation lists all available Connectors and their configuration options.
+
+
+In our example we are using the **routing** Connector, which is able to route the traces to different pipelines based on the namespace.
+This helps, to route the traces to the correct tenant, without the need to configure this in the local OpenTelemetry Collector. (In other words, the project cannot change this setting, because it is configured in the central OpenTelemetry Collector.)
+
+In this example traces from the namespace "team-a" will be routed to the pipeline "tenantA", traces from the namespace "team-b" will be routed to the pipeline "tenantB", and so on.
+
+[source,yaml]
+----
+    # Connectors - route traces to different pipelines
+    connectors:
+      routing/traces:
+        default_pipelines: <1>
+          - traces/Default
+        error_mode: ignore <2>
+        table:
+          # Route team-a namespace to tenantA
+          - statement: route() where attributes["k8s.namespace.name"] == "team-a" <3>
+            pipelines:
+              - traces/tenantA
+          # Route team-b namespace to tenantB
+          - statement: route() where attributes["k8s.namespace.name"] == "team-b"
+            pipelines:
+              - traces/tenantB
+          # Route team-c namespace to tenantC
+          - statement: route() where attributes["k8s.namespace.name"] == "team-c"
+            pipelines:
+              - traces/tenantC
+----
+<1> Destination pipelines for routing the telemetry data for which no routing condition is satisfied.
+<2> Error-handling mode: The propagate value is for logging an error and dropping the payload. The ignore value is for ignoring the condition and attempting to match with the next one. The silent value is the same as ignore but without logging the error. The default is propagate.
+<3> Route traces from namespace **team-a** to the pipeline **tenantA**.
+
+
+#### Exporters:
+
+The Exporters are the components that **export** the traces to a destination. Exporters accept data in a specified format and translate it into the destination format. In our example we want to export the traces to the TempoStack instance. The X-Scope-OrgID header is used to identify the tenant and is sent to the TempoStack instance.
+The authentication is done by using the ServiceAccount token.
+
+Many different Exporters are available. The https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html-single/red_hat_build_of_opentelemetry/index#otel-collector-exporters[OpenShift OTEL Exporters^] documentation lists all available Exporters and their configuration options.
+
+For our tests we are using the **otlp** Exporter, which will export using the OpenTelemetry Protocol (OTLP):
+
+[source,yaml]
+----
+    exporters:
+      # Tenant A exporter
+      otlp/tenantA: <1>
+        endpoint: tempo-simplest-gateway:8090 <2>
+        auth:
+          authenticator: bearertokenauth
+        headers:
+          X-Scope-OrgID: tenantA <3>
+        tls:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+          insecure_skip_verify: true <4>
+          server_name_override: tempo-simplest-gateway.tempostack.svc.cluster.local <5>         
+----
+<1> Protocol or name of the exporter.
+<2> The endpoint to export to. The endpoint is the address of the TempoStack instance.
+<3> The scope org ID to use.
+<4> Whether to skip certificate verification. I did not bother with certificates in this example.
+<5> The server name override to use. This was just for testing purposes and can be omitted.
+
+#### Extensions:
+
+The Extensions extend the Collector capabilities. In our example we are using the **bearertokenauth** Extension, which is used to authenticate to the TempoStack instance.
+
+[source,yaml]
+----
+    # Extensions - authentication
+    extensions:
+      bearertokenauth:
+        filename: /var/run/secrets/kubernetes.io/serviceaccount/token
+----
+
+#### Service:
+
+Components are enabled by adding them into a Pipeline. If a component is not configured in a pipeline, it is not enabled.
+
+In this example we are using the following pipelines (snippets):
+
+- **traces/in**: The incoming traces pipeline.
+- **traces/tenantA**: The tenant A pipeline.
+
+The *traces/in* pipeline is the incoming traces pipeline. It is used to receive the traces from the local collectors. It is using the **otlp** Receiver to receive the traces. It is using the **resourcedetection**, **k8sattributes**, **memory_limiter**, and **batch** processors to process the traces. And finally, is using the **routing/traces** Connector to route the traces to the **routing/traces**.
+
+The **routing/traces** Connector is used to route the traces to the correct tenant based on the namespace. 
+
+The **traces/tenantA** Pipeline is used to receive the traces from **routing/traces** and export the traces to **oltp/tenantA** which then uses TempoStack to store the traces using the header **X-Scope-OrgID: tenantA**.
+
+[source,yaml]
+----
+    # Service pipelines
+    service:
+      extensions:
+        - bearertokenauth
+      
+      pipelines:
+        # Incoming traces pipeline
+        traces/in:
+          receivers:
+            - otlp
+          processors:
+            - resourcedetection
+            - k8sattributes
+            - memory_limiter
+            - batch
+          exporters:
+            - routing/traces
+        
+        # Tenant A pipeline
+        traces/tenantA:
+          receivers:
+            - routing/traces
+          exporters:
+            - otlp/tenantA
+----
+
+#### Complete OpenTelemetry Collector Manifest:
+
+Let's put everything together in the complete OpenTelemetry Collector Manifest. The following defines the Central OpenTelemetry Collector:
+
+- **mode**: The deployment mode to use.
+- **replicas**: The number of replicas to use.
+- **serviceAccount**: The ServiceAccount to use, created in the previous step.
+- **config**: The configuration of the OpenTelemetry Collector.
+  - **receivers**: The receivers to use.
+  - **processors**: The processors to use.
+  - **connectors**: The connectors to use.
+  - **exporters**: The exporters to use.
+  - **extensions**: The extensions to use.
+  - **service**: The service to use.
+
+[source,yaml]
+----
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: otel
+  namespace: tempostack
+spec:
+  mode: deployment
+  replicas: 1
+  serviceAccount: otel-collector
+  
+  config:
+    # Receivers - accept traces from local collectors
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+    
+    # Processors - enrich and batch traces
+    processors:
+      # Add Kubernetes metadata
+      k8sattributes: {}
+      
+      # Detect OpenShift/K8s environment info
+      resourcedetection:
+        detectors:
+          - openshift
+        timeout: 2s
+      
+      # Memory protection
+      memory_limiter:
+        check_interval: 1s
+        limit_percentage: 75
+        spike_limit_percentage: 15
+      
+      # Batch for efficiency
+      batch:
+        send_batch_size: 10000
+        timeout: 10s
+    
+    # Connectors - route traces to different pipelines
+    connectors:
+      routing/traces:
+        default_pipelines:
+          - traces/Default
+        error_mode: ignore
+        table:
+          # Route team-a namespace to tenantA
+          - statement: route() where attributes["k8s.namespace.name"] == "team-a"
+            pipelines:
+              - traces/tenantA
+          # Route team-b namespace to tenantB
+          - statement: route() where attributes["k8s.namespace.name"] == "team-b"
+            pipelines:
+              - traces/tenantB
+          # Route team-c namespace to tenantC
+          - statement: route() where attributes["k8s.namespace.name"] == "team-c"
+            pipelines:
+              - traces/tenantC
+    
+    # Exporters - send to TempoStack
+    exporters:      
+      # Tenant A exporter
+      otlp/tenantA:
+        endpoint: tempo-simplest-gateway:8090
+        auth:
+          authenticator: bearertokenauth
+        headers:
+          X-Scope-OrgID: tenantA
+        tls:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+          insecure_skip_verify: true
+          server_name_override: tempo-simplest-gateway.tempostack.svc.cluster.local
+      
+      # Tenant B exporter
+      otlp/tenantB:
+        endpoint: tempo-simplest-gateway:8090
+        auth:
+          authenticator: bearertokenauth
+        headers:
+          X-Scope-OrgID: tenantB
+        tls:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+          insecure_skip_verify: true
+          server_name_override: tempo-simplest-gateway.tempostack.svc.cluster.local
+    
+    # Extensions - authentication
+    extensions:
+      bearertokenauth:
+        filename: /var/run/secrets/kubernetes.io/serviceaccount/token
+    
+    # Service pipelines
+    service:
+      extensions:
+        - bearertokenauth
+      
+      pipelines:
+        # Incoming traces pipeline
+        traces/in:
+          receivers:
+            - otlp
+          processors:
+            - resourcedetection
+            - k8sattributes
+            - memory_limiter
+            - batch
+          exporters:
+            - routing/traces
+        
+        # Default tenant pipeline
+        traces/Default:
+          receivers:
+            - routing/traces
+          exporters:
+            - otlp/Default
+        
+        # Tenant A pipeline
+        traces/tenantA:
+          receivers:
+            - routing/traces
+          exporters:
+            - otlp/tenantA
+        
+        # Tenant B pipeline
+        traces/tenantB:
+          receivers:
+            - routing/traces
+          exporters:
+            - otlp/tenantB
+----
+
+
+------------------------------------------------------------------------------------------------
+
+### Step 5: Deploy Local OpenTelemetry Collectors
+
+Local collectors run in application namespaces and forward traces to the central collector.
+
+**Team-A Namespace Setup:**
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: team-a
+```
+
+**Service Account:**
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: otelcol-agent
+  namespace: team-a
+```
+
+**Local Collector for Team-A:**
+
+```yaml
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: otelcol-agent
+  namespace: team-a
+spec:
+  mode: deployment
+  replicas: 1
+  serviceAccount: otelcol-agent
+  
+  config:
+    # Receivers - accept traces from applications
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+    
+    # Processors
+    processors:
+      # Add namespace identifier
+      attributes:
+        actions:
+          - action: insert
+            key: k8s.namespace.name
+            value: team-a
+      
+      # Batch for efficiency
+      batch: {}
+    
+    # Exporters - forward to central collector
+    exporters:
+      otlp/central:
+        endpoint: otel-collector.tempostack.svc.cluster.local:4317
+        tls:
+          insecure: true
+    
+    # Service pipeline
+    service:
+      pipelines:
+        traces:
+          receivers:
+            - otlp
+          processors:
+            - batch
+            - attributes
+          exporters:
+            - otlp/central
+```
+
+**Local Collector for Team-B (with Sidecar Mode):**
+
+```yaml
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: otelcol-agent
+  namespace: team-b
+spec:
+  mode: sidecar  # Injected as sidecar container
+  serviceAccount: otelcol-agent
+  
+  config:
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+    
+    processors:
+      attributes:
+        actions:
+          - action: insert
+            key: k8s.namespace.name
+            value: team-b
+      batch: {}
+    
+    exporters:
+      otlp/central:
+        endpoint: otel-collector.tempostack.svc.cluster.local:4317
+        tls:
+          insecure: true
+    
+    service:
+      pipelines:
+        traces:
+          receivers:
+            - otlp
+          processors:
+            - batch
+            - attributes
+          exporters:
+            - otlp/central
+```
+
+**Enable Sidecar Injection for Team-B:**
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: team-b
+  annotations:
+    sidecar.opentelemetry.io/inject: "true"
+```
+
+### Step 6: Deploy and Instrument Applications
+
+Now let's deploy applications that generate traces.
+
+**Example 1: Quarkus TODO Application (Team-A)**
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: todo
+  namespace: team-a
+  labels:
+    app: todo
+    app.openshift.io/runtime: quarkus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: todo
+  template:
+    metadata:
+      labels:
+        app: todo
+        version: v1
+    spec:
+      containers:
+      - name: todo
+        image: quay.io/voravitl/todo:otel
+        env:
+          # Configure OTLP endpoint
+          - name: quarkus.otel.exporter.otlp.endpoint
+            value: http://otelcol-agent-collector.team-a.svc.cluster.local:4317
+          
+          # Enable access logs
+          - name: quarkus.http.access-log.enabled
+            value: "true"
+          
+          # Set log level
+          - name: quarkus.log.level
+            value: INFO
+        
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        
+        resources:
+          requests:
+            cpu: 100m
+            memory: 300Mi
+          limits:
+            cpu: 200m
+            memory: 500Mi
+        
+        livenessProbe:
+          httpGet:
+            path: /q/health/live
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 300
+        
+        readinessProbe:
+          httpGet:
+            path: /q/health/ready
+            port: 8080
+          initialDelaySeconds: 12
+          periodSeconds: 300
+```
+
+**Example 2: Python Mockbin Application (Team-B)**
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mockbin
+  namespace: team-b
+  labels:
+    app: mockbin
+    app.openshift.io/runtime: python
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mockbin
+  template:
+    metadata:
+      labels:
+        app: mockbin
+    spec:
+      serviceAccount: mockbin
+      containers:
+      - name: mockbin
+        image: quay.io/tjungbau/mockbin:1.8.1
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+```
+
+**Note**: Since team-b namespace has sidecar injection enabled, the OTel collector sidecar is automatically injected into the mockbin pods.
+
+**Example 3: Simple Demo App**
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-app
+  namespace: team-a
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo-app
+  template:
+    metadata:
+      labels:
+        app: demo-app
+    spec:
+      containers:
+      - name: demo
+        image: curlimages/curl:8.2.1
+        command:
+        - sh
+        - -c
+        - while true; do sleep 5; echo hit; done
+        env:
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://otelcol-agent-collector.team-a.svc.cluster.local:4318/v1/traces
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: service.name=demo-app-tenantA
+```
+
+### Step 7: Verify the Setup
+
+**Check TempoStack Status:**
+
+```bash
+kubectl get tempostack -n tempostack
+```
+
+Expected output:
+```
+NAME       STATUS   VERSION
+simplest   Ready    2.8.2
+```
+
+**Check Central Collector:**
+
+```bash
+kubectl get otelcol -n tempostack
+kubectl get pods -n tempostack -l app.kubernetes.io/name=otel-collector
+```
+
+**Check Local Collectors:**
+
+```bash
+kubectl get otelcol -n team-a
+kubectl get otelcol -n team-b
+```
+
+**Check Application Pods:**
+
+```bash
+kubectl get pods -n team-a
+kubectl get pods -n team-b
+```
+
+**Access Jaeger UI:**
+
+Get the route to Jaeger UI:
+```bash
+kubectl get route -n tempostack
+```
+
+Navigate to the Jaeger UI URL and select your tenant to view traces.
+
+## Advanced Concepts
+
+### 1. Kubernetes Attributes Enrichment
+
+The **k8sattributes processor** is a critical component that enriches telemetry data with Kubernetes metadata. Understanding how it works helps you leverage this information for better observability.
+
+**How It Works:**
+
+When a trace span arrives at the central collector, the k8sattributes processor:
+
+1. **Extracts the source IP** from the incoming connection
+2. **Queries the Kubernetes API** to find the pod with that IP
+3. **Retrieves metadata** from the pod and its owners (ReplicaSet, Deployment)
+4. **Adds attributes** to the span
+
+**Metadata Added by k8sattributes Processor:**
+
+```yaml
+# Pod-level attributes
+k8s.pod.name: "todo-6b8c86d6c-xyz12"
+k8s.pod.uid: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+k8s.pod.start_time: "2025-11-20T11:30:15Z"
+k8s.pod.ip: "10.128.2.45"
+
+# Namespace attributes
+k8s.namespace.name: "team-a"
+
+# Node attributes
+k8s.node.name: "worker-node-1"
+
+# Deployment/ReplicaSet attributes
+k8s.replicaset.name: "todo-6b8c86d6c"
+k8s.replicaset.uid: "b2c3d4e5-f6g7-8901-bcde-f12345678901"
+k8s.deployment.name: "todo"
+
+# Container attributes
+k8s.container.name: "todo"
+k8s.container.restart_count: "0"
+```
+
+**Why This Matters:**
+
+1. **Root Cause Analysis**: Quickly identify which pod generated an error trace
+2. **Capacity Planning**: Correlate traces with node resources
+3. **Deployment Tracking**: See which version (ReplicaSet) produced specific traces
+4. **Multi-tenant Routing**: Use `k8s.namespace.name` to route traces to appropriate tenants
+5. **Pod Lifecycle Context**: Understand if issues occur during pod startup (`k8s.pod.start_time`)
+
+**Example Use Case:**
+
+When investigating slow database queries in the `todo` application, you can:
+- Filter traces by `k8s.deployment.name: "todo"`
+- Group by `k8s.pod.name` to identify if specific pods are slower
+- Check `k8s.node.name` to see if issues are node-specific
+- Use `k8s.namespace.name` to isolate team-specific problems
+
+**Performance Considerations:**
+
+The k8sattributes processor caches pod metadata to minimize API calls:
+- Default cache TTL: 10 minutes
+- Updates are triggered by Kubernetes watch events
+- Minimal impact on trace processing latency
+
+**Required RBAC Permissions:**
+
+As configured in Step 3, the processor requires:
+```yaml
+- get, watch, list: pods, namespaces, replicasets
+```
+
+These permissions allow the processor to:
+- **get**: Retrieve specific pod details by IP
+- **watch**: Receive real-time updates when pods change
+- **list**: Build initial cache of all pods
+
+### 2. OpenShift Resource Detection
+
+The **resourcedetection processor** with the `openshift` detector adds cluster-level metadata by querying OpenShift-specific APIs.
+
+**Infrastructure Metadata Added:**
+
+```yaml
+# From config.openshift.io/infrastructures
+cloud.platform: "aws"  # or "gcp", "azure", "none"
+cloud.region: "us-east-1"
+cloud.availability_zone: "us-east-1a"
+k8s.cluster.name: "production-cluster"
+```
+
+**Why Access to `config.openshift.io/infrastructures` Is Needed:**
+
+The `Infrastructure` resource in OpenShift contains:
+- **Platform Type**: AWS, GCP, Azure, bare metal
+- **Region**: Cloud provider region
+- **Cluster Name**: Unique cluster identifier
+- **API Server URL**: Internal/external endpoints
+
+**Example Infrastructure Resource:**
+
+```yaml
+apiVersion: config.openshift.io/v1
+kind: Infrastructure
+metadata:
+  name: cluster
+spec:
+  platformSpec:
+    type: AWS
+status:
+  platform: AWS
+  platformStatus:
+    aws:
+      region: us-east-1
+  infrastructureName: production-cluster
+```
+
+**Benefits:**
+
+1. **Multi-Cluster Tracing**: Identify which cluster generated traces
+2. **Regional Analysis**: Compare performance across regions
+3. **Cloud Provider Context**: Understand platform-specific behaviors
+4. **Cost Attribution**: Associate traces with specific cloud accounts
+
+**RBAC for OpenShift Detection:**
+
+```yaml
+- verbs: [get, watch, list]
+  apiGroups: [config.openshift.io]
+  resources: [infrastructures, infrastructures/status]
+```
+
+This read-only access allows the collector to:
+- Query the cluster's infrastructure configuration
+- Detect platform changes (e.g., cluster migration)
+- Add consistent cluster identity to all traces
+
+### 3. Trace Propagation
+
+OpenTelemetry uses **context propagation** to maintain trace continuity across service boundaries. The trace context is passed via HTTP headers:
+
+- `traceparent`: Contains trace ID, span ID, and sampling decision
+- `tracestate`: Vendor-specific trace information
+
+### 4. Sampling Strategies
+
+Control which traces are collected:
+
+```yaml
+processors:
+  probabilistic_sampler:
+    sampling_percentage: 10  # Sample 10% of traces
+```
+
+### 5. Resource Attributes
+
+Attach metadata to all spans from a service:
+
+```yaml
+processors:
+  resource:
+    attributes:
+      - key: service.version
+        value: "1.2.3"
+        action: insert
+      - key: deployment.environment
+        value: "production"
+        action: insert
+```
+
+### 6. Span Attributes
+
+Add custom attributes to individual spans in your application code:
+
+**Java (Quarkus):**
+```java
+import io.opentelemetry.api.trace.Span;
+
+Span span = Span.current();
+span.setAttribute("user.id", userId);
+span.setAttribute("order.amount", orderAmount);
+```
+
+**Python:**
+```python
+from opentelemetry import trace
+
+span = trace.get_current_span()
+span.set_attribute("user.id", user_id)
+span.set_attribute("order.amount", order_amount)
+```
+
+### 7. Performance Optimization
+
+**Batch Processor Configuration:**
+```yaml
+processors:
+  batch:
+    send_batch_size: 10000      # Batch size
+    timeout: 10s                 # Max wait time
+    send_batch_max_size: 11000   # Absolute max
+```
+
+**Memory Limiter:**
+```yaml
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 75         # Soft limit
+    spike_limit_percentage: 15   # Allows temporary spikes
+```
+
+## Adding a New Tenant (Application)
+
+As your organization grows, you'll need to add new teams or applications to your tracing infrastructure. This section walks through all the required steps to onboard a new tenant.
+
+### Scenario: Adding Team-C
+
+Let's add a new tenant called "team-c" with their own namespace, local collector, and route to TempoStack tenant "tenantC".
+
+### Step 1: Update TempoStack Configuration
+
+If the tenant doesn't already exist in TempoStack, add it to the tenants list.
+
+**Edit the TempoStack resource:**
+
+```bash
+kubectl edit tempostack simplest -n tempostack
+```
+
+**Add the new tenant to the authentication list:**
+
+```yaml
+spec:
+  tenants:
+    mode: openshift
+    authentication:
+      - tenantId: 1610b0c3-c509-4592-a256-a1871353dbfa
+        tenantName: dev
+      - tenantId: 1610b0c3-c509-4592-a256-a1871353dbfb
+        tenantName: prod
+      - tenantId: 1610b0c3-c509-4592-a256-a1871353dbfc
+        tenantName: tenantA
+      - tenantId: 1610b0c3-c509-4592-a256-a1871353dbfd
+        tenantName: tenantB
+      - tenantId: 1610b0c3-c509-4592-a256-a1871353dbfe
+        tenantName: tenantC
+      # Add new tenant
+      - tenantId: 1610b0c3-c509-4592-a256-a1871353dbff
+        tenantName: team-c
+```
+
+**Note**: Generate a unique `tenantId` (UUID format) for the new tenant. You can use:
+```bash
+uuidgen | tr '[:upper:]' '[:lower:]'
+```
+
+### Step 2: Update RBAC Permissions
+
+Update the ClusterRoles to grant write and read permissions for the new tenant.
+
+**Update traces-write ClusterRole:**
+
+```bash
+kubectl edit clusterrole tempostack-traces-write
+```
+
+```yaml
+rules:
+  - verbs:
+      - create
+    apiGroups:
+      - tempo.grafana.com
+    resources:
+      - dev
+      - prod
+      - tenantA
+      - tenantB
+      - tenantC
+      - team-c    # Add new tenant
+    resourceNames:
+      - traces
+```
+
+**Update traces-reader ClusterRole:**
+
+```bash
+kubectl edit clusterrole tempostack-traces-reader
+```
+
+```yaml
+rules:
+  - verbs:
+      - get
+    apiGroups:
+      - tempo.grafana.com
+    resources:
+      - dev
+      - tenantA
+      - tenantB
+      - tenantC
+      - team-c    # Add new tenant
+    resourceNames:
+      - traces
+```
+
+### Step 3: Update Central OpenTelemetry Collector
+
+The central collector needs configuration changes to route traces from the new namespace to the appropriate TempoStack tenant.
+
+**Edit the central collector:**
+
+```bash
+kubectl edit otelcol otel -n tempostack
+```
+
+**Add routing rule in the connectors section:**
+
+```yaml
+spec:
+  config:
+    connectors:
+      routing/traces:
+        default_pipelines:
+          - traces/Default
+        error_mode: ignore
+        table:
+          - statement: route() where attributes["k8s.namespace.name"] == "team-a"
+            pipelines:
+              - traces/tenantA
+          - statement: route() where attributes["k8s.namespace.name"] == "team-b"
+            pipelines:
+              - traces/tenantB
+          - statement: route() where attributes["k8s.namespace.name"] == "team-c"
+            pipelines:
+              - traces/tenantC
+          # Add new routing rule
+          - statement: route() where attributes["k8s.namespace.name"] == "team-c"
+            pipelines:
+              - traces/team-c
+```
+
+**Add exporter for the new tenant:**
+
+```yaml
+spec:
+  config:
+    exporters:
+      # ... existing exporters ...
+      
+      # New tenant exporter
+      otlp/team-c:
+        endpoint: tempo-simplest-gateway:8090
+        auth:
+          authenticator: bearertokenauth
+        headers:
+          X-Scope-OrgID: team-c
+        tls:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+          insecure_skip_verify: true
+          server_name_override: tempo-simplest-gateway.tempostack.svc.cluster.local
+```
+
+**Add pipeline for the new tenant:**
+
+```yaml
+spec:
+  config:
+    service:
+      pipelines:
+        # ... existing pipelines ...
+        
+        # New tenant pipeline
+        traces/team-c:
+          receivers:
+            - routing/traces
+          exporters:
+            - otlp/team-c
+```
+
+**Alternatively, apply the full configuration:**
+
+Save this to a file (e.g., `otel-central-updated.yaml`) and apply it:
+
+```yaml
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: otel
+  namespace: tempostack
+spec:
+  mode: deployment
+  replicas: 1
+  serviceAccount: otel-collector
+  config:
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+    
+    processors:
+      k8sattributes: {}
+      resourcedetection:
+        detectors:
+          - openshift
+        timeout: 2s
+      memory_limiter:
+        check_interval: 1s
+        limit_percentage: 75
+        spike_limit_percentage: 15
+      batch:
+        send_batch_size: 10000
+        timeout: 10s
+    
+    connectors:
+      routing/traces:
+        default_pipelines:
+          - traces/Default
+        error_mode: ignore
+        table:
+          - statement: route() where attributes["k8s.namespace.name"] == "team-a"
+            pipelines:
+              - traces/tenantA
+          - statement: route() where attributes["k8s.namespace.name"] == "team-b"
+            pipelines:
+              - traces/tenantB
+          - statement: route() where attributes["k8s.namespace.name"] == "team-c"
+            pipelines:
+              - traces/tenantC
+          # New routing rule
+          - statement: route() where attributes["k8s.namespace.name"] == "team-c"
+            pipelines:
+              - traces/team-c
+    
+    exporters:
+      otlp/Default:
+        endpoint: tempo-simplest-gateway:8090
+        auth:
+          authenticator: bearertokenauth
+        headers:
+          X-Scope-OrgID: dev
+        tls:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+          insecure_skip_verify: true
+          server_name_override: tempo-simplest-gateway.tempostack.svc.cluster.local
+      
+      otlp/tenantA:
+        endpoint: tempo-simplest-gateway:8090
+        auth:
+          authenticator: bearertokenauth
+        headers:
+          X-Scope-OrgID: tenantA
+        tls:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+          insecure_skip_verify: true
+          server_name_override: tempo-simplest-gateway.tempostack.svc.cluster.local
+      
+      otlp/tenantB:
+        endpoint: tempo-simplest-gateway:8090
+        auth:
+          authenticator: bearertokenauth
+        headers:
+          X-Scope-OrgID: tenantB
+        tls:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+          insecure_skip_verify: true
+          server_name_override: tempo-simplest-gateway.tempostack.svc.cluster.local
+      
+      otlp/tenantC:
+        endpoint: tempo-simplest-gateway:8090
+        auth:
+          authenticator: bearertokenauth
+        headers:
+          X-Scope-OrgID: tenantC
+        tls:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+          insecure_skip_verify: true
+          server_name_override: tempo-simplest-gateway.tempostack.svc.cluster.local
+      
+      # New tenant exporter
+      otlp/team-c:
+        endpoint: tempo-simplest-gateway:8090
+        auth:
+          authenticator: bearertokenauth
+        headers:
+          X-Scope-OrgID: team-c
+        tls:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+          insecure_skip_verify: true
+          server_name_override: tempo-simplest-gateway.tempostack.svc.cluster.local
+    
+    extensions:
+      bearertokenauth:
+        filename: /var/run/secrets/kubernetes.io/serviceaccount/token
+    
+    service:
+      extensions:
+        - bearertokenauth
+      pipelines:
+        traces/in:
+          receivers:
+            - otlp
+          processors:
+            - resourcedetection
+            - k8sattributes
+            - memory_limiter
+            - batch
+          exporters:
+            - routing/traces
+        
+        traces/Default:
+          receivers:
+            - routing/traces
+          exporters:
+            - otlp/Default
+        
+        traces/tenantA:
+          receivers:
+            - routing/traces
+          exporters:
+            - otlp/tenantA
+        
+        traces/tenantB:
+          receivers:
+            - routing/traces
+          exporters:
+            - otlp/tenantB
+        
+        traces/tenantC:
+          receivers:
+            - routing/traces
+          exporters:
+            - otlp/tenantC
+        
+        # New tenant pipeline
+        traces/team-c:
+          receivers:
+            - routing/traces
+          exporters:
+            - otlp/team-c
+```
+
+Apply the configuration:
+```bash
+kubectl apply -f otel-central-updated.yaml
+```
+
+### Step 4: Create Namespace for New Team
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: team-c
+  labels:
+    kubernetes.io/metadata.name: team-c
+  # Optional: Enable sidecar injection
+  # annotations:
+  #   sidecar.opentelemetry.io/inject: "true"
+```
+
+Apply:
+```bash
+kubectl apply -f team-c-namespace.yaml
+```
+
+### Step 5: Deploy Local OpenTelemetry Collector
+
+**Create ServiceAccount:**
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: otelcol-agent
+  namespace: team-c
+```
+
+**Deploy Local Collector:**
+
+```yaml
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: otelcol-agent
+  namespace: team-c
+spec:
+  mode: deployment  # or "sidecar" for auto-injection
+  replicas: 1
+  serviceAccount: otelcol-agent
+  
+  config:
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+    
+    processors:
+      # Add namespace identifier
+      attributes:
+        actions:
+          - action: insert
+            key: k8s.namespace.name
+            value: team-c
+      
+      batch: {}
+    
+    exporters:
+      # Forward to central collector
+      otlp/central:
+        endpoint: otel-collector.tempostack.svc.cluster.local:4317
+        tls:
+          insecure: true
+    
+    service:
+      pipelines:
+        traces:
+          receivers:
+            - otlp
+          processors:
+            - batch
+            - attributes
+          exporters:
+            - otlp/central
+      
+      telemetry:
+        metrics:
+          readers:
+            - pull:
+                exporter:
+                  prometheus:
+                    host: 0.0.0.0
+                    port: 8888
+```
+
+Apply:
+```bash
+kubectl apply -f otelcol-agent-team-c.yaml
+```
+
+### Step 6: Deploy Your Application
+
+Now deploy your application configured to send traces to the local collector.
+
+**Example Application:**
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  namespace: team-c
+  labels:
+    app: my-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - name: my-app
+        image: my-registry/my-app:latest
+        env:
+          # Configure OpenTelemetry
+          - name: OTEL_EXPORTER_OTLP_ENDPOINT
+            value: http://otelcol-agent-collector.team-c.svc.cluster.local:4317
+          - name: OTEL_SERVICE_NAME
+            value: my-app
+          - name: OTEL_RESOURCE_ATTRIBUTES
+            value: service.namespace=team-c,deployment.environment=production
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+```
+
+Apply:
+```bash
+kubectl apply -f my-app-deployment.yaml
+```
+
+### Step 7: Verify the New Tenant
+
+**Check all components are running:**
+
+```bash
+# Check namespace
+kubectl get namespace team-c
+
+# Check local collector
+kubectl get otelcol -n team-c
+kubectl get pods -n team-c -l app.kubernetes.io/name=otelcol-agent-collector
+
+# Check application
+kubectl get pods -n team-c -l app=my-app
+
+# Check central collector (should be restarted)
+kubectl get pods -n tempostack -l app.kubernetes.io/name=otel-collector
+```
+
+**Check local collector logs:**
+
+```bash
+kubectl logs -n team-c deployment/otelcol-agent-collector
+```
+
+Look for successful connection messages to the central collector.
+
+**Check central collector logs:**
+
+```bash
+kubectl logs -n tempostack deployment/otel-collector
+```
+
+Look for:
+- Traces being received from team-c namespace
+- Routing logic matching team-c traces
+- Successful export to TempoStack with X-Scope-OrgID: team-c
+
+**Generate test traces:**
+
+```bash
+# Port-forward to your application
+kubectl port-forward -n team-c deployment/my-app 8080:8080
+
+# Make requests to generate traces
+curl http://localhost:8080/api/endpoint
+```
+
+**View traces in Jaeger UI:**
+
+1. Get Jaeger UI route:
+   ```bash
+   kubectl get route -n tempostack
+   ```
+
+2. Open Jaeger UI in browser
+3. Select tenant: `team-c`
+4. Select service: `my-app`
+5. Click "Find Traces"
+
+You should see traces from your new application!
+
+### Quick Checklist for Adding a New Tenant
+
+Use this checklist to ensure you haven't missed any steps:
+
+- [ ] **TempoStack**: Add tenant to `spec.tenants.authentication[]`
+- [ ] **ClusterRole (write)**: Add tenant name to `tempostack-traces-write` resources
+- [ ] **ClusterRole (read)**: Add tenant name to `tempostack-traces-reader` resources
+- [ ] **Central OTC Routing**: Add routing rule in `connectors.routing/traces.table[]`
+- [ ] **Central OTC Exporter**: Add `otlp/[tenant-name]` exporter with correct `X-Scope-OrgID`
+- [ ] **Central OTC Pipeline**: Add `traces/[tenant-name]` pipeline
+- [ ] **Namespace**: Create namespace for the team
+- [ ] **ServiceAccount**: Create ServiceAccount for local collector
+- [ ] **Local OTC**: Deploy OpenTelemetryCollector in team namespace
+- [ ] **Application**: Deploy application with OTEL configuration
+- [ ] **Verify**: Check logs, generate traces, view in Jaeger UI
+
+**Note on RBAC:** You do NOT need to create new ClusterRoles for each tenant. The `k8sattributes-otel-collector` ClusterRole (configured in Step 3) already grants the central collector cluster-wide read access to pods, namespaces, and replicasets across all namespaces. This single ClusterRole serves all tenants.
+
+### Common Mistakes to Avoid
+
+1. **Mismatched Tenant Names**: Ensure tenant name in TempoStack matches the `X-Scope-OrgID` header in the exporter
+2. **Wrong Namespace Attribute**: The routing rule matches on `k8s.namespace.name`, ensure the local collector sets this correctly
+3. **Forgot RBAC Update**: Without updating ClusterRoles, traces will be rejected
+4. **Typo in Pipeline Names**: Pipeline names in routing connector must match the actual pipeline definitions
+5. **Missing exporter in Pipeline**: Each new pipeline must reference the correct exporter (e.g., `otlp/team-c`)
+
+### Alternative: Using a Default Catch-All Tenant
+
+If you don't want to update the central collector for every new team, you can use a default tenant for unmatched namespaces:
+
+```yaml
+connectors:
+  routing/traces:
+    default_pipelines:
+      - traces/Default    # All unmatched traces go here
+    error_mode: ignore
+    table:
+      - statement: route() where attributes["k8s.namespace.name"] == "team-a"
+        pipelines:
+          - traces/tenantA
+      - statement: route() where attributes["k8s.namespace.name"] == "team-b"
+        pipelines:
+          - traces/tenantB
+      # New teams automatically go to Default pipeline (dev tenant)
+```
+
+This approach is simpler but provides less tenant isolation.
+
+## Troubleshooting
+
+### Traces Not Appearing in Jaeger
+
+1. **Check collector logs:**
+   ```bash
+   kubectl logs -n tempostack deployment/otel-collector
+   kubectl logs -n team-a deployment/otelcol-agent-collector
+   ```
+
+2. **Verify connectivity:**
+   ```bash
+   kubectl exec -n team-a deployment/otelcol-agent-collector -- \
+     curl -v otel-collector.tempostack.svc.cluster.local:4317
+   ```
+
+3. **Check RBAC permissions:**
+   ```bash
+   kubectl auth can-i create traces.tempo.grafana.com/traces \
+     --as=system:serviceaccount:tempostack:otel-collector
+   ```
+
+### High Memory Usage
+
+Adjust collector resources:
+```yaml
+spec:
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 512Mi
+      cpu: 500m
+```
+
+Configure memory limiter:
+```yaml
+processors:
+  memory_limiter:
+    limit_percentage: 50  # Lower the limit
+```
+
+### Authentication Errors
+
+Ensure bearer token authentication is configured:
+```yaml
+extensions:
+  bearertokenauth:
+    filename: /var/run/secrets/kubernetes.io/serviceaccount/token
+
+exporters:
+  otlp:
+    auth:
+      authenticator: bearertokenauth
+```
+
+### RBAC Permission Issues
+
+If traces are missing Kubernetes metadata or the collector is logging permission errors:
+
+**Symptom:** Traces appear but lack `k8s.pod.name`, `k8s.namespace.name`, etc.
+
+**Check ClusterRole exists:**
+```bash
+kubectl get clusterrole k8sattributes-otel-collector
+```
+
+**Check ClusterRoleBinding:**
+```bash
+kubectl get clusterrolebinding k8sattributes-collector-tempo
+kubectl describe clusterrolebinding k8sattributes-collector-tempo
+```
+
+Verify the binding references:
+- **Subject**: ServiceAccount `otel-collector` in namespace `tempostack`
+- **RoleRef**: ClusterRole `k8sattributes-otel-collector`
+
+**Test Permissions:**
+```bash
+# Test if the ServiceAccount can list pods
+kubectl auth can-i list pods \
+  --as=system:serviceaccount:tempostack:otel-collector
+
+# Test namespace access
+kubectl auth can-i list namespaces \
+  --as=system:serviceaccount:tempostack:otel-collector
+
+# Test replicaset access
+kubectl auth can-i list replicasets \
+  --as=system:serviceaccount:tempostack:otel-collector
+
+# Test OpenShift infrastructure access
+kubectl auth can-i get infrastructures.config.openshift.io \
+  --as=system:serviceaccount:tempostack:otel-collector
+```
+
+All commands should return `yes`.
+
+**Check Collector Logs for RBAC Errors:**
+```bash
+kubectl logs -n tempostack deployment/otel-collector | grep -i "forbidden\|unauthorized\|rbac"
+```
+
+Common error messages:
+- `"forbidden: User \"system:serviceaccount:tempostack:otel-collector\" cannot list resource \"pods\"`
+- `"k8sattributes: failed to get pod: Unauthorized"`
+
+**Fix:** Reapply the ClusterRole and ClusterRoleBinding:
+```bash
+kubectl apply -f cr-otel-kubernetesattributes.yaml
+kubectl apply -f crb-otel-kubernetesattributes.yaml
+
+# Restart the collector to pick up new permissions
+kubectl rollout restart deployment/otel-collector -n tempostack
+```
+
+**OpenShift-Specific Check:**
+
+For the resourcedetection processor to work, verify infrastructure access:
+```bash
+# Should return cluster information
+kubectl get infrastructure cluster -o yaml
+
+# Verify collector can access it
+kubectl auth can-i get infrastructures.config.openshift.io/cluster \
+  --as=system:serviceaccount:tempostack:otel-collector
+```
+
+## Security Model and RBAC Architecture
+
+Understanding the security model is crucial for maintaining a secure observability infrastructure.
+
+### RBAC Roles Overview
+
+The configuration uses three distinct sets of permissions:
+
+#### 1. Central Collector Kubernetes Access (`k8sattributes-otel-collector`)
+
+**Purpose**: Allow metadata enrichment via k8sattributes and resourcedetection processors
+
+**Permissions**:
+```yaml
+- get, watch, list: pods, namespaces, replicasets (apiGroups: '*')
+- get, watch, list: infrastructures, infrastructures/status (apiGroups: config.openshift.io)
+```
+
+**Bound to**: `otel-collector` ServiceAccount in `tempostack` namespace
+
+**Security Rationale**: 
+- Read-only access minimizes risk
+- Cluster-wide scope necessary for multi-tenant metadata enrichment
+- No write permissions prevent accidental or malicious modifications
+
+#### 2. TempoStack Trace Writer (`tempostack-traces-write`)
+
+**Purpose**: Allow central collector to write traces to TempoStack
+
+**Permissions**:
+```yaml
+- create: traces (resources: dev, prod, tenantA, tenantB, tenantC)
+- apiGroups: tempo.grafana.com
+```
+
+**Bound to**: `otel-collector` ServiceAccount in `tempostack` namespace
+
+**Security Rationale**:
+- Only `create` verb (no read, update, or delete)
+- Explicit list of allowed tenants prevents unauthorized access
+- Scoped to TempoStack-specific API group
+
+#### 3. TempoStack Trace Reader (`tempostack-traces-reader`)
+
+**Purpose**: Allow users to query traces via Jaeger UI
+
+**Permissions**:
+```yaml
+- get: traces (resources: dev, tenantA, tenantB, tenantC)
+- apiGroups: tempo.grafana.com
+```
+
+**Bound to**: Group `system:authenticated` (all authenticated users)
+
+**Security Rationale**:
+- Read-only access for consumption
+- Can be restricted to specific groups/users for stricter access control
+- Per-tenant resource names allow fine-grained access policies
+
+### Security Best Practices
+
+1. **Principle of Least Privilege**: Each ServiceAccount has only the minimum permissions required
+2. **Separation of Duties**: 
+   - Local collectors: No Kubernetes API access, just forward traces
+   - Central collector: Kubernetes read + TempoStack write
+   - Users: TempoStack read only
+3. **Namespace Isolation**: Local collectors run in application namespaces with separate ServiceAccounts
+4. **No Privileged Access**: Collectors don't require elevated privileges or host access
+5. **Audit Trail**: RBAC events are logged in Kubernetes audit logs
+
+### Trust Boundaries
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Application Namespace (team-a)                         │
+│  Trust Level: Application                               │
+│  ┌──────────────┐         ┌──────────────┐             │
+│  │ Application  │────────>│ Local OTC    │             │
+│  │ (no K8s API) │  OTLP   │ (no K8s API) │             │
+│  └──────────────┘         └──────┬───────┘             │
+└────────────────────────────────────┼─────────────────────┘
+                                     │ OTLP (with namespace)
+                                     ▼
+┌─────────────────────────────────────────────────────────┐
+│  Central Namespace (tempostack)                         │
+│  Trust Level: Infrastructure                            │
+│  ┌──────────────────────────────────────────┐           │
+│  │ Central OTC                              │           │
+│  │ Permissions:                             │           │
+│  │ - Read K8s metadata (pods, namespaces)   │           │
+│  │ - Write traces to TempoStack             │           │
+│  └────────────────┬─────────────────────────┘           │
+│                   │ OTLP + X-Scope-OrgID                │
+│                   ▼                                      │
+│  ┌──────────────────────────────────────────┐           │
+│  │ TempoStack                               │           │
+│  │ Multi-tenant trace storage               │           │
+│  └──────────────────────────────────────────┘           │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Why Local Collectors Don't Need Kubernetes RBAC
+
+Local collectors in application namespaces don't require ClusterRoles because:
+
+1. **No Metadata Enrichment**: They just forward traces, no processing
+2. **Namespace Attribute**: Added via static configuration, not API queries
+3. **Security Boundary**: Applications shouldn't have cluster-wide read access
+4. **Simpler Management**: No RBAC changes needed when adding new teams
+
+The central collector performs all Kubernetes API queries centrally, improving security and reducing complexity.
+
+## Best Practices
+
+### 1. Deployment Strategy
+
+- **Use Sidecar Mode** for applications requiring low-latency trace collection
+- **Use Deployment Mode** for centralized collectors serving multiple applications
+- **Use DaemonSet Mode** for node-level collection (infrastructure monitoring)
+
+### 2. Resource Management
+
+```yaml
+# Local collectors (lightweight)
+resources:
+  requests:
+    memory: 128Mi
+    cpu: 50m
+  limits:
+    memory: 256Mi
+    cpu: 200m
+
+# Central collector (heavier processing)
+resources:
+  requests:
+    memory: 512Mi
+    cpu: 200m
+  limits:
+    memory: 2Gi
+    cpu: 1000m
+```
+
+### 3. Security
+
+- Always use TLS for production deployments
+- Implement RBAC for trace access control
+- Use ServiceAccount tokens for authentication
+- Rotate credentials regularly
+
+### 4. Scalability
+
+- Scale collectors horizontally based on trace volume
+- Use consistent hashing for stateful pipelines
+- Monitor collector metrics (dropped spans, queue size)
+
+### 5. Multi-tenancy
+
+- Isolate traces by team, environment, or application
+- Use routing connectors for dynamic tenant assignment
+- Set appropriate retention policies per tenant
+
+## Monitoring Collector Health
+
+OpenTelemetry Collector exposes Prometheus metrics:
+
+```yaml
+service:
+  telemetry:
+    metrics:
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888
+```
+
+**Key Metrics to Monitor:**
+
+- `otelcol_receiver_accepted_spans`: Spans received
+- `otelcol_receiver_refused_spans`: Spans rejected
+- `otelcol_exporter_sent_spans`: Spans successfully exported
+- `otelcol_exporter_failed_spans`: Failed exports
+- `otelcol_processor_batch_batch_send_size`: Batch sizes
+- `otelcol_process_memory_rss`: Memory usage
+
+## Conclusion
+
+This guide demonstrated how to build a production-ready distributed tracing infrastructure using OpenTelemetry and TempoStack. The two-tier collector architecture provides:
+
+- **Scalability**: Independent scaling of local and central collectors
+- **Multi-tenancy**: Trace isolation by team or environment
+- **Flexibility**: Easy to add new applications and tenants
+- **Security**: RBAC-based access control with principle of least privilege
+- **Observability**: Rich metadata enrichment with Kubernetes and OpenShift attributes
+
+### Key Security Takeaways
+
+1. **ClusterRole for k8sattributes**: Essential for the central collector to enrich traces with Kubernetes metadata (pods, namespaces, replicasets)
+2. **OpenShift Infrastructure Access**: Allows detection of cluster identity, region, and platform type
+3. **Read-Only Permissions**: Collectors only need read access to Kubernetes API
+4. **Tenant Isolation**: Separate ClusterRoles control trace write and read access per tenant
+5. **ServiceAccount per Component**: Each collector has its own identity and permissions
+
+### RBAC Configuration Summary
+
+The complete RBAC setup requires:
+
+| Resource | Purpose | Required By | Permissions |
+|----------|---------|-------------|-------------|
+| `k8sattributes-otel-collector` ClusterRole | K8s metadata enrichment | Central collector | get, watch, list: pods, namespaces, replicasets, infrastructures |
+| `k8sattributes-collector-tempo` ClusterRoleBinding | Bind K8s permissions to collector | Central collector SA | - |
+| `tempostack-traces-write` ClusterRole | Write traces to TempoStack | Central collector | create: traces (per tenant) |
+| `tempostack-traces` ClusterRoleBinding | Bind write permissions | Central collector SA | - |
+| `tempostack-traces-reader` ClusterRole | Query traces | Users/Jaeger UI | get: traces (per tenant) |
+| `tempostack-traces-reader` ClusterRoleBinding | Bind read permissions | Authenticated users | - |
+
+These RBAC configurations follow OpenShift best practices for:
+- **Role separation**: Different roles for different responsibilities
+- **Least privilege**: Minimal permissions for each component
+- **Auditability**: Clear permission boundaries for security reviews
+
+### Next Steps
+
+1. **Instrument More Services**: Add OpenTelemetry SDKs to additional applications
+2. **Configure Sampling**: Implement intelligent sampling strategies for high-volume services
+3. **Create Dashboards**: Build Grafana dashboards using TempoStack metrics
+4. **Set Up Alerts**: Create alerts based on trace metrics (error rates, latencies)
+5. **Integrate Logs**: Correlate traces with logs using trace IDs
+
+### Additional Resources
+
+**OpenTelemetry:**
+- [OpenTelemetry Documentation](https://opentelemetry.io/docs/)
+- [OpenTelemetry Collector Configuration](https://opentelemetry.io/docs/collector/configuration/)
+- [k8sattributes Processor Documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/k8sattributesprocessor)
+- [Resource Detection Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor)
+- [OpenTelemetry Operator](https://github.com/open-telemetry/opentelemetry-operator)
+- [OTLP Specification](https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/protocol/otlp.md)
+
+**Tempo and TempoStack:**
+- [Tempo Documentation](https://grafana.com/docs/tempo/)
+- [TempoStack Operator](https://github.com/grafana/tempo-operator)
+
+**OpenShift:**
+- [OpenShift RBAC Documentation](https://docs.redhat.com/en/documentation/openshift_container_platform/4.15/html/authentication_and_authorization/using-rbac)
+- [OpenShift ServiceAccounts](https://docs.redhat.com/en/documentation/openshift_container_platform/4.15/html/authentication_and_authorization/understanding-and-creating-service-accounts)
+- [OpenShift Distributed Tracing](https://docs.redhat.com/en/documentation/openshift_container_platform/4.15/html/distributed_tracing)
+- [OpenShift API Resources (config.openshift.io)](https://docs.openshift.com/container-platform/4.15/rest_api/config_apis/infrastructure-config-openshift-io-v1.html)
+
+---
+
+**About the Author**: This guide is based on a real-world implementation of OpenTelemetry and TempoStack in a Kubernetes/OpenShift environment, demonstrating best practices for distributed tracing in production systems.
+
