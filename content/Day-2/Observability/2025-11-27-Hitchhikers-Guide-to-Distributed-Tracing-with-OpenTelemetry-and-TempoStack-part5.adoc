@@ -1,0 +1,244 @@
+--- 
+title: "The Hitchhiker's Guide to Observability - Understanding Traces - Part 5"
+description: "Understanding Traces - Part 5"
+date: "2025-11-27"
+doctype: book
+weight: 500
+
+featured_image: /day-2/images/observability/Logo_observability_5.png
+show_featured_image_summary: false
+show_featured_image_article: true
+disableBreadcrumb: true
+
+authors: [Thomas Jungbauer]
+type: post
+categories:
+   - OpenShift
+   - Observability
+   - Distributed Tracing
+   - OpenTelemetry
+   - Tempo
+   - Grafana
+
+tags: ["OCP", "Day-2", "OpenShift", "Observability", "Distributed Tracing", "Tempo", "Grafana", "OTL", "OTLP", "Logging", "Metrics"] 
+---
+
+:imagesdir: /day-2/images/observability/
+:icons: font
+:toc:
+
+
+
+With the link:/day-2/observability/2025-11-23-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part1/[architecture established], link:/day-2/observability/2025-11-24-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part2/[TempoStack deployed], link:/day-2/observability/2025-11-25-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part3/[the Central Collector configured], and link:/day-2/observability/2025-11-26-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part4/[applications generating traces], it's time to take a step back and understand what we're actually building. Before you deploy more applications and start troubleshooting performance issues, you need to **understand how to read and interpret distributed traces**.
+
+Let's decode the matrix of distributed tracing!
+
+<!--more--> 
+
+## Understanding Distributed Traces
+
+WARNING: This article is not a comprehensive guide to distributed tracing. It is a quick overview to understand the building blocks of a trace.
+
+We need to understand the building blocks of a trace to be able to interpret them in the UI. 
+As the UI, we will use the integrated tracing interface inside OpenShift. 
+
+NOTE: Also compare with: https://grafana.com/docs/tempo/latest/introduction/trace-structure/[Trace Structure in Tempo Documentation^].
+
+### What You Can Do With Traces
+
+. Performance Optimization
+
+* Identify slow operations (database queries, API calls)
+* Find bottlenecks in the critical path
+* Compare performance across versions/deployments
+
+. Root Cause Analysis
+
+* Trace errors back to their origin
+* See the complete context of a failure
+* Understand cascading failures
+
+. Service Dependencies
+
+* Visualize your service architecture
+* Identify tightly coupled services
+* Plan capacity and scaling
+
+. User Experience Monitoring
+
+* Track end-to-end latency for user actions
+* Identify outliers and edge cases
+* Correlate user complaints with actual traces
+
+. Capacity Planning
+
+* Understand resource usage patterns
+* Identify underutilized or overloaded services
+* Plan infrastructure scaling
+
+. A/B Testing and Rollouts
+
+* Compare performance between feature flags
+* Verify canary deployments
+* Measure impact of code changes
+
+
+### What is a Trace?
+
+A **trace** represents the complete journey of a request as it flows through your system. Every service, database call, and external API interaction along the way will be tracked. 
+
+**Key Characteristics:**
+
+* **Unique Trace ID**: Every trace has a globally unique identifier (128-bit or 64-bit)
+* **Timeline**: Traces capture the temporal relationship between operations
+* **Distributed Context**: Maintains continuity across service boundaries
+* **Hierarchical Structure**: Organized as a tree of spans
+
+### What is a Span?
+
+A **span** is the fundamental unit of work in distributed tracing. It represents a single operation within a trace - such as handling an HTTP request, executing a database query, or calling an external service.
+
+### Span Components
+
+The following components of a span can be considered (among others):
+
+[cols="1,3", options="header"]
+|===
+|Component |Description
+
+|**Name**
+|Human-readable description of the operation (e.g., "GET /api/users", "SELECT FROM orders")
+
+|**Trace ID**
+|Links this span to its parent trace
+
+|**Span ID**
+|Unique identifier for this specific span
+
+|**Start Time**
+|When the operation began (nanosecond precision)
+
+|**Duration**
+|How long the operation took
+
+|**Span Kind**
+|Type of span: SERVER, CLIENT, PRODUCER, CONSUMER, INTERNAL
+
+|**Status**
+|Operation outcome: OK, ERROR, UNSET
+|===
+
+### Trace Tree Structure
+
+A trace forms a **directed acyclic graph (DAG)** - typically a tree structure where each span can have multiple children but only one parent.
+
+**Visual Example: Basic Trace Structure**
+
+```mermaid
+---
+config:
+  theme: 'neutral'
+---
+graph TD
+    %% Grouping everything as a Trace
+    subgraph Trace
+        direction TB
+        SpanA[Span A]
+        SpanB[Span B]
+        SpanC[Span C]
+        SpanD[Span D]
+        SpanE[Span E]
+    end
+
+    %% Quotes added to handle the curly braces
+    SpanA -->|"{Span context}"| SpanB
+    SpanA -->|"{Span context}"| SpanC
+    SpanC -->|"{Span context}"| SpanD
+    SpanC -->|"{Span context}"| SpanE
+```
+
+**What This Trace Structure Shows:**
+
+* **Span A** is the **root span** (parent of all other spans)
+* **Span B** and **Span C** are direct children of Span A (parallel operations)
+* **Span D** and **Span E** are children of Span C (sequential or parallel sub-operations)
+* The **span context** is propagated from parent to child, maintaining trace continuity
+* This hierarchical structure allows you to understand the complete request flow
+
+Let's have a look at a real trace in the OpenShift UI under **Observe > Traces**:
+
+image::trace-example.png[Trace Example]
+
+### Span Attributes: Adding Context
+
+Attributes are key-value pairs that add semantic meaning to spans. OpenTelemetry defines **semantic conventions** - standardized attribute names for common scenarios.
+
+**HTTP Attributes:**
+```
+http.method: "POST"
+http.url: "https://api.example.com/checkout"
+http.status_code: 200
+http.user_agent: "Mozilla/5.0..."
+```
+
+**Database Attributes:**
+```
+db.system: "postgresql"
+db.name: "orders"
+db.statement: "SELECT * FROM orders WHERE user_id = $1"
+db.connection_string: "postgresql://db.example.com:5432"
+```
+
+**Kubernetes Attributes (added by k8sattributes processor):**
+```
+k8s.namespace.name: "team-a"
+k8s.pod.name: "checkout-service-7d8f9c-xyz12"
+k8s.deployment.name: "checkout-service"
+k8s.node.name: "worker-node-2"
+```
+
+**Custom Business Attributes:**
+```
+user.id: "12345"
+order.id: "ORD-98765"
+order.total: 149.99
+payment.method: "credit_card"
+inventory.items_count: 3
+```
+
+### Span Events: Timestamped Logs
+
+**Events** are timestamped messages within a span that mark significant moments:
+
+```
+Span: Process Payment
+├─ Event @ 10ms: "Payment request validated"
+├─ Event @ 50ms: "Calling payment gateway"
+├─ Event @ 750ms: "Payment gateway responded"
+└─ Event @ 760ms: "Payment confirmed"
+```
+
+**Use Cases for Span Events:**
+
+* Debug checkpoints
+* Exception details
+* State transitions
+* External API interactions
+
+### Span Status and Error Handling
+
+Spans have three status codes:
+
+* **UNSET**: Default, operation completed (not necessarily successful)
+* **OK**: Explicitly marked as successful
+* **ERROR**: Operation failed
+
+Let's call one of your application endpoints on the path **/exception/500**. This will return a 500 status code and the span will be marked as ERROR.
+
+```bash
+curl -X GET https://<YOUR-APPLICATION-URL>/exception/500
+```
+
+Now we can see the span in the trace with the error status. Note how the span is highlighted in red, indicating an error occurred:
+
+image::trace-error-handling.png[Span Status]

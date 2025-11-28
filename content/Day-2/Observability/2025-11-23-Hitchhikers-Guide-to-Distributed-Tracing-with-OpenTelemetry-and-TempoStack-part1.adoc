@@ -1,0 +1,183 @@
+--- 
+title: "The Hitchhiker's Guide to Observability Introduction - Part 1"
+description: "The Hitchhiker's Guide to Observability with OpenTelemetry and Tempo - Part 1"
+date: "2025-11-23"
+doctype: book
+weight: 100
+
+featured_image: /day-2/images/observability/Logo_observability_1.png?width=640px
+show_featured_image_summary: false
+show_featured_image_article: true
+disableBreadcrumb: true
+
+authors: [Thomas Jungbauer]
+type: post
+categories:
+   - OpenShift
+   - Observability
+   - Distributed Tracing
+   - OpenTelemetry
+   - Tempo
+   - Grafana
+
+tags: ["OCP", "Day-2", "OpenShift", "Observability", "Distributed Tracing", "Tempo", "Grafana", "OTL", "OTLP", "Logging", "Metrics"] 
+---
+
+:imagesdir: /day-2/images/observability/
+:icons: font
+:toc:
+
+In modern microservices architectures, understanding how requests flow through your distributed system is crucial for debugging, performance optimization, and maintaining system health. **Distributed tracing** provides visibility into these complex interactions by tracking requests as they traverse multiple services.
+
+With this article I would like to summarize and, especially, remember my setup. This is Part 1 of a series of articles that I split up so it is easier to read and understand and not too long. Initially, there will be 6 parts, but I will add more as needed.
+
+This whole guide demonstrates how to set up a distributed tracing infrastructure using 
+
+- **OpenShift** (4.16+) as base platform
+- **Red Hat Build of OpenTelemetry** - The observability framework based on https://opentelemetry.io/[OpenTelemetry^]
+- **TempoStack** - https://grafana.com/docs/tempo/latest/[Grafana's distributed^] tracing backend for Kubernetes
+- **Multi-tenant architecture** - Isolating traces by team or environment
+- **Cluster Observability Operator** - For now this Operator is only used to extend the OpenShift UI with the tracing UI.
+
+<!--more--> 
+
+## Thanks to
+
+This article would not have been possible without the help of https://www.linkedin.com/in/michaela-lang-900603b9/[Michaela Lang^]. Check out her articles on LinkedIn mainly discussing Tracing and Service Mesh.
+
+## What is OpenTelemetry?
+
+https://opentelemetry.io/[OpenTelemetry^] is an observability framework and toolkit which aims to provide unified, standardized, and vendor-neutral telemetry data collection for traces, metrics and logs for cloud-native software.
+
+NOTE: In this article we will focus on traces only. 
+
+When it comes to Red Hat and OpenShift, the supported installation is based on the Operator **Red Hat Build of OpenTelemetry**, which is based on the open source OpenTelemetry project and adds supportability.
+
+### Core Features:
+_Source: https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html-single/red_hat_build_of_opentelemetry/index#otel-product-overview_otel-architecture[OpenShift OTEL Product Overview^]_
+
+The **OpenTelemetry Collector** can receive, process, and forward telemetry data in multiple formats, making it the ideal component for telemetry processing and interoperability between telemetry systems. The Collector provides a unified solution for collecting and processing metrics, traces, and logs.
+
+The core features of the OpenTelemetry Collector include:
+
+- **Data Collection and Processing Hub**
+It acts as a central component that gathers telemetry data like metrics and traces from various sources. This data can be created from instrumented applications and infrastructure.
+
+- **Customizable telemetry data pipeline**
+The OpenTelemetry Collector is customizable and supports various processors, exporters, and receivers.
+
+- **Auto-instrumentation features**
+Automatic instrumentation simplifies the process of adding observability to applications. If used, developers do not need to manually instrument their code for basic telemetry data. (This depends a bit on the used coding language and framework, maybe this is worth a separate article)
+
+Here are some of the use cases for the OpenTelemetry Collector:
+
+- **Centralized data collection**
+In a microservices architecture, the Collector can be deployed to aggregate data from multiple services.
+
+- **Data enrichment and processing**
+Before forwarding data to analysis tools, the Collector can enrich, filter, and process this data.
+
+- **Multi-backend receiving and exporting**
+The Collector can receive and send data to multiple monitoring and analysis platforms simultaneously.
+You can use Red Hat build of OpenTelemetry in combination with Red Hat OpenShift Distributed Tracing Platform.
+
+## What is Grafana Tempo?
+
+https://grafana.com/oss/tempo/[Grafana Tempo^] is an open-source, easy-to-use, and high-scale distributed tracing backend. Tempo lets you search for traces, generate metrics from spans, and link your tracing data with logs and metrics.
+It is deeply integrated with Grafana, Prometheus and Loki and can ingest traces from various sources, such as OpenTelemetry, Jaeger, Zipkin and more.
+
+### Core Features:
+
+_Source: https://grafana.com/oss/tempo/[Grafana Tempo^]_
+
+- **Built for massive scale**
+The only dependency is object storage which provides affordable long-term storage of traces.
+
+- **Cost-effective** 
+Not indexing the traces makes it possible to store orders of magnitude more trace data for the same cost.
+
+- **Strong integration with open source tools** 
+Compatible with open source tracing protocols.
+
+In addition, it is deeply integrated with **Grafana**, allowing you to visualize the traces in a Grafana dashboard and link logs, metrics and traces together.
+
+## Use Case for this Article
+
+The use case that was tested in this article was the following:
+
+Several applications (team-a, team-b, ...) are hosted on separate OpenShift namespaces. 
+On each application namespace, a **local** OpenTelemetry Collector (OTC) is configured to collect the traces from the application. These local OpenTelemetry Collectors will export the traces to a **central** OpenTelemetry Collector (hosted in the namespace *tempostack*). 
+The central Collector will then export the data to a TempoStack instance (also hosted in the namespace *tempostack*), which will store the traces in object storage. The storage itself is provided by S3-compatible storage, in this example OpenShift Data Foundation.
+
+For a more detailed view see the next section. 
+
+## Architecture Overview
+
+As described the implementation follows a **two-tier collector architecture** with multi-tenancy support:
+
+```mermaid 
+---
+title: "Architecture Overview"
+config:
+  theme: 'dark'
+---
+graph TB
+    subgraph app["Application"]
+        mockbin1["Mockbin #1<br/>(team-a namespace)<br/>(tenantA)"]
+        mockbin2["Mockbin #2<br/>(team-b namespace)<br/>(tenantB)"]
+    end
+    
+    subgraph local["Local OTC"]
+        otc_a["OTC-team-a<br/>• Add namespace<br/>• Batch processing<br/>• Forward to central"]
+        otc_b["OTC-team-b<br/>• Add namespace<br/>• Batch processing<br/>• Forward to central"]
+    end
+    
+    subgraph central["Central OTC (tempostack namespace)"]
+        otc_central["OTC-central<br/>• Receive from local collectors<br/>• Add K8s metadata (k8sattributes)<br/>• Route by namespace (routing connector)<br/>• Authenticate with bearer token<br/>• Forward to TempoStack with tenant ID"]
+    end
+    
+    subgraph tempo["TempoStack (tempostack namespace)"]
+        tempostack["Multi-tenant Trace Storage<br/>• tenantA, tenantB, ...<br/>• S3 backend storage<br/>• 48-hour retention"]
+    end
+    
+    mockbin1 -->|"OTLP"| otc_a
+    mockbin2 -->|"OTLP"| otc_b
+    
+    otc_a -->|"OTLP(with namespace)"| otc_central
+    otc_b -->|"OTLP(with namespace)"| otc_central
+    
+    otc_central -->|"OTLP<br/>(X-Scope-OrgID header)"| tempostack
+    
+    classDef appStyle fill:#2f652a,stroke:#2f652a,stroke-width:2px
+    classDef localStyle fill:#425cc6,stroke:#425cc6,stroke-width:2px;
+    classDef centralStyle fill:#425cc6,stroke:#425cc6,stroke-width:2px;
+    classDef tempoStyle fill:#906403,stroke:#906403,stroke-width:2px
+    
+    class mockbin1,mockbin2 appStyle
+    class otc_a,otc_b localStyle
+    class otc_central centralStyle
+    class tempostack tempoStyle
+```
+
+**As quick summary**
+Traces from the application **Mockbin #1** are collected by the "OTC-team-a" and forwarded to the "Central OTC". From there the traces are further forwarded to Tempo.
+
+### Why 2-Tier Architecture?
+
+You may ask yourself why there are two OpenTelemetry Collectors and if the application could not send directly to the Central OTC or if the Local OTC could not write directly into the Tempo storage. Both options are fine and will work, however, I tried to make it more secure. Only one OTC is allowed to perform write actions and applications can only send to the Local OTC, which forwards to the Central OTC where the traces are routed based on the source namespace. This way, nobody can interfere with other namespaces. 
+
+Therefore: 
+
+1. **Separation of Concerns**: Application namespaces handle local processing; central namespace handles routing and storage. The Central decides where and how to store. Application owners cannot overwrite this.
+2. **Resource Efficiency**: Lightweight collectors in app namespaces, heavy processing centralized
+3. **Security**: Applications don't need direct access to TempoStack
+4. **Scalability**: Each tier can scale independently
+5. **Multi-tenancy**: Central collector routes traces to appropriate tenants
+
+
+## What now? 
+
+The next articles will cover the actual implementation. We will first deploy Tempo and the Central Collector. Then we will deploy example applications and the Local Collector. 
+If everything works as planned, we will be able to see traces on the OpenShift UI.
+
+
