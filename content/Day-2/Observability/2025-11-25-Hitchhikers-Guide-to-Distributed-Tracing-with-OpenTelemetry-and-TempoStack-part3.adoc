@@ -5,8 +5,8 @@ date: "2025-11-25"
 doctype: book
 weight: 300
 
-featured_image: /day-2/images/observability/Logo_opentelemetry-horizontal-color.png?width=420px
-show_featured_image_summary: false
+featured_image: /day-2/images/observability/Logo_OTEL.png?width=420px
+show_featured_image_summary: true
 show_featured_image_article: true
 disableBreadcrumb: true
 
@@ -29,11 +29,11 @@ tags: ["OCP", "Day-2", "OpenShift", "Observability", "Distributed Tracing", "Tem
 
 With the architecture defined in link:/day-2/observability/2025-11-23-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part1/[Part 1] and TempoStack deployed in link:/day-2/observability/2025-11-24-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part2/[Part 2], it's time to tackle the heart of our distributed tracing system: the **Central OpenTelemetry Collector**. This is the critical component that sits between your application namespaces and TempoStack, orchestrating trace flow, metadata enrichment, and tenant routing.
 
+<!--more--> 
+
 In this article, we'll configure the RBAC permissions required for the Central Collector to enrich traces with Kubernetes metadata and deploy the Central OpenTelemetry Collector with its complete configuration. You'll learn how to set up receivers for accepting traces from local collectors, configure processors to enrich traces with Kubernetes and OpenShift metadata, and implement routing connectors to direct traces to the appropriate TempoStack tenants based on namespace.
 
 To be honest, this was the most challenging part of the entire setup to get right, as you can easily miss a setting, or misconfigure a part of the configuration. But once you understand the configuration, it becomes straightforward to extend and modify.
-
-<!--more--> 
 
 ## Central OpenTelemetry Collector - Step-by-Step Implementation
 

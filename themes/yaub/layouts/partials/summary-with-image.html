@@ -8,7 +8,7 @@
         {{ $featured_image := (trim $featured_image "/") | absURL }}
         <div class="pr3-ns mb4 mb0-ns w-100 w-40-ns">
           <a href="{{.RelPermalink}}">
-            <img src="{{ $featured_image }}" class="img" alt="image from {{ .Title }}">
+            <img src="{{ $featured_image }}" class="img recentlist" alt="image from {{ .Title }}">
           </a>
         </div>
       {{ end }}
@@ -25,7 +25,7 @@
         {{end}}
 
         
-        <h2 class="recentlist">
+        <h2 class="recentlist recentlist-with-image">
           <a href="{{.RelPermalink}}" class="recentlist">
             <em class="gradient-header post-header">{{ .Title }}</em>
           </a>

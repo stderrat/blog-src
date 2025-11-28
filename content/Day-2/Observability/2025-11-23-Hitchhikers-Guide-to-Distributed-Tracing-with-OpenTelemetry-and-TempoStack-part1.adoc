@@ -5,8 +5,8 @@ date: "2025-11-23"
 doctype: book
 weight: 100
 
-featured_image: /day-2/images/observability/Logo_observability_1.png?width=640px
-show_featured_image_summary: false
+featured_image: /day-2/images/observability/Logo_observability_1.png?width=416px
+show_featured_image_summary: true
 show_featured_image_article: true
 disableBreadcrumb: true
 
@@ -27,9 +27,14 @@ tags: ["OCP", "Day-2", "OpenShift", "Observability", "Distributed Tracing", "Tem
 :icons: font
 :toc:
 
-In modern microservices architectures, understanding how requests flow through your distributed system is crucial for debugging, performance optimization, and maintaining system health. **Distributed tracing** provides visibility into these complex interactions by tracking requests as they traverse multiple services.
-
 With this article I would like to summarize and, especially, remember my setup. This is Part 1 of a series of articles that I split up so it is easier to read and understand and not too long. Initially, there will be 6 parts, but I will add more as needed.
+
+
+<!--more--> 
+
+## Introduction
+
+In modern microservices architectures, understanding how requests flow through your distributed system is crucial for debugging, performance optimization, and maintaining system health. **Distributed tracing** provides visibility into these complex interactions by tracking requests as they traverse multiple services.
 
 This whole guide demonstrates how to set up a distributed tracing infrastructure using 
 
@@ -39,7 +44,6 @@ This whole guide demonstrates how to set up a distributed tracing infrastructure
 - **Multi-tenant architecture** - Isolating traces by team or environment
 - **Cluster Observability Operator** - For now this Operator is only used to extend the OpenShift UI with the tracing UI.
 
-<!--more--> 
 
 ## Thanks to
 

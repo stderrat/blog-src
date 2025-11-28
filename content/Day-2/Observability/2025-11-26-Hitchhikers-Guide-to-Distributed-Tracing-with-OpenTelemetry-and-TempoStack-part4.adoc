@@ -6,7 +6,7 @@ doctype: book
 weight: 400
 
 featured_image: /day-2/images/observability/Logo_observability_3.png
-show_featured_image_summary: false
+show_featured_image_summary: true
 show_featured_image_article: true
 disableBreadcrumb: true
 
@@ -31,13 +31,15 @@ With the link:/day-2/observability/2025-11-23-hitchhikers-guide-to-distributed-t
 
 In this fourth installment, we'll focus on the **application layer** - deploying **Local OpenTelemetry Collectors** in team namespaces and configuring example applications to generate traces. You'll see how applications automatically get enriched with Kubernetes metadata, how namespace-based routing directs traces to the correct TempoStack tenants, and how the entire two-tier architecture comes together.
 
+
+<!--more--> 
+
 We'll deploy an example application (**Mockbin**) into two different namespaces. Together with the application, we will deploy a local OpenTelemetry Collector. One with sidecar mode, one with deployment mode.
 
 You'll learn how to configure local collectors to add namespace attributes, forward traces to the central collector, and verify that traces appear in the UI with full Kubernetes context.
 
 By the end of this article, you'll have a fully functional distributed tracing system with applications generating traces, local collectors forwarding them, and the central collector routing everything to the appropriate TempoStack tenants. Let's bring this architecture to life!
 
-<!--more--> 
 
 ## Application Mockbin - Step-by-Step Implementation
 

@@ -6,7 +6,7 @@ doctype: book
 weight: 500
 
 featured_image: /day-2/images/observability/Logo_observability_5.png
-show_featured_image_summary: false
+show_featured_image_summary: true
 show_featured_image_article: true
 disableBreadcrumb: true
 
