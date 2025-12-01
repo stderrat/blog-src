@@ -1,0 +1,19 @@
+{{- /* 
+  Hugo's automatic image renderer override
+  Automatically serves WebP with PNG/JPG fallback
+  Works for all Markdown/AsciiDoc images
+*/ -}}
+
+{{- $src := .Destination }}
+{{- $alt := .Text }}
+{{- $title := .Title }}
+
+{{- /* Generate WebP source path */ -}}
+{{- $webpSrc := replace $src ".png" ".webp" | replace ".jpg" ".webp" | replace ".jpeg" ".webp" | replace ".PNG" ".webp" | replace ".JPG" ".webp" | replace ".JPEG" ".webp" }}
+
+{{- /* Always output picture element - browser will fallback to img if WebP doesn't exist */ -}}
+<picture>
+  <source srcset="{{ $webpSrc | relURL }}" type="image/webp">
+  <img src="{{ $src | relURL }}" alt="{{ $alt }}"{{ with $title }} title="{{ . }}"{{ end }} loading="lazy">
+</picture>
+
