@@ -242,6 +242,20 @@
     </script>
 
     {{ if (or (and (ne .Params.disableMermaid nil) (not .Params.disableMermaid)) (not .Site.Params.disableMermaid)) }}
+        <!-- JS-YAML for mermaid frontmatter parsing -->
+        <script src="{{"js/js-yaml/js-yaml.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+        
+        <!-- D3 libraries for Mermaid zoom functionality -->
+        <script src="{{"js/d3/d3-color.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+        <script src="{{"js/d3/d3-dispatch.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+        <script src="{{"js/d3/d3-drag.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+        <script src="{{"js/d3/d3-ease.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+        <script src="{{"js/d3/d3-interpolate.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+        <script src="{{"js/d3/d3-selection.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+        <script src="{{"js/d3/d3-timer.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+        <script src="{{"js/d3/d3-transition.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+        <script src="{{"js/d3/d3-zoom.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+        
         {{ if isset .Params "customMermaidURL" }}
             <script src="{{ .Params.customMermaidURL }}"></script>
         {{ else if isset .Site.Params "customMermaidURL" }}
@@ -250,7 +264,28 @@
             <script src="{{"mermaid/mermaid.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
         {{ end }}
         <script>
-            mermaid.initialize({ startOnLoad: true });
+            // Initialize window.relearn for zoom functionality
+            window.relearn = window.relearn || {};
+            window.relearn.themeUseMermaid = true;
+            window.relearn.mermaidConfig = { securityLevel: 'loose' };
+            
+            // Translation strings for mermaid zoom
+            window.T_Reset_view = 'Reset view';
+            window.T_View_reset = 'View reset';
+            
+            // Toast notification function (simple fallback)
+            window.showToast = window.showToast || function(msg) {
+                console.log('Toast:', msg);
+            };
+            
+            // Initialize mermaid with cross-browser compatible settings
+            if (typeof mermaid !== 'undefined') {
+                mermaid.initialize({ 
+                    startOnLoad: false,  // We'll manually trigger it
+                    securityLevel: 'loose',  // Firefox/Safari compatible
+                    theme: 'default'
+                });
+            }
         </script>
     {{ end }}
 

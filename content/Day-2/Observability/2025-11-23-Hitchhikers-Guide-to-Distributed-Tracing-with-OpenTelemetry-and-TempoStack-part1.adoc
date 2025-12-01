@@ -119,7 +119,7 @@ For a more detailed view see the next section.
 
 As described the implementation follows a **two-tier collector architecture** with multi-tenancy support:
 
-```mermaid 
+```mermaid {align="center" zoom="true"}
 ---
 title: "Architecture Overview"
 config:

@@ -1,2 +1,5 @@
 {{ $_hugo_config := `{ "version": 1 }` }}
-<div class="mermaid" align="{{ if .Get "align" }}{{ .Get "align" }}{{ else }}center{{ end }}">{{ safeHTML .Inner }}</div>
+{{- $align := .Get "align" | default "center" }}
+{{- $zoom := .Get "zoom" | default "true" }}
+{{- $zoomEnabled := eq $zoom "true" }}
+<pre class="mermaid actionbar-wrapper{{ if $zoomEnabled }} zoomable{{ end }}" align="{{ $align }}">{{ .Inner | htmlEscape }}</pre>
