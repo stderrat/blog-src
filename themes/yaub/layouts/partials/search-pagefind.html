@@ -1,0 +1,23 @@
+<!-- Pagefind Search Component -->
+<div class="searchbox pagefind-searchbox">
+    <div id="pagefind-search"></div>
+</div>
+
+<link href="/pagefind/pagefind-ui.css" rel="stylesheet">
+<script src="/pagefind/pagefind-ui.js"></script>
+<script>
+    window.addEventListener('DOMContentLoaded', (event) => {
+        new PagefindUI({ 
+            element: "#pagefind-search",
+            showSubResults: true,
+            showImages: false,
+            excerptLength: 15,
+            resetStyles: false,
+            translations: {
+                placeholder: "Search articles...",
+                zero_results: "No results for [SEARCH_TERM]"
+            }
+        });
+    });
+</script>
+

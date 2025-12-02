@@ -1,0 +1,226 @@
+{{ partial "header.html" . }}
+
+<div class="search-page">
+    <div id="search-container">
+        <div id="pagefind-results"></div>
+    </div>
+</div>
+
+<link href="/pagefind/pagefind-ui.css" rel="stylesheet">
+<script src="/pagefind/pagefind-ui.js"></script>
+
+<style>
+/* Hide TOC on search page */
+#toc-field {
+    display: none !important;
+}
+
+/* Search page specific styles */
+.search-page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 1rem;
+}
+
+#search-container {
+    margin-top: 1rem;
+}
+
+/* Fix: Results should display inline, not as dropdown overlay */
+#pagefind-results .pagefind-ui__drawer {
+    position: static !important;
+    z-index: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: transparent !important;
+    margin-top: 1.5rem !important;
+}
+
+/* Override Pagefind styles for main content area */
+#pagefind-results .pagefind-ui {
+    --pagefind-ui-scale: 1;
+    --pagefind-ui-primary: var(--MAIN-LINK-color);
+    --pagefind-ui-text: var(--MAIN-TEXT-color);
+    --pagefind-ui-background: var(--MAIN-BG-color);
+    --pagefind-ui-border: var(--BUTTON-BORDER-color);
+    --pagefind-ui-tag: var(--MENU-TAG-BG-color);
+    --pagefind-ui-border-width: 1px;
+    --pagefind-ui-border-radius: 6px;
+    --pagefind-ui-font: inherit;
+}
+
+/* Search form - position the magnifying glass icon */
+#pagefind-results .pagefind-ui__form {
+    position: relative !important;
+}
+
+#pagefind-results .pagefind-ui__form::before {
+    position: absolute !important;
+    top: 24px !important;
+    transform: translateY(-50%) !important;
+    left: 14px !important;
+    z-index: 10 !important;
+    pointer-events: none !important;
+}
+
+#pagefind-results .pagefind-ui__search-input {
+    font-size: 18px !important;
+    padding: 14px 18px 14px 45px !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid var(--BUTTON-BORDER-color) !important;
+    color: var(--MAIN-TEXT-color) !important;
+    border-radius: 6px !important;
+}
+
+#pagefind-results .pagefind-ui__search-input:focus {
+    border-color: var(--MAIN-LINK-color) !important;
+    box-shadow: 0 0 0 3px rgba(163, 208, 245, 0.2) !important;
+}
+
+#pagefind-results .pagefind-ui__search-input::placeholder {
+    color: var(--MAIN-TEXT-color) !important;
+    opacity: 0.7 !important;
+}
+
+#pagefind-results .pagefind-ui__result {
+    padding: 1.5rem !important;
+    margin: 1rem 0 !important;
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 8px !important;
+    transition: all 0.2s ease !important;
+    overflow: hidden !important;
+    max-width: 100% !important;
+}
+
+#pagefind-results .pagefind-ui__result:hover {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border-color: var(--MAIN-LINK-color) !important;
+}
+
+#pagefind-results .pagefind-ui__result-title {
+    font-size: 1.2rem !important;
+    font-weight: 600 !important;
+    margin-bottom: 0.5rem !important;
+}
+
+/* Highlight effect for result links */
+#pagefind-results .pagefind-ui__result-link {
+    color: var(--MAIN-LINK-color) !important;
+    text-decoration: none !important;
+    outline: none !important;
+    display: inline-block !important;
+    line-height: 1.1 !important;
+    position: relative !important;
+}
+
+#pagefind-results .pagefind-ui__result-link::after {
+    display: block;
+    content: "";
+    height: 1px;
+    width: 0%;
+    transition: width 0.5s ease;
+    background-color: var(--MAIN-LINK-HOVER-color);
+}
+
+#pagefind-results .pagefind-ui__result-link:hover::after,
+#pagefind-results .pagefind-ui__result-link:focus::after {
+    width: 100%;
+}
+
+#pagefind-results .pagefind-ui__result-excerpt {
+    font-size: 0.95rem !important;
+    line-height: 1.6 !important;
+    color: var(--MAIN-TEXT-color) !important;
+    opacity: 0.85 !important;
+    word-break: break-all !important;
+    overflow-wrap: anywhere !important;
+    white-space: normal !important;
+    max-width: 100% !important;
+}
+
+/* Handle code/pre elements in search results */
+#pagefind-results code,
+#pagefind-results pre {
+    word-break: break-all !important;
+    white-space: pre-wrap !important;
+    overflow-wrap: anywhere !important;
+}
+
+#pagefind-results .pagefind-ui__result-excerpt mark {
+    background: rgba(163, 208, 245, 0.3) !important;
+    color: var(--WHITE) !important;
+    padding: 2px 4px !important;
+    border-radius: 3px !important;
+}
+
+#pagefind-results .pagefind-ui__message {
+    font-size: 1.1rem !important;
+    color: var(--MAIN-TEXT-color) !important;
+    opacity: 0.7 !important;
+    text-align: center !important;
+    /* padding: 2rem !important; */
+}
+
+#pagefind-results .pagefind-ui__result-thumb {
+    display: none !important;
+}
+
+/* Results count */
+#pagefind-results .pagefind-ui__results-area {
+    margin-top: 1.5rem !important;
+}
+
+/* Button styling */
+#pagefind-results .pagefind-ui__button {
+    background: var(--BUTTON-BG-color) !important;
+    color: var(--WHITE) !important;
+    border: none !important;
+    padding: 10px 20px !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    margin-top: 1rem !important;
+}
+
+#pagefind-results .pagefind-ui__button:hover {
+    background: var(--MAIN-LINK-HOVER-color) !important;
+}
+</style>
+
+<script>
+window.addEventListener('DOMContentLoaded', (event) => {
+    // Initialize Pagefind
+    const pagefind = new PagefindUI({ 
+        element: "#pagefind-results",
+        showSubResults: true,
+        showImages: false,
+        excerptLength: 30,
+        resetStyles: false,
+        autofocus: true,
+        translations: {
+            placeholder: "Search articles... (Use Quotes for exact matches)",
+            zero_results: "No results found for \"[SEARCH_TERM]\". Try different keywords.",
+            many_results: "[COUNT] results for \"[SEARCH_TERM]\"",
+            one_result: "1 result for \"[SEARCH_TERM]\""
+        }
+    });
+    
+    // Check for query parameter and trigger search
+    const urlParams = new URLSearchParams(window.location.search);
+    const query = urlParams.get('q');
+    if (query) {
+        // Find the search input and set the value
+        const searchInput = document.querySelector('#pagefind-results input');
+        if (searchInput) {
+            searchInput.value = query;
+            // Trigger input event to start search
+            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    }
+});
+</script>
+
+{{ partial "footer.html" . }}
+

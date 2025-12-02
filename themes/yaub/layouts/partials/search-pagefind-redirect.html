@@ -1,0 +1,35 @@
+<!-- Sidebar Search - Redirects to Search Page -->
+<div class="searchbox">
+    <form action="/search/" method="GET" id="sidebar-search-form">
+        <label for="sidebar-search"><i class="fas fa-search"></i></label>
+        <input 
+            type="search" 
+            id="sidebar-search" 
+            name="q" 
+            placeholder="{{ T "Search-placeholder" | default "Search..." }}"
+            autocomplete="off"
+        >
+        <span id="sidebar-search-clear" style="display: none;"><i class="fas fa-times"></i></span>
+    </form>
+</div>
+
+<script>
+(function() {
+    const input = document.getElementById('sidebar-search');
+    const clearBtn = document.getElementById('sidebar-search-clear');
+    
+    // Show/hide clear button
+    input.addEventListener('input', function() {
+        clearBtn.style.display = this.value ? 'block' : 'none';
+    });
+    
+    // Clear button click
+    clearBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        input.value = '';
+        clearBtn.style.display = 'none';
+        input.focus();
+    });
+})();
+</script>
+

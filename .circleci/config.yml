@@ -12,6 +12,9 @@ jobs:
       - run:
           name: Build blog content
           command: cd /home/deployer/project && hugo --minify --enableGitInfo
+      - run:
+          name: Index content with Pagefind
+          command: cd /home/deployer/project && npx pagefind --site public
       # - store_artifacts:
       #     path: public/
       - persist_to_workspace:

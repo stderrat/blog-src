@@ -13,7 +13,12 @@
       {{ partial "logo.html" . }}
     </div>
     {{if not .Site.Params.disableSearch}}
-        {{ partial "search.html" . }}
+        {{/* Search options - uncomment ONE of the following:
+             - search.html              = Original Lunr.js search (dropdown)
+             - search-pagefind.html     = Pagefind dropdown in sidebar
+             - search-pagefind-redirect.html = Pagefind with dedicated search page (current)
+        */}}
+        {{ partial "search-pagefind-redirect.html" . }}
     {{end}}
 
   </div>
