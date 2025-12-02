@@ -4,6 +4,9 @@ description: "Adding ApplicationSets and Applications to our GitOps"
 date: "2024-04-02"
 doctype: book
 
+series: "GitOps Episodes"
+series_part: 4
+
 authors: [Thomas Jungbauer]
 type: post
 draft: false

@@ -1,8 +1,53 @@
-<!-- Partial intended to be overwritten with tags loaded at the end of the page loading (usually for Javascript)
+<!-- Code Block Language Badges -->
 <script>
-    console.log("running some javascript");
+(function() {
+    // Add language badges to code blocks
+    document.querySelectorAll('pre code[class*="language-"], pre code[class*="hljs"]').forEach(function(codeBlock) {
+        // Get the language from class
+        let language = null;
+        const classes = codeBlock.className.split(' ');
+        
+        for (const cls of classes) {
+            // Check for language-xxx or hljs-xxx patterns
+            if (cls.startsWith('language-')) {
+                language = cls.replace('language-', '');
+                break;
+            }
+            // Also check for direct language class (e.g., 'yaml', 'bash')
+            const knownLanguages = ['yaml', 'yml', 'bash', 'shell', 'sh', 'javascript', 'js', 'typescript', 'ts', 
+                'python', 'py', 'go', 'golang', 'json', 'html', 'css', 'dockerfile', 'docker', 'ruby', 'rb', 
+                'java', 'sql', 'xml', 'markdown', 'md', 'rust', 'rs', 'terraform', 'tf', 'hcl', 'ansible', 'helm',
+                'c', 'cpp', 'csharp', 'php', 'perl', 'lua', 'r', 'scala', 'kotlin', 'swift', 'groovy', 'powershell',
+                'ini', 'toml', 'nginx', 'apache', 'diff', 'plaintext', 'text', 'console', 'log'];
+            if (knownLanguages.includes(cls.toLowerCase())) {
+                language = cls;
+                break;
+            }
+        }
+        
+        if (language) {
+            const pre = codeBlock.parentElement;
+            if (pre && pre.tagName === 'PRE') {
+                // Wrap pre in a container if not already wrapped
+                if (!pre.parentElement.classList.contains('code-block-wrapper')) {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'code-block-wrapper';
+                    pre.parentNode.insertBefore(wrapper, pre);
+                    wrapper.appendChild(pre);
+                }
+                
+                // Create and add the badge
+                const badge = document.createElement('span');
+                badge.className = 'code-language-badge lang-' + language.toLowerCase();
+                badge.textContent = language.toUpperCase();
+                
+                // Add badge to wrapper
+                pre.parentElement.insertBefore(badge, pre);
+            }
+        }
+    });
+})();
 </script>
--->
 
 <!--
 <script>

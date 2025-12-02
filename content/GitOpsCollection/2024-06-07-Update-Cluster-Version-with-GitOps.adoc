@@ -4,6 +4,9 @@ description: "Update an OpenShift cluster using a GitOps approach."
 date: "2024-06-07"
 doctype: book
 
+series: "GitOps Episodes"
+series_part: 10
+
 authors: [Thomas Jungbauer]
 type: post
 draft: false

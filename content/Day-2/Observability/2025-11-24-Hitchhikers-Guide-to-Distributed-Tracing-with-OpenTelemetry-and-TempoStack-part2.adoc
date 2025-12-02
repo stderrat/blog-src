@@ -5,6 +5,9 @@ date: "2025-11-24"
 doctype: book
 weight: 200
 
+series: "The Hitchhiker's Guide to Observability"
+series_part: 2
+
 featured_image: /day-2/images/observability/Logo_observability_2.png?width=420px
 show_featured_image_summary: true
 show_featured_image_article: true

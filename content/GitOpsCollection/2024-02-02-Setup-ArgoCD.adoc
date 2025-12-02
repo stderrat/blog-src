@@ -4,6 +4,9 @@ description: "Openshift 4.x - Install GitOps to the cluster"
 date: "2024-02-02"
 doctype: book
 
+series: "GitOps Episodes"
+series_part: 3
+
 authors: [Thomas Jungbauer]
 type: post
 draft: false

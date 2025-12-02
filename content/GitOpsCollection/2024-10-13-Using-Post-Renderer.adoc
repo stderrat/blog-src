@@ -4,6 +4,9 @@ description: "Using Kustomize to post render a Helm Chart."
 date: "2024-10-13"
 doctype: book
 
+series: "GitOps Episodes"
+series_part: 12
+
 authors: [Thomas Jungbauer]
 type: post
 draft: false

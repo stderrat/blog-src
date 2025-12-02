@@ -4,6 +4,9 @@ description: "Installing OpenShift Logging using a GitOps approach."
 date: "2024-05-24"
 doctype: book
 
+series: "GitOps Episodes"
+series_part: 8
+
 authors: [Thomas Jungbauer]
 type: post
 draft: false

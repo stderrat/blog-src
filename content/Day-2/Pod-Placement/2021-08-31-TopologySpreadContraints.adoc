@@ -4,6 +4,9 @@ description: "Placeing Pods Using Topology Spread Constraints"
 date: "2021-08-26"
 doctype: book
 
+series: "Pod Placement"
+series_part: 6
+
 authors: [Thomas Jungbauer]
 type: post
 categories:

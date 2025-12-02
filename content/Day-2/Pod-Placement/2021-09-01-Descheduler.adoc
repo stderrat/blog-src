@@ -4,6 +4,9 @@ description: "Evicting pods using the Descheduler"
 date: "2021-08-26"
 doctype: book
 
+series: "Pod Placement"
+series_part: 7
+
 authors: [Thomas Jungbauer]
 type: post
 categories:

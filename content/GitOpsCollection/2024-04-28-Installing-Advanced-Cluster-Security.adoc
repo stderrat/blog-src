@@ -4,6 +4,9 @@ description: "Installing and configuring ACS using GitOps approach."
 date: "2024-04-28"
 doctype: book
 
+series: "GitOps Episodes"
+series_part: 6
+
 authors: [Thomas Jungbauer]
 type: post
 draft: false

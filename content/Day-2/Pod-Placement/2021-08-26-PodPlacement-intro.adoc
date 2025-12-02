@@ -4,6 +4,9 @@ description: "Introduction to Pod Placement"
 date: "2021-08-26"
 doctype: book
 
+series: "Pod Placement"
+series_part: 1
+
 authors: [Thomas Jungbauer]
 type: post
 categories:

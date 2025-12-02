@@ -5,6 +5,9 @@ date: "2025-11-25"
 doctype: book
 weight: 300
 
+series: "The Hitchhiker's Guide to Observability"
+series_part: 3
+
 featured_image: /day-2/images/observability/Logo_OTEL.png?width=420px
 show_featured_image_summary: true
 show_featured_image_article: true

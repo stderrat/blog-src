@@ -4,6 +4,9 @@ description: "Using ApplicationSet with Matrix Generator and define individual N
 date: "2025-04-17"
 doctype: book
 
+series: "GitOps Episodes"
+series_part: 13
+
 authors: [Thomas Jungbauer]
 type: post
 draft: false

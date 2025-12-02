@@ -4,6 +4,9 @@ description: "Placeing Pods Using the NodeSelector"
 date: "2021-08-26"
 doctype: book
 
+series: "Pod Placement"
+series_part: 2
+
 authors: [Thomas Jungbauer]
 type: post
 categories:

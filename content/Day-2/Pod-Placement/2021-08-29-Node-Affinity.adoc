@@ -4,6 +4,9 @@ description: "Placeing Pods Using the Node Affinity rules"
 date: "2021-08-26"
 doctype: book
 
+series: "Pod Placement"
+series_part: 4
+
 authors: [Thomas Jungbauer]
 type: post
 categories:

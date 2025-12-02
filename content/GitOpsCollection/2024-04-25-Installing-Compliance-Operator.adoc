@@ -4,6 +4,9 @@ description: "Installing and configuring Compliance Operator using GitOps approa
 date: "2024-04-25"
 doctype: book
 
+series: "GitOps Episodes"
+series_part: 5
+
 authors: [Thomas Jungbauer]
 type: post
 draft: false
