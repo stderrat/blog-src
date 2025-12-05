@@ -161,7 +161,24 @@
             {{end}}
           {{ end }}
         {{else}}
-          {{ range $pages.ByWeight }}
+          {{/* Separate series pages from non-series pages */}}
+          {{ $seriesPages := where $pages "Params.series" "!=" nil }}
+          {{ $nonSeriesPages := where $pages "Params.series" nil }}
+          
+          {{/* Sort series pages by series_part (ascending = oldest first) */}}
+          {{ $sortedSeriesPages := sort $seriesPages "Params.series_part" "asc" }}
+          
+          {{/* Sort non-series pages by weight (default behavior) */}}
+          {{ $sortedNonSeriesPages := $nonSeriesPages.ByWeight }}
+          
+          {{/* Combine: non-series first (by weight), then series (by part) */}}
+          {{ range $sortedNonSeriesPages }}
+            {{ if and .Params.hidden (not $.showhidden) }}
+            {{else}}
+            {{ template "section-tree-nav" dict "sect" . "currentnode" $currentNode "showvisitedlinks" $showvisitedlinks }}
+            {{end}}
+          {{ end }}
+          {{ range $sortedSeriesPages }}
             {{ if and .Params.hidden (not $.showhidden) }}
             {{else}}
             {{ template "section-tree-nav" dict "sect" . "currentnode" $currentNode "showvisitedlinks" $showvisitedlinks }}
