@@ -1,0 +1,776 @@
+--- 
+title: "The Hitchhiker's Guide to Observability - Here Comes Grafana - Part 7"
+description: "Here Comes Grafana - Part 7"
+date: "2025-12-04"
+doctype: book
+weight: 99
+
+series: "The Hitchhiker's Guide to Observability"
+series_part: 7
+
+featured_image: /day-2/images/observability/Logo_observability_7.png
+show_featured_image_summary: true
+show_featured_image_article: true
+disableBreadcrumb: true
+
+authors: [Thomas Jungbauer]
+type: post
+categories:
+   - OpenShift
+   - Observability
+   - Distributed Tracing
+   - OpenTelemetry
+   - Tempo
+   - Grafana
+
+tags: ["OCP", "Day-2", "OpenShift", "Observability", "Distributed Tracing", "Tempo", "Grafana", "OTL", "OTLP", "Logging", "Metrics"] 
+---
+
+:imagesdir: /day-2/images/observability/
+:icons: font
+:toc:
+
+
+While we have been using the integrated tracing UI in OpenShift, it is time to summon **Grafana**. Grafana is a visualization powerhouse that allows teams to build custom dashboards, correlate traces with logs and metrics, and gain deep insights into their applications. In this article, we'll deploy a dedicated Grafana instance for **team-a** in their namespace, configure a Tempo datasource, and create a dashboard to explore distributed traces.
+
+<!--more--> 
+
+## Prerequisites
+
+Before we begin, make sure you have:
+
+- The Grafana Operator installed cluster-wide (we'll cover this first)
+- TempoStack deployed and configured (from link:/day-2/observability/2025-11-24-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part2/[Part 2])
+- Team-a namespace with traces flowing (from link:/day-2/observability/2025-11-26-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part4/[Part 4])
+
+## The Grafana Operator
+
+The Grafana Operator provides Custom Resource Definitions (CRDs) for managing Grafana instances, datasources, and dashboards declaratively.
+
+Be sure that the Operator is installed. Typically, it is installed in the `openshift-operators` namespace. If you keep that namespace, all you need to do is create a Subscription. Otherwise you will also need to create an OperatorGroup.
+
+CAUTION: If you select a different namespace, be sure to verify possible RBAC bindings, that you might need to set up.
+
+### Install Subscription
+
+The Grafana Operator is available from the OperatorHub. Either use the UI to install it, or simply create a Subscription to install it:
+
+[source,yaml]
+----
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: grafana-operator
+  namespace: openshift-operators <1>
+spec:
+  channel: v5 <2>
+  installPlanApproval: Automatic
+  name: grafana-operator
+  source: community-operators <3>
+  sourceNamespace: openshift-marketplace
+----
+<1> Installing in `openshift-operators` makes the operator available cluster-wide
+<2> Use the v5 channel for the operator. This is the only available channel currently.
+<3> The source is the OperatorHub catalog. Grafana is a **community** operator.
+
+Verify the operator is running:
+
+[source,bash]
+----
+oc get pods -n openshift-operators -l app.kubernetes.io/name=grafana-operator
+----
+
+You should see output similar to:
+
+[source,bash]
+----
+NAME                                READY   STATUS    RESTARTS   AGE
+grafana-operator-7d8f9c6b5-xyz12    1/1     Running   0          2m
+----
+
+## Create Grafana Instance for Team-A
+
+Now let's deploy a Grafana instance in the *team-a namespace*. This gives the team full control over their dashboards while isolating them from other teams.
+
+NOTE: We are logging in as the *project admin* user of the *team-a namespace*. So everything we do in this namespace will be done as this user.
+
+### Create the Grafana Admin Secret
+
+First, we need to create a secret containing the Grafana admin credentials, since we do not want to store passwords in plain text in our manifests!
+
+CAUTION: Never store passwords in plain text in your manifests and use a secrets management solution like Sealed Secrets or External Secrets Operator.
+
+Create the following example. Replace the password with your own strong password.
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-admin-credentials
+  namespace: team-a
+type: Opaque
+stringData:
+  GF_SECURITY_ADMIN_USER: admin <1>
+  GF_SECURITY_ADMIN_PASSWORD: <your-secure-password> <2>
+----
+<1> The admin username for Grafana
+<2> Replace with a strong password
+
+### Deploy the Grafana Instance
+
+The Grafana Operator provides a Custom Resource Definition (CRD) for deploying Grafana instances. We can use this to deploy a Grafana instance in the *team-a namespace*.
+This instance is labelled with "dashboards: "grafana-team-a"" to make it easier to target it with GrafanaDashboard resources.
+
+[source,yaml]
+----
+apiVersion: grafana.integreatly.org/v1beta1
+kind: Grafana
+metadata:
+  name: grafana
+  namespace: team-a
+  labels:
+    dashboards: "grafana-team-a" <1>
+spec:
+  config:
+    log:
+      mode: "console"
+    auth:
+      disable_login_form: "false"
+    security:
+      admin_user: ${GF_SECURITY_ADMIN_USER} <2>
+      admin_password: ${GF_SECURITY_ADMIN_PASSWORD}
+  deployment:
+    spec:
+      replicas: 1
+      template:
+        spec:
+          containers:
+            - name: grafana
+              envFrom:
+                - secretRef:
+                    name: grafana-admin-credentials <3>
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+  route:
+    spec:
+      tls:
+        termination: edge <4>
+  disableDefaultAdminSecret: true <5>
+----
+<1> Label used by GrafanaDashboard resources to target this instance. Required so that the datasource can find the instance.
+<2> References environment variables from the secret
+<3> Mounts the secret as environment variables
+<4> Creates an OpenShift Route with TLS edge termination
+<5> Disables the default admin secret created by the Grafana Operator. We will use our own secret and this setting prevents that the operator overwrites it.
+
+
+
+After a few moments, the Grafana pod should be ready. 
+
+[source,bash]
+----
+oc get pods -n team-a -l app=grafana -w
+----
+
+Get the Route URL:
+
+[source,bash]
+----
+oc get route grafana-route -n team-a -o jsonpath='{.spec.host}'
+----
+
+Use this route and the credentials from the secret to log into Grafana.
+
+image::grafana-login.png[Grafana Login]
+
+## Configure Tempo Datasource
+
+The datasource connects Grafana to TempoStack (or any other datasource like Loki, Prometheus, etc.), allowing you to query and visualize traces. We need to authenticate with a client certificate to TempoStack and be sure the send the tenant ID of tenantA in the header of the queries.
+
+CAUTION: When you read the previous part of this series, you saw that we created a ClusterRole to grant read access to the traces. The Binding for this role allows *read* access to everybody who is *authenticated against the system*. Therefore, we do not need to take care of permissions... at this point.
+
+### TempoStack Client Certificate Authentication
+
+To query the TempoStack instance, we need to authenticate with it. This is done by using a client certificate. Therefore, we need to create a secret with the client certificate and key. In addition, this secret will also contain the tenant ID, which must be sent to the TempoStack instance as a header.
+
+First, get the client certificate and key from the TempoStack instance:
+
+[source,bash]
+----
+oc get secret -n tempostack | grep gateway-mtls
+----
+
+You should find something like this:
+
+[source,bash]
+tempo-simplest-gateway-mtls              kubernetes.io/tls         2      19d
+
+Fetch the client certificate and key and store them in a file locally:
+
+[source,bash]
+----
+oc get secret -n tempostack tempo-simplest-gateway-mtls -o jsonpath='{.data.tls\.crt}' | base64 -d > tls.crt
+oc get secret -n tempostack tempo-simplest-gateway-mtls -o jsonpath='{.data.tls\.key}' | base64 -d > tls.key
+----
+
+Now, let's get the tenant ID from the TempoStack instance:
+
+[source,bash]
+----
+oc get tempostack/simplest -n tempostack -o jsonpath='{.spec.tenants.authentication}'
+----
+
+You should find something like this (tenantA is the one we are interested in):
+
+[source,json]
+----
+[
+  {
+    "tenantId": "1610b0c3-c509-4592-a256-a1871353dbfc", <1>
+    "tenantName": "tenantA"
+  },
+  {
+    "tenantId": "1610b0c3-c509-4592-a256-a1871353dbfd",
+    "tenantName": "tenantB"
+  }
+]
+----
+<1> The tenant ID of tenantA
+
+Now, let's create the secret with the client certificate and key and the tenant ID:
+
+[source,bash]
+----
+oc create secret generic tempo-auth -n team-a --from-file=tls.crt=tls.crt --from-file=tls.key=tls.key --from-literal=tenantA="1610b0c3-c509-4592-a256-a1871353dbfc"
+----
+
+That's everything we need to authenticate with TempoStack for tenantA.
+
+NOTE: As you prefer, you can create a separate secret for each tenantID. Just be sure to update the "valuesFrom" section of the GrafanaDatasource resource.
+
+
+### Create the Tempo Datasource
+
+Now we can create the GrafanaDatasource that connects to TempoStack:
+
+[source,yaml]
+----
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: tempo-tenanta-datasource
+  namespace: team-a
+spec:
+  allowCrossNamespaceImport: false
+  datasource:
+    access: proxy
+    editable: true 
+    isDefault: true
+    jsonData:
+      httpHeaderName1: X-Scope-OrgID <1>
+      timeInterval: 5s
+      tlsAuth: true
+      tlsAuthWithCACert: false
+      tlsSkipVerify: true
+    name: tempo-tenanta <2>
+    secureJsonData: <3>
+      httpHeaderValue1: '${tenantA}'
+      tlsClientCert: '${tls.crt}'
+      tlsClientKey: '${tls.key}'
+    type: tempo <4>
+    url: 'https://tempo-simplest-query-frontend.tempostack.svc.cluster.local:3200' <5>
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana-team-a <6>
+  resyncPeriod: 10m0s
+  valuesFrom: <7>
+    - targetPath: secureJsonData.tlsClientCert
+      valueFrom:
+        secretKeyRef:
+          key: tls.crt
+          name: tempo-auth
+    - targetPath: secureJsonData.tlsClientKey
+      valueFrom:
+        secretKeyRef:
+          key: tls.key
+          name: tempo-auth
+    - targetPath: secureJsonData.httpHeaderValue1
+      valueFrom:
+        secretKeyRef:
+          key: tenantA
+          name: tempo-auth
+----
+<1> The header name for the tenant ID.
+<2> The name of the Tempo datasource.
+<3> The reference to the client certificate, key and tenantID. They are coming from the secret we created earlier.
+<4> The type of the datasource. This type must be available in Grafana. For Tempo, the type is `tempo`.
+<5> The URL of the Tempo query frontend. This is the URL of the Tempo query frontend service in the TempoStack namespace.
+<6> The label of the Grafana instance to target. This is the label we added to the Grafana instance when we created it.
+<7> The reference to the secrets and the keys inside the secret. 
+
+### Verify the Datasource
+
+Log into Grafana and navigate to **Connection > Data sources**. You should see the Tempo datasource listed. 
+
+image::grafana-data-sources-list.png[Grafana Datasource]
+
+Click on the Tempo datasource to see the details:
+
+image::grafana-datasource.png[Grafana Datasource Details]
+
+As depicted in the image above, the datasource is configured with TLS Client Authentication and a HTTP Header. 
+
+WARNING: Any changes in the Grafana UI will not be synced back to the GrafanaDatasource resource. You need to update the resource manually.
+
+To verify the datasource, we can create a test query. Navigate to **Explore**.
+
+Enter the query *{}*, which will simply get all traces from the TempoStack instance from (by default) the last minute.
+
+NOTE: If you have multiple data sources configured already, be sure to select the correct one in the dropdown menu.
+
+You should see the traces in the Grafana Explore UI.
+
+image::grafana-explore-metrics.png[Grafana Explore Metrics]
+
+You can select any trace and see the details in the Grafana Explore UI. 
+
+image::grafana-explore-trace.png[Grafana Explore Trace]
+
+## Create a Traces Dashboard
+
+Now let's create a dashboard to visualize and explore traces. The Grafana Operator allows us to define dashboards as Kubernetes resources.
+
+### Create the Dashboard ConfigMap
+
+To have the first showable data, we need to create a dashboard. The Grafana Operator provides a Custom Resource Definition called GrafanaDashboard for deploying such dashboards.
+
+Now, dashboards are their own beast. There are so many things to configure and set that probably a whole separate blog series is needed to cover all of it.
+I am by far not an expert in this field and I am happy that I got this one up and running, so I will just create a simple dashboard with a few panels. 
+
+NOTE: Honestly, I am not sure if it is a good way to create dashboards using the CRD. It is probably better to use the Grafana UI and then export the JSON data if you want to keep it declarative.  
+
+This dashboard provides:
+
+* A trace search panel
+* Latency histogram --> I have set this to "higher than 3ms" to at least see something. 
+* Recent traces table
+
+[source,yaml]
+----
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: grafana-team-a-traces-dashboard
+  namespace: team-a
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: "grafana-team-a" <1>
+  json: | <2>
+    {
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
+      },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "id": 1,
+      "links": [],
+      "panels": [
+        {
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 24,
+            "x": 0,
+            "y": 0
+          },
+          "id": 1,
+          "options": {
+            "code": {
+              "language": "plaintext",
+              "showLineNumbers": false,
+              "showMiniMap": false
+            },
+            "content": "# Team-A Distributed Traces\n\nThis dashboard allows you to explore distributed traces from your applications.\n\n",
+            "mode": "markdown"
+          },
+          "pluginVersion": "12.1.0",
+          "title": "Welcome",
+          "type": "text"
+        },
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "inspect": false
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 4
+          },
+          "id": 2,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "fields": "",
+              "reducer": [
+                "sum"
+              ],
+              "show": false
+            },
+            "showHeader": true
+          },
+          "pluginVersion": "12.1.0",
+          "targets": [
+            {
+              "datasource": {
+                "type": "tempo",
+                "uid": "${datasource}"
+              },
+              "filters": [
+                {
+                  "id": "81ea3f00",
+                  "operator": "=",
+                  "scope": "span"
+                }
+              ],
+              "limit": 20,
+              "metricsQueryType": "range",
+              "queryType": "traceqlSearch",
+              "refId": "A",
+              "tableType": "traces"
+            }
+          ],
+          "title": "Trace Search",
+          "type": "table"
+        },
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "bars",
+                "fillOpacity": 100,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "ms"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 4
+          },
+          "id": 3,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "12.1.0",
+          "targets": [
+            {
+              "datasource": {
+                "type": "tempo",
+                "uid": "${datasource}"
+              },
+              "filters": [
+                {
+                  "id": "6ff20d0d",
+                  "operator": "=",
+                  "scope": "span"
+                },
+                {
+                  "id": "min-duration",
+                  "operator": ">",
+                  "tag": "duration",
+                  "value": "0.3ms",
+                  "valueType": "duration"
+                }
+              ],
+              "limit": 20,
+              "metricsQueryType": "range",
+              "queryType": "traceqlSearch",
+              "refId": "A",
+              "tableType": "spans"
+            }
+          ],
+          "title": "Span Duration Distribution",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "inspect": false
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": 0
+                  }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "traceID"
+                },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "View Trace",
+                        "url": "/explore?orgId=1&left=%7B%22datasource%22:%22${datasource}%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22datasource%22:%7B%22type%22:%22tempo%22,%22uid%22:%22${datasource}%22%7D,%22queryType%22:%22traceql%22,%22limit%22:20,%22query%22:%22${__value.raw}%22%7D%5D,%22range%22:%7B%22from%22:%22now-1h%22,%22to%22:%22now%22%7D%7D"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "duration"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "ns"
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 10,
+            "w": 24,
+            "x": 0,
+            "y": 12
+          },
+          "id": 4,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "fields": "",
+              "reducer": [
+                "sum"
+              ],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": [
+              {
+                "desc": true,
+                "displayName": "startTime"
+              }
+            ]
+          },
+          "pluginVersion": "12.1.0",
+          "targets": [
+            {
+              "datasource": {
+                "type": "tempo",
+                "uid": "${datasource}"
+              },
+              "limit": 50,
+              "queryType": "traceqlSearch",
+              "refId": "A",
+              "tableType": "traces"
+            }
+          ],
+          "title": "Recent Traces",
+          "type": "table"
+        }
+      ],
+      "preload": false,
+      "refresh": "30s",
+      "schemaVersion": 41,
+      "tags": [
+        "tracing",
+        "tempo",
+        "team-a"
+      ],
+      "templating": {
+        "list": [
+          {
+            "current": {
+              "text": "tempo-tenanta",
+              "value": "90b71ee3-693a-4c41-8cdf-624a3bb78e7a"
+            },
+            "includeAll": false,
+            "label": "Datasource",
+            "name": "datasource",
+            "options": [],
+            "query": "tempo",
+            "refresh": 1,
+            "regex": "",
+            "type": "datasource"
+          }
+        ]
+      },
+      "time": {
+        "from": "now-1h",
+        "to": "now"
+      },
+      "timepicker": {},
+      "timezone": "",
+      "title": "Team-A Distributed Traces",
+      "uid": "team-a-traces",
+      "version": 3
+    }
+----
+<1> The label of the Grafana instance to target. This is the label we added to the Grafana instance when we created it.
+<2> The JSON data of the dashboard (yes, it's a monster!).
+
+Now you will see a new dashboard in the Grafana UI. Navigate to **Dashboards** and find **Team-A Distributed Traces**.
+
+image::grafana-dashboard.png[Grafana Dashboard]
+
+
+## Next Steps
+
+Congratulations! *The Cat has summoned Grafana* . 
+
+image::cat-wizard-done-its-job.png?width=400px[Cat Wizard]
+
+You now have a functional Grafana instance with Tempo integration for team-a. Here are some ideas for extending this setup:
+
+* **Add Loki datasource**: Correlate traces with logs using derived fields
+* **Add Prometheus datasource**: Link metrics to traces for full observability
+* **Create alerting rules**: Set up alerts for high latency or error rates
+* **Build more dashboards**: Create service-specific dashboards for different applications
+
+As mentioned above, Grafana and its dashboards are powerful tools for visualizing and exploring traces. There are tons of things to configure and set up. 
+Maybe I will cover some of these things in a future article.
+
+Happy tracing! 🚀
