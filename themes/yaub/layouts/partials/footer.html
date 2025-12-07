@@ -130,8 +130,12 @@
     
     <!-- WebP image upgrade for better performance (works with AsciiDoc) -->
     <script src="{{"js/webp-upgrade.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
-    <script src="{{"js/highlight.pack.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
+    <script src="{{"js/highlight.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+    <script>
+        // Configure highlight.js to ignore AsciiDoc callout markers like <1>, <2>, etc.
+        hljs.configure({ ignoreUnescapedHTML: true });
+        hljs.highlightAll();
+    </script>
     <script src="{{"js/modernizr.custom-3.6.0.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
     <script src="{{"js/learn.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
     <script src="{{"js/hugo-learn.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
