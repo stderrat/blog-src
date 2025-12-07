@@ -1,0 +1,108 @@
+{{/* Keyboard Navigation Hints - Shows users they can use arrow keys */}}
+{{ if not .Params.disableNextPrev }}
+<div class="keyboard-hints" id="keyboard-hints">
+    <div class="keyboard-hint keyboard-hint-left">
+        <kbd>←</kbd>
+        <span>Previous</span>
+    </div>
+    <div class="keyboard-hint-center">
+        <span class="hint-text">Use arrow keys to navigate</span>
+        <button class="hint-dismiss" id="hint-dismiss" title="Got it!">✓</button>
+    </div>
+    <div class="keyboard-hint keyboard-hint-right">
+        <span>Next</span>
+        <kbd>→</kbd>
+    </div>
+</div>
+
+<!-- Feedback flash when keys are pressed -->
+<div class="keyboard-flash keyboard-flash-left" id="flash-left">
+    <kbd>←</kbd>
+</div>
+<div class="keyboard-flash keyboard-flash-right" id="flash-right">
+    <kbd>→</kbd>
+</div>
+
+<script>
+(function() {
+    const STORAGE_KEY = 'keyboard-hints-dismissed';
+    const hintsEl = document.getElementById('keyboard-hints');
+    const dismissBtn = document.getElementById('hint-dismiss');
+    const flashLeft = document.getElementById('flash-left');
+    const flashRight = document.getElementById('flash-right');
+    
+    // Check if hints were dismissed
+    function isHintsDismissed() {
+        return localStorage.getItem(STORAGE_KEY) === 'true';
+    }
+    
+    // Show hints on first visit (after a short delay)
+    function initHints() {
+        if (!hintsEl) return;
+        
+        if (isHintsDismissed()) {
+            hintsEl.style.display = 'none';
+        } else {
+            // Show after 2 seconds on first visit
+            setTimeout(function() {
+                hintsEl.classList.add('show');
+                
+                // Auto-hide after 8 seconds
+                setTimeout(function() {
+                    if (!isHintsDismissed()) {
+                        hintsEl.classList.remove('show');
+                        hintsEl.classList.add('fade-out');
+                    }
+                }, 8000);
+            }, 2000);
+        }
+    }
+    
+    // Dismiss handler
+    if (dismissBtn) {
+        dismissBtn.addEventListener('click', function() {
+            localStorage.setItem(STORAGE_KEY, 'true');
+            hintsEl.classList.remove('show');
+            hintsEl.classList.add('fade-out');
+            setTimeout(function() {
+                hintsEl.style.display = 'none';
+            }, 300);
+        });
+    }
+    
+    // Show flash when arrow keys are pressed
+    document.addEventListener('keydown', function(e) {
+        // Skip if in input/textarea
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        
+        if (e.which === 37 && flashLeft) {
+            // Left arrow
+            flashLeft.classList.add('show');
+            setTimeout(function() {
+                flashLeft.classList.remove('show');
+            }, 300);
+        } else if (e.which === 39 && flashRight) {
+            // Right arrow
+            flashRight.classList.add('show');
+            setTimeout(function() {
+                flashRight.classList.remove('show');
+            }, 300);
+        }
+        
+        // Also dismiss hints permanently after first key press
+        if ((e.which === 37 || e.which === 39) && hintsEl && !isHintsDismissed()) {
+            localStorage.setItem(STORAGE_KEY, 'true');
+            hintsEl.classList.remove('show');
+        }
+    });
+    
+    // Initialize on DOM ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initHints);
+    } else {
+        initHints();
+    }
+})();
+</script>
+{{ end }}
+

@@ -50,7 +50,10 @@ other = "Copyright"
 other = "Author: "
 
 [Lastmodification]
-other = "Lastmod: "
+other = "Rev: "
+
+[Rev]
+other = "Rev:"
 
 [Published]
 other = "Published: "

@@ -17,7 +17,7 @@
       <div class="w-100{{ if $featured_image }} w-60-ns pl3-ns{{ end }}">
 
         {{ if .Params.categories }}
-        <div class="catagories">    
+        <div class="categories">    
           {{range .Params.categories}}
               <a id="{{ "category-" }}{{ . | urlize }}-{{ $.Title | urlize }}" class="category-link no-highlight" href="{{ "/categories/" | relLangURL }}{{ . | urlize }}">{{ . }}</a>
             {{end}}
@@ -32,45 +32,33 @@
         </h2>
          
         <div class="articleinfo">
-          <time class="f6 mv4 dib tracked" {{ printf `datetime="%s"` (.Date.Format "2006-01-02T15:04:05Z07:00") | safeHTMLAttr }}>
+          <span class="publish-date summary-date" {{ printf `datetime="%s"` (.Date.Format "2006-01-02T15:04:05Z07:00") | safeHTMLAttr }}>
             <strong>{{- .Date.Format "January 2, 2006" -}}</strong>
-          </time>
-
-          <span class="divider">
-          -
           </span>
 
-          <span class="author">
+          <span class="divider">-</span>
+
+          <span class="author-info">
           {{ range .Param "authors" }}
           {{ $name := . }}
           {{ $path := printf "/%s/%s" "authors" ($name | urlize) }}
           {{ with $.Site.GetPage $path }}
-            <a href="{{ "/authors/" | relLangURL }}{{ .Params.name  | urlize }}">
+            <a href="{{ "/authors/" | relLangURL }}{{ .Params.name  | urlize }}" class="author-link">
             <img class="avatar" src="/img{{ $path }}.png" alt="{{ .Params.name }}"/> 
             {{ .Params.name }}
             </a>
           {{ end }}
           {{ end }}
-
-        <!-- old 
-        {{ with .Params.author }}
-          By: 
-          {{ if reflect.IsSlice . }}
-            {{ delimit . ", " | markdownify }}
-          {{else}}
-            {{ . | markdownify }}
-          {{ end }}
-        {{ end }}
-        -->
-
-          ( {{ $.Param "Lastmodification" | default (i18n "Lastmodification") }} {{.Page.Lastmod.Format "2006-01-02"}} ) 
           </span>
 
-          <span class="divider">
-            -
-          </span>
+          <span class="divider">-</span>
 
-          <span class="readtime"><strong>{{ if lt (math.Round (div (countwords .Content) 250.0)) 1 }}1{{ else }}{{ (math.Round (div (countwords .Content) 250.0)) }}{{ end }} min read</strong></span>
+          {{- $wordCount := countwords .Content -}}
+          {{- $readingTime := math.Round (div $wordCount 200.0) -}}
+          {{- if lt $readingTime 1 }}{{ $readingTime = 1 }}{{ end -}}
+          <span class="readtime summary-readtime">
+            <strong>{{ $readingTime }} min</strong>
+          </span>
         </div>
         <div class="f6 f5-l lh-copy nested-copy-line-height nested-links">
           {{ .Summary }}

@@ -4,24 +4,26 @@
 {{ partial "header.html" . }}
 
 {{ if .Params.categories }}
-<div class="catagories tracked">    
+
+<div class="categories tracked">    
   {{range .Params.categories}}
 	  <a id="textElement" class="category-link no-highlight" href="{{ "/categories/" | relLangURL }}{{ . | urlize }}">{{ . }}</a>
 	{{end}}
 </div>
 {{end}}
 
-<p class="tracked">
-<time class="f6 mv4 dib tracked" {{ printf `datetime="%s"` (.Date.Format "2006-01-02T15:04:05Z07:00") | safeHTMLAttr }}>
-	<strong>{{- .Date.Format "January 2, 2006" -}}</strong>
-</time>
+<p class="tracked article-meta">
+<span class="publish-date" {{ printf `datetime="%s"` (.Date.Format "2006-01-02T15:04:05Z07:00") | safeHTMLAttr }}>
+    <i class="fas fa-calendar-alt"></i>
+    <strong>{{- .Date.Format "January 2, 2006" -}}</strong>
+    <span class="rev-date">({{ i18n "Rev" }} {{.Page.Lastmod.Format "2006-01-02"}})</span>
+</span>
 
 <span class="divider">
 	-
 </span>
 
 <span class="author">
-
 	{{ range .Param "authors" }}
 	{{ $name := . }}
 	{{ $path := printf "/%s/%s" "authors" ($name | urlize) }}
@@ -32,19 +34,6 @@
 	  </a>
 	{{ end }}
     {{ end }}
-
-
-<!-- old 
-{{ with .Params.author }}
-	By: 
-	{{ if reflect.IsSlice . }}
-		{{ delimit . ", " | markdownify }}
-	{{else}}
-		{{ . | markdownify }}
-	{{ end }}
-{{ end }}
--->
-( {{ $.Param "Lastmodification" | default (i18n "Lastmodification") }} {{.Page.Lastmod.Format "2006-01-02"}} )
 </span>
 
 <span class="divider">

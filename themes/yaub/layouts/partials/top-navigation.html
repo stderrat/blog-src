@@ -70,12 +70,21 @@
               {{ partial "toc.html" . }}
             {{ end }}
 
+            {{/* Social Share - URL encode all parameters for proper sharing */}}
             {{ $title := .Title }}
-            {{ $url := printf "%s" .Permalink | absLangURL }}
-            {{ $body := print $title ", by " .Site.Title "\n" .Params.description "\n\n" $url "\n" }}
+            {{ $url := .Permalink }}
+            {{ $description := .Params.description | default .Summary | plainify | truncate 200 }}
+            {{ $siteName := .Site.Title }}
+            
+            {{/* URL-encoded versions for share links */}}
+            {{ $encodedUrl := $url | urlquery }}
+            {{ $encodedTitle := $title | urlquery }}
+            {{ $encodedDescription := $description | urlquery }}
+            {{ $encodedBody := (printf "%s\n\n%s\n\n%s" $title $description $url) | urlquery }}
+            
             <div class="social">
                   {{ if .Site.Params.social.share.facebook }}
-              <a href="http://www.facebook.com/sharer.php?u={{ $url }}" class="facebook no-highlight" aria-label="share on Facebook">
+              <a href="https://www.facebook.com/sharer/sharer.php?u={{ $encodedUrl }}" target="_blank" rel="noopener noreferrer" class="facebook no-highlight" aria-label="share on Facebook">
                 <div class="resp-sharing-button resp-sharing-button--facebook resp-sharing-button--small">
                   <div aria-hidden="true" class="resp-sharing-button__icon resp-sharing-button__icon--solid">
                     {{ partial "svg/facebook.svg" (dict "size" "32px") }}
@@ -84,9 +93,9 @@
               </a>
                   {{ end }}
 
-                  <!-- Twitter -->
+                  <!-- Twitter/X -->
                   {{ if .Site.Params.social.share.twitter }}
-              <a href="https://twitter.com/intent/tweet?hashtags=codingnconcepts&amp;url={{ .Permalink }}&amp;text={{ .Title }}" class="twitter no-highlight" aria-label="share on Twitter">
+              <a href="https://twitter.com/intent/tweet?url={{ $encodedUrl }}&amp;text={{ $encodedTitle }}" target="_blank" rel="noopener noreferrer" class="twitter no-highlight" aria-label="share on Twitter">
                 <div class="resp-sharing-button resp-sharing-button--twitter resp-sharing-button--small">
                   <div aria-hidden="true" class="resp-sharing-button__icon resp-sharing-button__icon--solid">
                     {{ partial "svg/twitter.svg" (dict "size" "32px") }}
@@ -98,7 +107,7 @@
 
                   <!-- LinkedIn -->
                   {{ if .Site.Params.social.share.linkedin }}
-              <a href="https://www.linkedin.com/shareArticle?mini=true&amp;url={{ $url }}&amp;source={{ $url }}&amp;title={{ $title }}&amp;summary={{ $title }}" class="linkedin no-highlight" aria-label="share on Linkedin">
+              <a href="https://www.linkedin.com/sharing/share-offsite/?url={{ $encodedUrl }}" target="_blank" rel="noopener noreferrer" class="linkedin no-highlight" aria-label="share on LinkedIn">
                 <div class="resp-sharing-button resp-sharing-button--linkedin resp-sharing-button--small">
                   <div aria-hidden="true" class="resp-sharing-button__icon resp-sharing-button__icon--solid">
                     {{ partial "svg/linkedin.svg" (dict "size" "32px") }}
@@ -109,7 +118,7 @@
 
                   <!-- WhatsApp -->
                   {{ if .Site.Params.social.share.whatsapp }}
-              <a href="whatsapp://send?text={{ $body }}" class="whatsapp  no-highlight" aria-label="share on Whatsapp">
+              <a href="https://api.whatsapp.com/send?text={{ $encodedTitle }}%20{{ $encodedUrl }}" target="_blank" rel="noopener noreferrer" class="whatsapp no-highlight" aria-label="share on WhatsApp">
                 <div class="resp-sharing-button resp-sharing-button--whatsapp resp-sharing-button--small">
                   <div aria-hidden="true" class="resp-sharing-button__icon resp-sharing-button__icon--solid">
                     {{ partial "svg/whatsapp.svg" (dict "size" "32px") }}
@@ -120,7 +129,7 @@
 
                   <!-- Email -->
                   {{ if .Site.Params.social.share.email }}
-              <a href="mailto:?subject={{ .Site.Title }} - {{ $title }}.&amp;body={{ $body }}" class="email  no-highlight" aria-label="share on Email">
+              <a href="mailto:?subject={{ $encodedTitle }}&amp;body={{ $encodedBody }}" class="email no-highlight" aria-label="share via Email">
                 <div class="resp-sharing-button resp-sharing-button--email resp-sharing-button--small">
                   <div aria-hidden="true" class="resp-sharing-button__icon resp-sharing-button__icon--solid">
                     {{ partial "svg/email.svg" (dict "size" "32px") }}
