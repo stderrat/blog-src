@@ -59,6 +59,7 @@
     <strong>{{ $readingTime }} min read</strong>
     <span class="word-count">({{ $wordCount }} words)</span>
 </span>
+{{ partial "bookmark-button.html" . }}
 </p>
 
 {{ if $featured_image }}

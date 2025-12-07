@@ -73,6 +73,9 @@
     -->
     <!-- Shortcuts moved to top navigation bar -->
 
+    <!-- Saved Articles / Bookmarks -->
+    {{ partial "bookmarks-list.html" . }}
+
     {{ if or hugo.IsMultilingual $showvisitedlinks }}
     <section id="prefooter">
       <hr/>
