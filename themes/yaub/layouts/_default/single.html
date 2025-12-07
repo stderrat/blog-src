@@ -51,7 +51,14 @@
 	-
 </span>
 
-<span class="readtime"><strong>{{ if lt (math.Round (div (countwords .Content) 250.0)) 1 }}1{{ else }}{{ (math.Round (div (countwords .Content) 250.0)) }}{{ end }} min read</strong></span>
+{{- $wordCount := countwords .Content -}}
+{{- $readingTime := math.Round (div $wordCount 200.0) -}}
+{{- if lt $readingTime 1 }}{{ $readingTime = 1 }}{{ end -}}
+<span class="readtime" title="{{ $wordCount }} words">
+    <i class="fas fa-clock"></i>
+    <strong>{{ $readingTime }} min read</strong>
+    <span class="word-count">({{ $wordCount }} words)</span>
+</span>
 </p>
 
 {{ if $featured_image }}
@@ -71,10 +78,9 @@
 
 {{ partial "series-nav.html" . }}
 
-<!--
-{{ partial "feedback.html" . }}
--->
 {{ partial "related.html" . }}
+
+{{ partial "custom-comments.html" . }}
 
 
 <footer class="footline">

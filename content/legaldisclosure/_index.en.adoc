@@ -36,5 +36,27 @@ Responsibility for the content of external links (to web pages of third parties)
 Copyright +
 Our web pages and their contents are subject to German copyright law. Unless expressly permitted by law, every form of utilizing, reproducing or processing works subject to copyright protection on our web pages requires the prior consent of the respective owner of the rights. Individual reproductions of a work are only allowed for private use. The materials from these pages are copyrighted and any unauthorized use may violate copyright laws.
 
+=== Comments (GitHub Discussions)
+
+This website uses https://giscus.app[Giscus] for comments, which is powered by GitHub Discussions. When you choose to load the comments section:
+
+* Comments are loaded only after you explicitly click "Load Comments"
+* You will need to authenticate with your GitHub account to participate
+* Your comment, username, and profile picture will be stored in this website's GitHub repository as part of GitHub Discussions
+* GitHub's Privacy Policy applies to your data when using this feature
+
+We do not process or store your personal data from comments on our own servers. All comment data is managed by GitHub Inc. (Microsoft Corporation).
+
+*Important:* By participating in discussions, you agree to GitHub's https://docs.github.com/en/site-policy/github-terms/github-terms-of-service[Terms of Service] and https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement[Privacy Statement].
+
+=== Data Processing
+
+This website does not use cookies for tracking purposes. The following external services may set cookies when you interact with them:
+
+* *GitHub (Giscus Comments):* Functional cookies for authentication when you choose to load and participate in comments
+* *Syntax Highlighting:* Code highlighting is performed locally in your browser
+
+No analytics or tracking services are used on this website.
+
 [.small]
 Quelle: http://translate-24h.de 

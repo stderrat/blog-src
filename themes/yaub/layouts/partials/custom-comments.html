@@ -1,3 +1,226 @@
-<!-- import your comments system 
-{{ template "_internal/disqus.html" . }}
+<!-- Giscus Comments System
+     Requires GitHub Discussions enabled on your repository
+     Configure at: https://giscus.app
+     
+     Add to your config.toml:
+     [params.giscus]
+       enabled = true
+       repo = "your-username/your-repo"
+       repoID = "your-repo-id"
+       category = "Comments"
+       categoryID = "your-category-id"
+       mapping = "pathname"
+       reactionsEnabled = "1"
+       emitMetadata = "0"
+       inputPosition = "top"
+       theme = "preferred_color_scheme"
+       lang = "en"
 -->
+
+{{/* Show comments on all single pages except those with disableComments: true */}}
+{{ if and .Site.Params.giscus.enabled (not .Params.disableComments) .Section }}
+<div class="comments-section" id="comments">
+    <hr class="comments-divider" />
+    <h3 class="comments-title">
+        <i class="fas fa-comments"></i> Discussion
+    </h3>
+    
+    <!-- GDPR-compliant: Comments load only after user consent -->
+    <div id="comments-consent" class="comments-consent">
+        <div class="consent-box">
+            <i class="fab fa-github consent-icon"></i>
+            <p class="consent-text">
+                Comments are powered by <strong>GitHub Discussions</strong>. 
+                To participate, you'll need a GitHub account.
+            </p>
+            <p class="consent-notice">
+                <i class="fas fa-info-circle"></i>
+                By loading comments, you agree to GitHub's 
+                <a href="https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement" target="_blank" rel="noopener">Privacy Policy</a>.
+                Your data is processed by GitHub, not by this website.
+            </p>
+            <button id="load-comments-btn" class="load-comments-btn">
+                <i class="fas fa-comment-dots"></i> Load Comments
+            </button>
+            <label class="remember-choice">
+                <input type="checkbox" id="remember-consent" />
+                <span>Remember my choice for this site</span>
+            </label>
+        </div>
+    </div>
+    
+    <!-- Giscus container (hidden until consent) -->
+    <div id="giscus-container" class="giscus-container" style="display: none;"></div>
+</div>
+
+<script>
+(function() {
+    const consentBox = document.getElementById('comments-consent');
+    const giscusContainer = document.getElementById('giscus-container');
+    const loadBtn = document.getElementById('load-comments-btn');
+    const rememberCheckbox = document.getElementById('remember-consent');
+    const storageKey = 'giscus-consent';
+    
+    // Check if user previously gave consent
+    if (localStorage.getItem(storageKey) === 'granted') {
+        loadGiscus();
+    }
+    
+    // Handle button click
+    if (loadBtn) {
+        loadBtn.addEventListener('click', function() {
+            if (rememberCheckbox && rememberCheckbox.checked) {
+                localStorage.setItem(storageKey, 'granted');
+            }
+            loadGiscus();
+        });
+    }
+    
+    function loadGiscus() {
+        if (consentBox) consentBox.style.display = 'none';
+        if (giscusContainer) giscusContainer.style.display = 'block';
+        
+        // Create and inject the Giscus script
+        const script = document.createElement('script');
+        script.src = 'https://giscus.app/client.js';
+        script.setAttribute('data-repo', '{{ .Site.Params.giscus.repo }}');
+        script.setAttribute('data-repo-id', '{{ .Site.Params.giscus.repoID }}');
+        script.setAttribute('data-category', '{{ .Site.Params.giscus.category | default "Comments" }}');
+        script.setAttribute('data-category-id', '{{ .Site.Params.giscus.categoryID }}');
+        script.setAttribute('data-mapping', '{{ .Site.Params.giscus.mapping | default "pathname" }}');
+        script.setAttribute('data-strict', '0');
+        script.setAttribute('data-reactions-enabled', '{{ .Site.Params.giscus.reactionsEnabled | default "1" }}');
+        script.setAttribute('data-emit-metadata', '{{ .Site.Params.giscus.emitMetadata | default "0" }}');
+        script.setAttribute('data-input-position', '{{ .Site.Params.giscus.inputPosition | default "top" }}');
+        script.setAttribute('data-theme', '{{ .Site.Params.giscus.theme | default "preferred_color_scheme" }}');
+        script.setAttribute('data-lang', '{{ .Site.Params.giscus.lang | default "en" }}');
+        script.setAttribute('data-loading', 'lazy');
+        script.crossOrigin = 'anonymous';
+        script.async = true;
+        
+        giscusContainer.appendChild(script);
+    }
+})();
+</script>
+
+<style>
+.comments-section {
+    margin-top: 3rem;
+    padding-top: 2rem;
+}
+
+.comments-divider {
+    border: none;
+    border-top: 1px solid var(--MENU-SECTION-HR-color, #ddd);
+    margin-bottom: 1.5rem;
+}
+
+.comments-title {
+    font-size: 1.4rem;
+    margin-bottom: 1.5rem;
+    color: var(--MAIN-TEXT-color);
+}
+
+.comments-title i {
+    margin-right: 0.5rem;
+    color: var(--MAIN-LINK-color, #1e90ff);
+}
+
+.comments-consent {
+    margin: 1.5rem 0;
+}
+
+.consent-box {
+    background: var(--MENU-SECTIONS-BG-color, #f5f5f5);
+    border: 1px solid var(--MENU-SECTION-HR-color, #ddd);
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.consent-icon {
+    font-size: 2.5rem;
+    color: var(--MAIN-LINK-color, #1e90ff);
+    margin-bottom: 1rem;
+}
+
+.consent-text {
+    font-size: 1rem;
+    margin-bottom: 0.75rem;
+    color: var(--MAIN-TEXT-color);
+}
+
+.consent-notice {
+    font-size: 0.85rem;
+    color: var(--MAIN-TEXT-color-DARK, #666);
+    margin-bottom: 1.25rem;
+    padding: 0.75rem;
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 4px;
+}
+
+.consent-notice i {
+    margin-right: 0.4rem;
+}
+
+.consent-notice a {
+    color: var(--MAIN-LINK-color, #1e90ff);
+}
+
+.load-comments-btn {
+    background: var(--TH-BG-color, #1e90ff);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.1s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.load-comments-btn:hover {
+    background: var(--MAIN-LINK-HOVER-color, #1c7ed6);
+    transform: translateY(-1px);
+}
+
+.load-comments-btn:active {
+    transform: translateY(0);
+}
+
+.remember-choice {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    font-size: 0.85rem;
+    color: var(--MAIN-TEXT-color-DARK, #666);
+    cursor: pointer;
+}
+
+.remember-choice input[type="checkbox"] {
+    cursor: pointer;
+}
+
+.giscus-container {
+    margin-top: 1rem;
+}
+
+/* Dark mode adjustments for Giscus */
+@media (prefers-color-scheme: dark) {
+    .consent-box {
+        background: rgba(255, 255, 255, 0.05);
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    .consent-notice {
+        background: rgba(255, 255, 255, 0.05);
+    }
+}
+</style>
+{{ end }}
