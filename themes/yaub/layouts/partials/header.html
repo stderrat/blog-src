@@ -1,7 +1,9 @@
 <!DOCTYPE html>
 <html lang="{{ .Page.Language | default "en" }}" class="js csstransforms3d">
   <head>
-    <meta name="google-site-verification" content="yq2Ib3doJVHVlEW2wtHap5WY54JhS2CCvI40y30F0FI" />
+    {{- with .Site.Params.googleSiteVerification }}
+    <meta name="google-site-verification" content="{{ . }}" />
+    {{- end }}
     <meta name="color-scheme" content="dark light">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     {{ hugo.Generator }}
