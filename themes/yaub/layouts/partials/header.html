@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html lang="{{ .Page.Language | default "en" }}" class="js csstransforms3d">
+<html lang="{{ .Page.Language | default "en" }}" class="no-js">
   <head>
+    <script>document.documentElement.className = document.documentElement.className.replace('no-js', 'js');</script>
     {{- with .Site.Params.googleSiteVerification }}
     <meta name="google-site-verification" content="{{ . }}" />
     {{- end }}
