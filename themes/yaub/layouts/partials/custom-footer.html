@@ -1,14 +1,14 @@
 <!-- Code Block Language Badges -->
 <script>
 (function() {
-    // Add language badges to code blocks
+    // Add language badges to code blocks - positioned as tabs above the code block
     document.querySelectorAll('pre code[class*="language-"], pre code[class*="hljs"]').forEach(function(codeBlock) {
         // Get the language from class
         let language = null;
         const classes = codeBlock.className.split(' ');
         
         for (const cls of classes) {
-            // Check for language-xxx or hljs-xxx patterns
+            // Check for language-xxx patterns
             if (cls.startsWith('language-')) {
                 language = cls.replace('language-', '');
                 break;
@@ -27,72 +27,31 @@
         
         if (language) {
             const pre = codeBlock.parentElement;
-            if (pre && pre.tagName === 'PRE') {
-                // Wrap pre in a container if not already wrapped
-                if (!pre.parentElement.classList.contains('code-block-wrapper')) {
-                    const wrapper = document.createElement('div');
-                    wrapper.className = 'code-block-wrapper';
-                    pre.parentNode.insertBefore(wrapper, pre);
-                    wrapper.appendChild(pre);
-                }
+            if (pre && pre.tagName === 'PRE' && !pre.parentElement.classList.contains('code-block-wrapper')) {
+                // Create wrapper div
+                const wrapper = document.createElement('div');
+                wrapper.className = 'code-block-wrapper';
+                wrapper.style.cssText = 'position: relative; margin-top: 1.5em;';
                 
-                // Create and add the badge
+                // Create the badge as a tab above the code block
                 const badge = document.createElement('span');
-                badge.className = 'code-language-badge lang-' + language.toLowerCase();
+                badge.className = 'code-language-badge';
                 badge.textContent = language.toUpperCase();
+                //badge.style.cssText = 'position: absolute; top: -1.5em; right: 0; ' +
+                //    'background-color: #2d2d2d; color: #e6db74; ' +
+                //    'padding: 4px 12px; border-radius: 4px 4px 0 0; font-size: 0.75em; ' +
+                //    'font-family: sans-serif; text-transform: uppercase; letter-spacing: 0.5px; ' +
+                //    'font-weight: 600; z-index: 1;';
                 
-                // Add badge to wrapper
-                pre.parentElement.insertBefore(badge, pre);
+                // Wrap the pre element
+                pre.parentNode.insertBefore(wrapper, pre);
+                wrapper.appendChild(badge);
+                wrapper.appendChild(pre);
+                
+                // Remove top border-radius from pre on the right side
+                pre.style.borderTopRightRadius = '0';
             }
         }
     });
 })();
 </script>
-
-<!-- Service Worker Registration for PWA/Offline Support -->
-<script>
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function() {
-        navigator.serviceWorker.register('/js/sw.js')
-            .then(function(registration) {
-                console.log('ServiceWorker registered successfully with scope: ', registration.scope);
-            })
-            .catch(function(error) {
-                console.log('ServiceWorker registration failed: ', error);
-            });
-    });
-}
-</script>
-
-<!--
-<script>
-
-    const btn = document.querySelector(".btn-toggle");
-    const prefersDarkScheme = window.matchMedia("(prefers-color-scheme: dark)");
-
-    /* store theme selection locally */
-    const currentTheme = localStorage.getItem("theme");
-    if (currentTheme == "dark") {
-      document.body.classList.toggle("dark-theme");
-    } else if (currentTheme == "light") {
-      document.body.classList.toggle("light-theme");
-    }
-
-    btn.addEventListener("click", function () {
-      if (prefersDarkScheme.matches) {
-        document.body.classList.toggle("light-theme");
-        var theme = document.body.classList.contains("light-theme")
-          ? "light"
-          : "dark";
-      } else {
-        document.body.classList.toggle("dark-theme");
-        var theme = document.body.classList.contains("dark-theme")
-          ? "dark"
-          : "light";
-      }
-      localStorage.setItem("theme", theme);
-    });
-
-
-</script>
--->
