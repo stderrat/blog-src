@@ -1,0 +1,104 @@
+{{ partial "header.html" . }}
+
+<!-- Author Term Page - Shows articles by specific author -->
+
+{{ $authorName := .Data.Term | default .Title }}
+{{ $authorSlug := .Data.Term | urlize }}
+
+<!-- Articles by this Author -->
+<h2 class="gradient-header" style="margin: 2rem 0 1rem 0;">
+  <em>Articles by {{ $authorName }}</em>
+</h2>
+
+<div class="flex flex-wrap">
+  <section class="flex-ns flex-wrap justify-between w-100">
+    {{ $paginator := .Paginate .Pages 10 }}
+    {{ range $paginator.Pages }}
+      <div class="summary-gradient relative flex-auto w-100 w-40-l mr3 mb3 ba b--moon-gray nested-copy-line-height weight-5">
+        <div class="mb2 pa3 pa4-l gray">
+          {{ partial "summary-with-image.html" . }}
+        </div>
+      </div>
+    {{ end }}
+  </section>
+</div>
+
+<!-- Pagination -->
+{{ $paginator := .Paginator }}
+{{ $adjacent_links := 2 }}
+{{ $max_links := (add (mul $adjacent_links 2) 1) }}
+{{ $lower_limit := (add $adjacent_links 1) }}
+{{ $upper_limit := (sub $paginator.TotalPages $adjacent_links) }}
+
+{{ if gt $paginator.TotalPages 1 }}
+<div>
+  <ul class="pagination" id="pagination">
+    {{ if ne $paginator.PageNumber 1 }}
+    <li class="pagination__item pagination__item--first">
+      <a class="pagination__link pagination__link--first btn btn-default" href="{{ $paginator.First.URL }}">
+        &laquo; &laquo;
+      </a>
+    </li>
+    {{ end }}
+
+    {{ if $paginator.HasPrev }}
+    <li class="pagination__item pagination__item--previous">
+      <a href="{{ $paginator.Prev.URL }}" class="pagination__link pagination__link--previous btn btn-default">
+        &laquo;
+      </a>
+    </li>
+    {{ end }}
+  
+    {{ range $paginator.Pagers }}
+      {{ $.Scratch.Set "page_number_flag" false }}
+      
+      {{ if gt $paginator.TotalPages $max_links }}
+        {{ if le $paginator.PageNumber $lower_limit }}
+          {{ if le .PageNumber $max_links }}
+            {{ $.Scratch.Set "page_number_flag" true }}
+          {{ end }}
+        {{ else if ge $paginator.PageNumber $upper_limit }}
+          {{ if gt .PageNumber (sub $paginator.TotalPages $max_links) }}
+            {{ $.Scratch.Set "page_number_flag" true }}
+          {{ end }}
+        {{ else }}
+          {{ if and ( ge .PageNumber (sub $paginator.PageNumber $adjacent_links) ) ( le .PageNumber (add $paginator.PageNumber $adjacent_links) ) }}
+            {{ $.Scratch.Set "page_number_flag" true }}
+          {{ end }}
+        {{ end }}
+      {{ else }}
+        {{ $.Scratch.Set "page_number_flag" true }}
+      {{ end }}
+
+      {{ if eq ($.Scratch.Get "page_number_flag") true }}
+        <li class="pagination__item{{ if eq . $paginator }} pagination__item--current{{ end }}">
+          <a href="{{ .URL }}" class="pagination__link btn btn-default">
+            {{ .PageNumber }}
+          </a>
+        </li>
+      {{ end }}
+    {{ end }}
+
+    {{ if $paginator.HasNext }}
+    <li class="pagination__item pagination__item--next">
+      <a href="{{ $paginator.Next.URL }}" class="pagination__link pagination__link--next btn btn-default">
+        &raquo;
+      </a>
+    </li>
+    {{ end }}
+
+    {{ if ne $paginator.PageNumber $paginator.TotalPages }}
+    <li class="pagination__item pagination__item--last">
+      <a class="pagination__link pagination__link--last btn btn-default" href="{{ $paginator.Last.URL }}">
+        &raquo; &raquo;
+      </a>
+    </li>
+    {{ end }}
+  </ul>
+</div>
+{{ end }}
+
+<footer class="footline">
+</footer>
+
+{{ partial "footer.html" . }}

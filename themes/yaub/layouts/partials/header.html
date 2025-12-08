@@ -58,7 +58,7 @@
         <div id="overlay"></div>
 
         {{ if not .Params.chapter }}
-          {{ if not (eq .Kind "taxonomy") }}
+          {{ if not (or (eq .Kind "taxonomy") (eq .Kind "term")) }}
           <aside id="toc-field" class="hidden lg:block tableOfContentContainer">
             <header id="TableOfContentsHeader">What's on this Page</header>
             {{ .TableOfContents }}

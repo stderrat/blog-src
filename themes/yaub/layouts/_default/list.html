@@ -4,28 +4,23 @@
 	{{ .Content }}
 {{end}}
 
-<!-- only print summary page for categories or authors -->
+<!-- Print summary page for categories -->
 {{if eq .Data.Singular "category"}}
-  {{ partial "summary_index.html" . }}
-{{end}}
-{{if eq .Data.Singular "author"}}
   {{ partial "summary_index.html" . }}
 {{end}}
 
 {{ if or (eq .Kind "taxonomy") (eq .Kind "term") }}
-<ul>
-	{{ range .Pages }}
-     <!-- ignore Blog site itself -->
-    {{ if (eq .Title "YAUB Yet Another Useless Blog") }}
-	 <!-- or ignore author list -->
-	{{ else if (eq $.Data.Singular "author") }}
-	 <!-- ignore category list -->
-	{{ else if (eq $.Data.Singular "category") }}
-    {{ else }}
-		  <li><a href="{{.RelPermalink}}">{{.Title}}</a></li>
+  <!-- Skip list for categories and authors (handled by their own templates) -->
+  {{ if not (or (eq .Data.Singular "category") (eq .Data.Singular "author")) }}
+  <ul>
+    {{ range .Pages }}
+      <!-- ignore Blog site itself -->
+      {{ if not (eq .Title "YAUB Yet Another Useless Blog") }}
+        <li><a href="{{.RelPermalink}}">{{.Title}}</a></li>
+      {{ end }}
     {{ end }}
-	{{ end }}
-</ul>
+  </ul>
+  {{ end }}
 {{end}}
 
 

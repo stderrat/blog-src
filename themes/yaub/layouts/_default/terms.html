@@ -1,5 +1,6 @@
 {{ partial "header.html" . }}
 
+<!-- Default terms template for taxonomy list pages (tags, categories, etc.) -->
 {{ if eq .Kind "section" }}
 	{{ .Content }}
 {{end}}
