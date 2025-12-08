@@ -52,7 +52,10 @@
     {{ end -}}
   </head>
   <body data-url="{{ .RelPermalink }}">
-    <button onclick="scrollTopAnimated()" id="myBtn" class="top-btn button fa fa-arrow-up" title="Go to top"></button>
+    <!-- Skip to content link for keyboard navigation accessibility -->
+    <a href="#main-content" class="skip-to-content">Skip to main content</a>
+    
+    <button onclick="scrollTopAnimated()" id="myBtn" class="top-btn button fa fa-arrow-up" title="Go to top" aria-label="Go to top"></button>
 
     <span class="read-progress"></span>
 
@@ -142,7 +145,7 @@
         </div>
       {{ end }}
 
-        <div class="padding highlightable">
+        <div id="main-content" class="padding highlightable" tabindex="-1">
 
           {{ partial "top-navigation.html" . }} 
      
