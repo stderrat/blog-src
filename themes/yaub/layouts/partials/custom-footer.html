@@ -25,7 +25,8 @@
             }
         }
         
-        if (language) {
+        // Skip mermaid diagrams - they get converted to SVG visualizations
+        if (language && language.toLowerCase() !== 'mermaid') {
             const pre = codeBlock.parentElement;
             if (pre && pre.tagName === 'PRE' && !pre.parentElement.classList.contains('code-block-wrapper')) {
                 // Create wrapper div
