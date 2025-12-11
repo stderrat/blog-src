@@ -1,6 +1,6 @@
 ---
 title: OpenShift
-weight: 2
+weight: 30
 chapter: true
 layout: summary
 

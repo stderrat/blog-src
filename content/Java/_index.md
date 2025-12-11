@@ -1,6 +1,6 @@
 ---
 title: Java
-weight: 11
+weight: 42
 chapter: true
 layout: summary
 draft: false

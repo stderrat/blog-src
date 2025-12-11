@@ -112,7 +112,7 @@ parent = "authors"
     class = "left"
 
 [[menu.shortcuts]]
-name = "<i class='far fa-bookmark padding-right-25rem'></i> Catagories"
+name = "<i class='far fa-bookmark padding-right-25rem'></i> Categories"
 url = "/categories"
 weight = 2
   [menu.shortcuts.params]

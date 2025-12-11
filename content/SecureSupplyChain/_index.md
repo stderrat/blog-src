@@ -1,6 +1,6 @@
 ---
 title: Secure Supply Chain
-weight: 3
+weight: 31
 chapter: true
 layout: summary
 

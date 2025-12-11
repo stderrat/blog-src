@@ -3,14 +3,18 @@
 <link rel="stylesheet" href="/css/helm-charts.css">
 
 <div class="helm-charts-page">
-  <h1>Helm Chartsx</h1>
 
   <div class="helm-intro">
     <p>
-      Welcome to my Helm Repository! This collection serves as a central storage for my GitOps approach to cluster management.<br>
+      Welcome to the public Helm Repository! This collection serves as a central storage for my GitOps approach to cluster management.<br>
       Whenever I spin up a new OpenShift cluster, these charts help me configure it quickly and consistently.<br><br>
       The charts are primarily used by my <a href="https://github.com/tjungbauer/openshift-clusterconfig-gitops">OpenShift GitOps cluster configuration project</a>.<br><br>
       For detailed information and usage examples, please check out my blog: <a href="/gitopscollection/">GitOps Collection</a>
+
+      <br>
+      <p>
+        Feel free to use these charts for your own projects. If you have any questions, please feel free to contact me.
+      </p>
     </p>
   </div>
 
@@ -194,14 +198,14 @@ document.addEventListener('DOMContentLoaded', async function() {
                 Download
               </a>
             ` : ''}
-            <a href="https://artifacthub.io/packages/helm/openshift-bootstraps/${chart.name}" target="_blank" rel="noopener noreferrer" class="helm-chart-btn" title="View on ArtifactHub">
-              ArtifactHub
-            </a>
         </div>
         <p class="helm-chart-description">${chart.description || 'No description available'}</p>
         <div class="helm-chart-meta">
           <span class="helm-chart-meta-item">📦 v${chart.version}</span>
           ${chart.created ? `<span class="helm-chart-meta-item">📅 ${new Date(chart.created).toLocaleDateString()}</span>` : ''}
+          <a href="https://artifacthub.io/packages/helm/openshift-bootstraps/${chart.name}" target="_blank" rel="noopener noreferrer" class="helm-link highlight" title="View on ArtifactHub">
+            🔗 ArtifactHub
+          </a>
         </div>
         ${chart.keywords.length > 0 ? `
           <div class="helm-chart-tags">
@@ -213,6 +217,28 @@ document.addEventListener('DOMContentLoaded', async function() {
   }
 });
 </script>
+
+  <!-- License and Attribution Footer -->
+  <div class="helm-license-footer">
+    <div class="helm-license-section">
+      <h2>License</h2>
+      <p class="helm-copyright">Copyright © {{ now.Year }} Thomas Jungbauer</p>
+      <p class="helm-license-text">
+        Licensed under the <a href="http://www.apache.org/licenses/LICENSE-2.0" target="_blank" rel="noopener noreferrer">Apache License, Version 2.0</a> (the "License"); 
+        you may not use this file except in compliance with the License.
+      </p>
+      <p class="helm-license-disclaimer">
+        Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, 
+        WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and
+        limitations under the License.
+      </p>
+    </div>
+    <div class="helm-icons-section">
+      <h2>Icons</h2>
+      <p>Various Artists - <a href="https://www.flaticon.com/" target="_blank" rel="noopener noreferrer">Flaticon</a> and <a href="https://www.redhat.com/" target="_blank" rel="noopener noreferrer">Red Hat</a></p>
+    </div>
+  </div>
+</div>
 
 <footer class="footline">
 </footer>

@@ -17,10 +17,13 @@
   border-left: 4px solid #0066cc;
 }
 
-.helm-intro a {
-  color: #0066cc;
+.helm-link {
+  line-height: normal !important;
 }
 
+.helm-intro a:hover {
+  color: var(--MAIN-LINK-HOVER-color);
+}
 .helm-search-container {
   margin-bottom: 1.5rem;
 }
@@ -33,7 +36,7 @@
   border: 2px solid #ddd;
   border-radius: 8px;
   background: var(--MAIN-BG-color, #fff);
-  color: var(--MAIN-TEXT-color, #333);
+  color: #757575;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
@@ -68,17 +71,18 @@
 }
 
 .helm-chart-card {
-  background: var(--MAIN-BG-color, #fff);
-  border: 1px solid #e0e0e0;
-  border-radius: 12px;
+  background: var(--MENU-SECTIONS-BG-color, #fff);
+  border: 1px solid #676869;
+  border-radius: 5px;
   padding: 1.5rem;
   transition: transform 0.2s, box-shadow 0.2s;
+  transition: var(--transition-default) box-shadow, var(--transition-default) transform;
   display: flex;
   flex-direction: column;
 }
 
 .helm-chart-card:hover {
-  transform: translateY(-2px);
+  transform: scale(0.98);
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
 }
 
@@ -95,12 +99,12 @@
 }
 
 .helm-chart-icon {
-  width: 45px;
-  height: 45px;
+  width: 60px;
+  height: 60px;
   min-width: 45px;
   min-height: 45px;
   border-radius: 8px;
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: transparent !important;
   background-size: contain;
   background-position: center;
   background-repeat: no-repeat;
@@ -120,7 +124,7 @@
 }
 
 .helm-chart-title {
-  font-size: 1.1rem;
+  font-size: 1.5rem;
   font-weight: 600;
   margin: 0 0 0.25rem 0;
   word-wrap: break-word;
@@ -158,8 +162,8 @@
 }
 
 .helm-chart-btn:hover {
-  background: rgba(0, 102, 204, 0.1);
-  border-color: #0066cc;
+  background: var(--MENU-TAG-BG-color);
+  border-color: var(--MENU-TAG-BG-color);
 }
 
 .helm-chart-btn svg {
@@ -192,6 +196,20 @@
   gap: 0.3rem;
 }
 
+.helm-chart-meta-link {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: #4dabf7;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.helm-chart-meta-link:hover {
+  color: #74c0fc;
+  text-decoration: underline;
+}
+
 .helm-chart-tags {
   display: flex;
   flex-wrap: wrap;
@@ -199,12 +217,13 @@
 }
 
 .helm-chart-tag {
-  background: rgba(0, 102, 204, 0.1);
-  color: #0066cc;
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 0.75rem;
+  background: var(--MENU-TAG-BG-color);
+  color: var(--WHITE);
+  padding: 0 8px 0 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  font-size: 0.8em;
   font-weight: 500;
+  line-height: 2em;
 }
 
 .helm-deprecated-badge {
@@ -263,6 +282,7 @@
   cursor: pointer;
   user-select: none;
   list-style: none;
+  text-decoration: none;
 }
 
 .deprecated-summary::-webkit-details-marker {
@@ -320,5 +340,55 @@
 
 .deprecated-grid .helm-chart-card:hover {
   opacity: 1;
+}
+
+/* License Footer Styles */
+.helm-license-footer {
+  margin-top: 3rem;
+  padding: 2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.helm-license-section {
+  margin-bottom: 1.5rem;
+}
+
+.helm-copyright {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.helm-license-text {
+  margin-bottom: 0.5rem;
+}
+
+.helm-license-text a {
+  color: var(--MAIN-LINK-color, #4dabf7);
+}
+
+.helm-license-text a:hover {
+  text-decoration: underline;
+}
+
+.helm-license-disclaimer {
+  font-size: 0.8rem;
+  opacity: 0.8;
+  font-style: italic;
+}
+
+.helm-icons-section h4 {
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.helm-icons-section a {
+  color: var(--MAIN-LINK-color, #4dabf7);
+}
+
+.helm-icons-section a:hover {
+  text-decoration: underline;
 }
 
