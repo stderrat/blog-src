@@ -39,7 +39,7 @@ NOTE: The content below is dynamically loaded from the Helm repository and alway
 
 {{< helm-changelog limit="10" >}}
 
-=== Quick Links
+== Quick Links
 
 [cols="1,2"]
 |===
