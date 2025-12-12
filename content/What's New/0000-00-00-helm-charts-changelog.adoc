@@ -5,6 +5,7 @@ date: "2024-12-31"
 weight: 1
 doctype: book
 chapter: true
+disableReaderMode: true
 
 featured_image: /whats-new/images/helm-charts-logo.png
 show_featured_image_summary: true
