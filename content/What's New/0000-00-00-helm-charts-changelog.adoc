@@ -1,0 +1,59 @@
+---
+title: "Helm Charts Repository Updates"
+description: "Latest updates and changes to the stderr.at Helm Charts collection for OpenShift and Kubernetes"
+date: "2024-12-31"
+weight: 1
+doctype: book
+chapter: true
+
+featured_image: /whats-new/images/helm-charts-logo.png
+show_featured_image_summary: true
+show_featured_image_article: true
+
+authors: [Thomas Jungbauer]
+type: post
+draft: false
+categories:
+   - Helm Charts
+   - GitOps
+   - Changelog
+
+tags: ["Helm", "Charts", "Changelog", "ArgoCD", "OpenShift", "Kubernetes", "GitOps"]
+
+aliases: [
+   "/helm-charts-changelog",
+   "/charts/changelog",
+]
+---
+
+:imagesdir: /openshift/images/
+:icons: font
+:toc:
+
+This page shows the **latest updates** to the https://blog.stderr.at/helm-charts[stderr.at Helm Charts Repository]. 
+The charts are designed for OpenShift and Kubernetes deployments, with a focus on GitOps workflows using Argo CD.
+
+NOTE: The content below is dynamically loaded from the Helm repository and always shows the most recent changes.
+
+<!--more-->
+
+{{< helm-changelog limit="10" >}}
+
+=== Quick Links
+
+[cols="1,2"]
+|===
+|Resource |Link
+
+|Helm Repository
+|https://charts.stderr.at/
+
+|GitHub Source
+|https://github.com/tjungbauer/helm-charts
+
+|ArtifactHub
+|https://artifacthub.io/packages/search?repo=tjungbauer
+
+|Example GitOps Repo
+|https://github.com/tjungbauer/openshift-clusterconfig-gitops
+|===
