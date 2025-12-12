@@ -611,3 +611,55 @@ Select the tempostack instance and select the tenant *tenantB* this time.
 
 image::mockbin-2-traces.png[Mock Team B - Traces]
 
+### Argo CD Stays in Progressing State
+
+If you have deployed the Mockbin Application and the OpenTelemetry Collector **as a sidecar** deployment in the team-b namespace, you might notice that the Argo CD Application stays in the *Progressing* state.
+
+This is because the OpenTelemetry Collector does not really return a state. The status is simply: 
+
+[source,yaml]
+----
+status:
+  version: 0.140.0
+----
+
+Nothing else ... thats too less for Argo CD to work with.
+
+In order to fix this, we need to add a custom health check to the Argo CD instance.
+
+The Argo CD instance knows the following part:
+
+[source,yaml]
+----
+apiVersion: argoproj.io/v1beta1
+kind: ArgoCD
+metadata:
+  name: openshift-gitops   
+  namespace: openshift-gitops
+spec:
+[...]
+  resourceHealthChecks: <1>
+    - check: |
+        hs = {}
+        if obj.status ~= nil then
+          if obj.status.version ~= nil and obj.status.version ~= "" then
+            hs.status = "Healthy"
+            hs.message = "Running version " .. obj.status.version
+          else
+            hs.status = "Progressing"
+            hs.message = "Waiting for version report"
+          end
+        else
+          hs.status = "Progressing"
+          hs.message = "Status not available"
+        end
+        return hs
+      group: opentelemetry.io
+      kind: OpenTelemetryCollector
+[...]
+----
+<1> Custom health check for the OpenTelemetry Collector.
+
+NOTE: Above will end up in a ConfigMap that is managed by the OpenShift GitOps operator.
+
+This will make Argo CD happy and the Application will be in the *Progressing* state.
