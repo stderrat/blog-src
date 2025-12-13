@@ -12,16 +12,37 @@
   <div id="header">
       {{ partial "logo.html" . }}
     </div>
-    {{if not .Site.Params.disableSearch}}
-        {{/* Search options - uncomment ONE of the following:
-             - search.html              = Original Lunr.js search (dropdown)
-             - search-pagefind.html     = Pagefind dropdown in sidebar
-             - search-pagefind-redirect.html = Pagefind with dedicated search page (current)
-        */}}
-        {{ partial "search-pagefind-redirect.html" . }}
-    {{end}}
-
   </div>
+
+  {{/* Search button that opens the search modal - placed after logo/header */}}
+  {{if not .Site.Params.disableSearch}}
+  <div id="sidebar-search">
+      <button class="sidebar-search-btn" onclick="window.SearchModal && window.SearchModal.open()" title="Search" aria-label="Open search">
+          <i class="fas fa-search"></i>
+          <span class="sidebar-search-text">Search...</span>
+          <kbd class="sidebar-search-kbd"></kbd>
+      </button>
+  </div>
+  {{end}}
+    
+  {{/* 
+  ==========================================================================
+  OLD SIDEBAR SEARCH FIELD - DISABLED
+  The search modal (Cmd/Ctrl+K) is now the primary search experience.
+  To re-enable the old sidebar search dropdown, uncomment the block below
+  and comment out the sidebar-search-btn above.
+  ==========================================================================
+  
+  {{if not .Site.Params.disableSearch}}
+      {{/* Search options - uncomment ONE of the following:
+           - search.html              = Original Lunr.js search (dropdown)
+           - search-pagefind.html     = Pagefind dropdown in sidebar
+           - search-pagefind-redirect.html = Pagefind with dedicated search page
+      *}}
+      {{ partial "search-pagefind-redirect.html" . }}
+  {{end}}
+  
+  */}}
 
   <!--
   <div class="togglemode">
