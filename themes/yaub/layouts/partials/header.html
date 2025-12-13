@@ -50,6 +50,9 @@
     {{ range .AlternativeOutputFormats -}}
       {{ printf `<link rel="%s" type="%s" href="%s" title="%s" />` .Rel .MediaType.Type .Permalink $.Site.Title | safeHTML }}
     {{ end -}}
+
+    {{- /* SEO: Breadcrumb structured data for search engines */ -}}
+    {{ partial "breadcrumb-jsonld.html" . }}
   </head>
   <body data-url="{{ .RelPermalink }}">
     <!-- Skip to content link for keyboard navigation accessibility -->
@@ -60,7 +63,7 @@
     <span class="read-progress"></span>
 
     {{ partial "menu.html" . }}
-        <section id="body" class="post-content">
+        <main id="body" class="post-content" role="main">
         <div id="overlay"></div>
 
         {{ if not .Params.chapter }}

@@ -74,7 +74,7 @@
       <p>{{ $.Param "copyright" | default (i18n "Copyright") }} &copy; {{ with .Site.Params.yaub.copyrightstart }} {{ . }}{{ end }} - {{ dateFormat "2006" now }} {{ .Site.Copyright }}</p>
     </div>
     {{ end }}
-    </section>
+    </main>
 
 <!-- READING PROGRESS BAR -->
 <script>
@@ -137,6 +137,9 @@
     <link href="/pagefind/pagefind-ui.css" rel="stylesheet">
     <script src="/pagefind/pagefind-ui.js"></script>
     <script src="{{"js/search-modal.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+    
+    <!-- Keyboard Shortcuts Help Modal (?) -->
+    <script src="{{"js/shortcuts-modal.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
 
 {{ if .Sections}}
 {{else}}

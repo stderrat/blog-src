@@ -1,0 +1,36 @@
+{{- /* JSON-LD Breadcrumb Structured Data for SEO */ -}}
+{{- if not .IsHome -}}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Home",
+      "item": "{{ .Site.BaseURL }}"
+    }
+    {{- $position := 2 -}}
+    {{- $ancestors := .Ancestors.Reverse -}}
+    {{- range $ancestors -}}
+    {{- if and .Title (not .IsHome) -}}
+    ,{
+      "@type": "ListItem",
+      "position": {{ $position }},
+      "name": "{{ .Title }}",
+      "item": "{{ .Permalink }}"
+    }
+    {{- $position = add $position 1 -}}
+    {{- end -}}
+    {{- end -}}
+    ,{
+      "@type": "ListItem",
+      "position": {{ $position }},
+      "name": "{{ .Title }}"
+    }
+  ]
+}
+</script>
+{{- end -}}
+

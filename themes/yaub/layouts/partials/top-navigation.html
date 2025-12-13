@@ -35,7 +35,17 @@
                   {{end}}
                 {{end}}
 
-                  <!-- Search Button (right-aligned) -->
+                  <!-- Spacer to push buttons to the right -->
+                  <li class="topnav-spacer"></li>
+
+                  <!-- Help Button (keyboard shortcuts) -->
+                  <li class="list-horizontal topnav-help-li">
+                      <button class="topnav-help-btn" onclick="window.ShortcutsModal && window.ShortcutsModal.open()" title="Keyboard shortcuts" aria-label="Show keyboard shortcuts">
+                          <kbd>?</kbd>
+                      </button>
+                  </li>
+
+                  <!-- Search Button -->
                   <li class="list-horizontal topnav-search-li">
                       <button class="topnav-search-btn" onclick="window.SearchModal && window.SearchModal.open()" title="Search" aria-label="Open search">
                           <i class="fas fa-search"></i>

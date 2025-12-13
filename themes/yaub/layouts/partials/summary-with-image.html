@@ -56,8 +56,8 @@
           {{- $wordCount := countwords .Content -}}
           {{- $readingTime := math.Round (div $wordCount 200.0) -}}
           {{- if lt $readingTime 1 }}{{ $readingTime = 1 }}{{ end -}}
-          <span class="readtime summary-readtime">
-            <strong>{{ $readingTime }} min</strong>
+          <span class="readtime summary-readtime" title="Estimated reading time">
+            <i class="far fa-clock"></i> {{ $readingTime }} min read
           </span>
         </div>
         <div class="f6 f5-l lh-copy nested-copy-line-height nested-links">
