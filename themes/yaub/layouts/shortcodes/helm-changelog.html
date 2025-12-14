@@ -70,7 +70,7 @@
           <div class="helm-chart-item" data-href="${chartUrl}" onclick="window.open('${chartUrl}', '_blank')" role="link" tabindex="0">
             <div class="helm-chart-header">
               ${iconHtml}
-              <span class="helm-chart-name">${chart.name}</span>
+              <span class="helm-chart-name"><a href="${chartUrl}" target="_blank" rel="noopener noreferrer" class="highlight">${chart.name}</a></span>
               <span class="helm-chart-version">v${chart.version}</span>
               <span class="helm-chart-date">📅 ${dateStr}</span>
             </div>
@@ -82,11 +82,11 @@
       
       html += `
         <div class="helm-changelog-footer">
-          <a href="https://github.com/tjungbauer/helm-charts" target="_blank">
+          <a href="https://github.com/tjungbauer/helm-charts" target="_blank" rel="noopener noreferrer">
             <i class="fa fa-github"></i> View all ${data.charts.length} charts on GitHub
           </a>
           &nbsp;|&nbsp;
-          <a href="https://charts.stderr.at/" target="_blank">
+          <a href="https://charts.stderr.at/" target="_blank" rel="noopener noreferrer">
             <i class="fa fa-external-link"></i> Helm Repository
           </a>
         </div>
@@ -100,7 +100,7 @@
         <p class="helm-changelog-error">
           <i class="fa fa-exclamation-triangle"></i> 
           Could not load Helm chart updates. 
-          <a href="https://github.com/tjungbauer/helm-charts" target="_blank">View on GitHub</a>
+          <a href="https://github.com/tjungbauer/helm-charts" target="_blank" rel="noopener noreferrer">View on GitHub</a>
         </p>
       `;
     });

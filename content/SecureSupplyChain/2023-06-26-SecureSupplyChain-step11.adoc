@@ -9,7 +9,7 @@ type: post
 categories:
    - OpenShift
    - Supply Chain
-tags: ["OCP", "Tekton", "OpenShift", "Pipleines", "CI/CD", "Supply Chain", "ACS"] 
+tags: ["OCP", "Tekton", "OpenShift", "Pipelines", "CI/CD", "Supply Chain", "ACS"] 
 
 aliases: [ 
 	 "/openshift/securesupplychain/step11",

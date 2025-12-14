@@ -255,7 +255,7 @@ spec:
 
 It is important to understand the `topologyKey` setting. This is the key for the node label. If an affinity rule is met, Kubernetes will try to find suitable nodes which are labelled with the topologyKey. All nodes must be labelled consistently, otherwise unintended behaviour might occur.
 
-As described in the Kubernetes documentation at https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity[Pod Affinity and Anit-Affinity^], the topologyKey has some constraints:
+As described in the Kubernetes documentation at https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity[Pod Affinity and Anti-Affinity^], the topologyKey has some constraints:
 
 _Quote Kubernetes:_
 

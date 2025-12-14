@@ -169,7 +169,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         <div class="helm-chart-top">
           ${chart.icon ? `<div class="helm-chart-icon" style="background-image: url('${chart.icon}')" title="${chart.name}"></div>` : ''}
           <div class="helm-chart-info">
-            <h3 class="helm-chart-title">${chart.name}</h3>
+            <h3 class="helm-chart-title"><a href="${chart.home}" target="_blank" rel="noopener noreferrer" class="highlight" title="Opens external site">${chart.name}<i class="fas fa-arrow-up-right-from-square external-link-icon" aria-hidden="true"></i></a></h3>
             ${chart.maintainers.length > 0 ? `
               <div class="helm-chart-maintainer">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512">
@@ -204,7 +204,7 @@ document.addEventListener('DOMContentLoaded', async function() {
           <span class="helm-chart-meta-item">📦 v${chart.version}</span>
           ${chart.created ? `<span class="helm-chart-meta-item">📅 ${new Date(chart.created).toLocaleDateString()}</span>` : ''}
           <a href="https://artifacthub.io/packages/helm/openshift-bootstraps/${chart.name}" target="_blank" rel="noopener noreferrer" class="helm-link highlight" title="View on ArtifactHub">
-            🔗 ArtifactHub
+            🔗 ArtifactHub<i class="fas fa-arrow-up-right-from-square external-link-icon" aria-hidden="true"></i>
           </a>
         </div>
         ${chart.keywords.length > 0 ? `
