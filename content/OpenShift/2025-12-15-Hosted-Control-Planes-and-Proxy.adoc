@@ -1,0 +1,108 @@
+---
+title: "Hosted Control Planes behind a Proxy"
+description: "Hosted Control Planes behind a Proxy"
+date: "2025-12-15"
+weight: 98
+doctype: book
+
+featured_image: /openshift/images/Logo-HCP-Proxy.png
+show_featured_image_summary: true
+show_featured_image_article: true
+
+authors: [Thomas Jungbauer]
+type: post
+draft: false
+categories:
+   - OpenShift
+   - Hosted Control Plane
+   - Security
+
+tags: ["OCP", "OpenShift", "Hosted Control Plane", "Proxy", "HyperShift", "HCP", "Security"] 
+---
+
+:imagesdir: /images/
+:icons: font
+:toc:
+
+Recently, I encountered a problem deploying a Hosted Control Plane (HCP) at a customer site. The installation started successfully—etcd came up fine—but then it just stopped. The virtual machines were created, but they never joined the cluster. No OVN or Multus pods ever started.
+The only meaningful message in the cluster-version-operator pod logs was: 
+
+<!--more--> 
+
+[source,console]
+----
+I1204 08:22:35.473783       1 status.go:185] Synchronizing status errs=field.ErrorList(nil) status=&cvo.SyncWorkerStatus{Generation:1, Failure:(*payload.UpdateError)(0xc0006313b0), Done:575, Total:623, 
+----
+
+This message did appear over and over again. 
+
+## Problem Summary
+
+* etcd started successfully, but the installation stalled
+* API server was running
+* VMs started but never joined the cluster
+* No OVN or Multus pods ever started
+* The installation was stuck in a loop 
+
+## Troubleshooting
+
+Troubleshooting was not straightforward. The cluster-version-operator logs provided the only clue.
+However, the VMs were already running, so we could log in to them—and there it was, the reason for the stalled installation.
+
+### Connect to a VM 
+
+To connect to a VM, use the `virtctl` command. This connects you to the machine as the `core` user:
+
+NOTE: You can download `virtctl` from the OpenShift Downloads page in the OpenShift web console.
+
+WARNING: You need the SSH key for the `core` user. 
+
+[source,bash]
+----
+virtctl ssh -n clusters-my-hosted-cluster core@vmi/my-node-pool-dsj7z-sss8w <1>
+----
+<1> Replace *my-hosted-cluster* with the name of your hosted cluster and *my-node-pool-dsj7z-sss8w* with the name of your VM.
+
+### Verify the Problem
+
+Once logged in, check the `journalctl -xf` output. In case of a proxy issue, you'll see an error like this: 
+
+[source,bash]
+----
+> Dec 10 06:23:09 my-node-pool2-gwvjh-rwtx8 sh[2143]: time="2025-12-10T06:23:09Z" level=warning msg="Failed, retrying in 1s ... (3/3). Error: initializing source docker://quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:500704de3ef374e61417cc14eda99585450c317d72f454dda0dadd5dda1ba57a: pinging container registry quay.io: Get \"https://quay.io/v2/\": dial tcp 3.209.93.201:443: i/o timeout"
+----
+
+So we have a timeout when trying to pull the image from the container registry. This is a classic proxy issue. When you try `curl` or manual pulls you will get the same message. 
+
+## Configuring the Proxy for the Hosted Control Plane
+
+The big question is: How do we configure the proxy for the Hosted Control Plane?
+
+This is not well documented yet—in fact, it's barely documented at all.
+
+The Hosted Control Plane is managed through a custom resource called `HostedCluster`, and that's exactly where we configure the proxy.
+The upstream documentation at https://hypershift.pages.dev/how-to/configure-ocp-components/#overview[HyperShift Documentation^] explains that you can add a `configuration` section to the resource. Let's do that: 
+
+Update the `HostedCluster` resource with the following configuration:
+
+[source,yaml]
+----
+spec:
+  configuration:
+    proxy:
+      httpProxy: http://proxy.example.com:8080 <1>
+      httpsProxy: https://proxy.example.com:8080 <2>
+      noProxy: .cluster.local,.svc,10.128.0.0/14,127.0.0.1,localhost <3>
+      trustedCA:
+        name: user-ca-bundle <4>
+---- 
+<1> HTTP proxy URL
+<2> HTTPS proxy URL
+<3> Comma-separated list of domains, IPs, or CIDRs to exclude from proxy routing
+<4> OPTIONAL: Name of a ConfigMap containing a custom CA certificate bundle
+
+CAUTION: If you're using a custom CA, create the ConfigMap beforehand or alongside the `HostedCluster` resource. The ConfigMap must contain a key named `ca-bundle.crt` with your CA certificate(s).
+
+## Summary 
+
+That's actually everything you need for proxy configuration with Hosted Control Planes. Hopefully, the official OpenShift documentation will be updated soon to include this information.

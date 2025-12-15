@@ -1,8 +1,8 @@
 ---
 title: "Helm Charts Repository Updates"
 description: "Latest updates and changes to the stderr.at Helm Charts collection for OpenShift and Kubernetes"
-date: "2024-12-31"
-weight: 1
+date: "2025-12-12"
+weight: 98
 doctype: book
 chapter: true
 disableReaderMode: true

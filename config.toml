@@ -49,6 +49,21 @@ home = [ "HTML", "RSS", "JSON"]
   tag = 'tags'
   author = "authors"
 
+# Related content configuration for "See Also" section
+[related]
+  includeNewer = true
+  threshold = 80
+  toLower = true
+  [[related.indices]]
+    name = "tags"
+    weight = 100
+  [[related.indices]]
+    name = "categories"
+    weight = 80
+  [[related.indices]]
+    name = "date"
+    weight = 10
+
 [params.yaub]
   copyrightstart = "2020"
 

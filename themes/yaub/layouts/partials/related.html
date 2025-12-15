@@ -1,24 +1,36 @@
-{{- range first 1 (where (where .Site.Pages ".Params.categories" "intersect" .Params.categories) "Permalink" "!=" .Permalink) -}}
-    {{- $.Scratch.Set "has_related" true -}}
-{{- end -}}
+{{/* Related Articles - Uses Hugo's built-in Related Content feature */}}
+{{- $related := .Site.RegularPages.Related . | first 4 -}}
 
-{{ if $.Scratch.Get "has_related" }}
-<hr class="related" />
-    <div class="related-content">
-        <h3>See Also:</h3>
-        <ul>
-            {{- $num_to_show := .Site.Params.related_content_limit | default 5 -}}
-            {{ range first $num_to_show (where (where .Site.Pages ".Params.categories" "intersect" .Params.categories) "Permalink" "!=" .Permalink) }}
-            <li class="related">
-                <a href="{{ .RelPermalink }}">{{ .Title }}</a>
-                &ndash; 
-                <time datetime="{{ .Date.UTC.Format "2006-01-02T15:04:05-0700" }}">
-                    <i>{{ .Date.Format "Jan 2, 2006" }}</i>
-                </time>
-                <br /> 
-                <small><p class="related">{{ .Summary | plainify | htmlUnescape }}</p></small>
-            </li>
-          {{ end }}
-        </ul>
+{{ with $related }}
+<section class="related-articles" aria-labelledby="related-heading">
+    <h3 id="related-heading"><i class="fas fa-link"></i> Related Articles</h3>
+    <div class="related-grid">
+        {{ range . }}
+        <a href="{{ .RelPermalink }}" class="related-card no-highlight{{ if not .Params.featured_image }} no-image{{ end }}">
+            {{/* Only show image container if featured_image exists */}}
+            {{ with .Params.featured_image }}
+            <div class="related-card-image">
+                <img src="{{ . }}" alt="" loading="lazy" class="inline">
+            </div>
+            {{ end }}
+            <div class="related-card-content">
+                <span class="related-card-category">
+                    {{ with .Params.categories }}{{ index . 0 }}{{ end }}
+                </span>
+                <span class="related-card-title">{{ .Title }}</span>
+                <span class="related-card-meta">
+                    <time datetime="{{ .Date.Format "2006-01-02" }}">
+                        {{ .Date.Format "Jan 2, 2006" }}
+                    </time>
+                    {{ if .Params.authors }}
+                    <span class="related-card-author">
+                        · {{ index .Params.authors 0 }}
+                    </span>
+                    {{ end }}
+                </span>
+            </div>
+        </a>
+        {{ end }}
     </div>
+</section>
 {{ end }}

@@ -1,41 +1,286 @@
+{{ define "main" }}
+<!-- This is intentionally left empty as we handle everything in baseof -->
+{{ end }}
 
-<html>
-  <head>
-      <style>        
-      #message{
-             display:block;
-             width:100%;
-             padding:150px 0;
-             line-height:1.6em;
-             text-align:center;
-          }
-      h1, h2 {            
-             color: rgb(151, 151, 151);                
-             float: left;
-             margin:0 0 0 40px;
-             padding:0;
-             float:left;
-             font-family: Georgia, 'Times New Roman', Times, serif;               
-             font-weight: normal;               
-             line-height: normal;                                
-             text-transform: uppercase;
-      }
-      #message .aside{display:block; width:80%; margin:0 auto; padding:0;}        
-      #message .aside h2 span{display:block; font-size:30px;}        
-      #message p:first-child{margin-top:0;}
-      h1 {margin-top:-90px; font-size:200px;}
-      h2 {font-size: 60px;}
-      </style>    
-  </head>
-  <body>
-      <div class="content">          
-          <section id="message">
-            <div class="aside">
-              <h1>404</h1>
-              <h2>Error ! <span>Page Not Found</span></h2>
+<!DOCTYPE html>
+<html lang="{{ .Site.Language.Lang }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page Not Found - {{ .Site.Title }}</title>
+    <link rel="icon" href="{{ "images/favicon.ico" | relURL }}">
+    <link rel="stylesheet" href="{{ "css/fontawesome-all.min.css" | relURL }}">
+    <style>
+        :root {
+            --bg-color: #282a36;
+            --card-bg: #323443;
+            --text-color: #f8f8f2;
+            --text-muted: #9ca3af;
+            --accent-color: #4f7aa4;
+            --accent-hover: #6b9bc3;
+            --border-color: #444;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-color);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        
+        .container {
+            max-width: 600px;
+            text-align: center;
+        }
+        
+        .error-code {
+            font-size: 8rem;
+            font-weight: 700;
+            color: var(--accent-color);
+            line-height: 1;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 4px 20px rgba(79, 122, 164, 0.3);
+        }
+        
+        .error-title {
+            font-size: 1.75rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--text-color);
+        }
+        
+        .error-message {
+            font-size: 1.1rem;
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+            line-height: 1.6;
+        }
+        
+        .search-box {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            max-width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .search-input {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--card-bg);
+            color: var(--text-color);
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        
+        .search-input:focus {
+            border-color: var(--accent-color);
+        }
+        
+        .search-input::placeholder {
+            color: var(--text-muted);
+        }
+        
+        .search-btn {
+            padding: 0.75rem 1.25rem;
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.2s;
+        }
+        
+        .search-btn:hover {
+            background: var(--accent-hover);
+        }
+        
+        .quick-links {
+            margin-bottom: 2.5rem;
+        }
+        
+        .quick-links h3 {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 1rem;
+        }
+        
+        .links-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            justify-content: center;
+        }
+        
+        .link-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 1rem;
+            background: var(--card-bg);
+            color: var(--text-color);
+            text-decoration: none;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        
+        .link-btn:hover {
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+            transform: translateY(-2px);
+        }
+        
+        .link-btn i {
+            font-size: 0.85rem;
+        }
+        
+        .recent-posts {
+            text-align: left;
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+        }
+        
+        .recent-posts h3 {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .recent-posts ul {
+            list-style: none;
+        }
+        
+        .recent-posts li {
+            padding: 0.6rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .recent-posts li:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+        
+        .recent-posts a {
+            color: var(--text-color);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transition: color 0.2s;
+        }
+        
+        .recent-posts a:hover {
+            color: var(--accent-color);
+        }
+        
+        .recent-posts .post-icon {
+            color: var(--accent-color);
+            font-size: 0.8rem;
+        }
+        
+        .recent-posts .post-date {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-left: auto;
+            white-space: nowrap;
+        }
+        
+        @media (max-width: 480px) {
+            .error-code {
+                font-size: 5rem;
+            }
+            
+            .error-title {
+                font-size: 1.4rem;
+            }
+            
+            .search-box {
+                flex-direction: column;
+            }
+            
+            .recent-posts .post-date {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="error-code">404</div>
+        <h1 class="error-title">Oops! Page not found</h1>
+        <p class="error-message">
+            The page you're looking for doesn't exist or has been moved.<br>
+            Try searching or check out the links below.
+        </p>
+        
+        <form class="search-box" action="{{ "search/" | relURL }}" method="get">
+            <input type="text" name="q" class="search-input" placeholder="Search articles..." aria-label="Search">
+            <button type="submit" class="search-btn">
+                <i class="fas fa-search"></i>
+            </button>
+        </form>
+        
+        <div class="quick-links">
+            <h3>Quick Links</h3>
+            <div class="links-row">
+                <a href="{{ "/" | relURL }}" class="link-btn">
+                    <i class="fas fa-home"></i> Home
+                </a>
+                <a href="{{ "gitopscollection/" | relURL }}" class="link-btn">
+                    <i class="fas fa-code-branch"></i> GitOps
+                </a>
+                <a href="{{ "day-2/observability/" | relURL }}" class="link-btn">
+                    <i class="fas fa-chart-line"></i> Observability
+                </a>
+                <a href="{{ "day-2/" | relURL }}" class="link-btn">
+                    <i class="fas fa-cogs"></i> Day-2 Ops
+                </a>
+                <a href="{{ "helm-charts/" | relURL }}" class="link-btn">
+                    <i class="fas fa-dharmachakra"></i> Helm Charts
+                </a>
             </div>
-          </section>
-      </div>
-  </body>
+        </div>
+        
+        <div class="recent-posts">
+            <h3><i class="fas fa-clock"></i> Recent Articles</h3>
+            <ul>
+                {{ range first 5 .Site.RegularPages.ByDate.Reverse }}
+                <li>
+                    <a href="{{ .RelPermalink }}">
+                        <i class="fas fa-file-alt post-icon"></i>
+                        <span>{{ .Title | truncate 50 }}</span>
+                        <span class="post-date">{{ .Date.Format "Jan 2" }}</span>
+                    </a>
+                </li>
+                {{ end }}
+            </ul>
+        </div>
+    </div>
+</body>
 </html>
-
