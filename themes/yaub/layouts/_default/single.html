@@ -35,7 +35,7 @@
 	{{ $path := printf "/%s/%s" "authors" ($name | urlize) }}
 	{{ with $.Site.GetPage $path }}
 	  <a href="{{ "/authors/" | relLangURL }}{{ .Params.name  | urlize }}">
-		<img class="avatar" src="/img{{ $path }}.png" alt="{{ .Params.name }}"/> 
+		<img class="avatar" src="/img{{ $path }}.png" alt="{{ .Params.name }}" width="35" height="35"/> 
 		{{ .Params.name }}
 	  </a>
 	{{ end }}

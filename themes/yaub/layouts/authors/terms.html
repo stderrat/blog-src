@@ -11,7 +11,7 @@
 		{{ $name := .Params.name }}
 		{{ $path := printf "/%s/%s" "authors" ($name | urlize) }}
 		{{ with $.Site.GetPage $path }}
-		  <img class="avatar-big" src="/img{{ $path }}.png" alt="{{ .Params.name }}"/>
+		  <img class="avatar-big" src="/img{{ $path }}.png" alt="{{ .Params.name }}" width="200" height="200"/>
 		{{ end }}
 
 	</div>

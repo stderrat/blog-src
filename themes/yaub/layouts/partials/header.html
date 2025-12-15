@@ -13,6 +13,10 @@
     <title>{{ .Title }} {{ default "::" .Site.Params.titleSeparator }} {{ .Site.Title }}</title>
     <link rel="manifest" href="/manifest.json">
 
+    <!-- Preload critical fonts for better LCP -->
+    <link rel="preload" href="{{ "fonts/Work_Sans_300.woff2" | relURL }}" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="{{ "fonts/Work_Sans_500.woff2" | relURL }}" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="{{ "webfonts/fa-solid-900.woff2" | relURL }}" as="font" type="font/woff2" crossorigin>
 
     {{ $assetBusting := not .Site.Params.disableAssetsBusting }}
     <meta name="theme-color" content="#317EFB"/>

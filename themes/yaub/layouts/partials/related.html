@@ -10,7 +10,7 @@
             {{/* Only show image container if featured_image exists */}}
             {{ with .Params.featured_image }}
             <div class="related-card-image">
-                <img src="{{ . }}" alt="" loading="lazy" class="inline">
+                <img src="{{ . }}" alt="Featured image for {{ $.Title }}" loading="lazy" class="inline" width="300" height="120">
             </div>
             {{ end }}
             <div class="related-card-content">
