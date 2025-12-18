@@ -56,3 +56,36 @@
     });
 })();
 </script>
+
+<!-- Scroll Reveal Animation for Article Cards -->
+<script>
+(function() {
+    // Initialize Intersection Observer for scroll-reveal elements
+    const revealElements = document.querySelectorAll('.scroll-reveal');
+    
+    if (revealElements.length === 0) return;
+    
+    // Check if user prefers reduced motion
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        revealElements.forEach(el => el.classList.add('revealed'));
+        return;
+    }
+    
+    const observerOptions = {
+        root: null,
+        rootMargin: '0px 0px -50px 0px', // Trigger slightly before element is fully visible
+        threshold: 0.1
+    };
+    
+    const revealObserver = new IntersectionObserver((entries, observer) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('revealed');
+                observer.unobserve(entry.target); // Stop observing once revealed
+            }
+        });
+    }, observerOptions);
+    
+    revealElements.forEach(el => revealObserver.observe(el));
+})();
+</script>
