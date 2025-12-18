@@ -141,37 +141,7 @@
     <!-- Keyboard Shortcuts Help Modal (?) -->
     <script src="{{"js/shortcuts-modal.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
 
-{{ if .Sections}}
-{{else}}
-     <script>
-        window.addEventListener('DOMContentLoaded', () => {
-
-            const observerForTableOfContentActiveState = new IntersectionObserver(entries => {
-                entries.forEach(entry => {
-                    const id = entry.target.getAttribute('id');
-                    if (entry.intersectionRatio > 0) {
-                        clearActiveStatesInTableOfContents();
-                        // Null check to prevent errors when heading isn't in TOC
-                        const tocLink = document.querySelector(`aside nav li a[href="#${id}"]`);
-                        if (tocLink) {
-                            tocLink.parentElement.classList.add('active');
-                        }
-                    }
-                });
-            });
-
-            document.querySelectorAll('h1[id],h2[id],h3[id]').forEach((section) => {
-                observerForTableOfContentActiveState.observe(section);
-            });
-        });
-
-        function clearActiveStatesInTableOfContents() {
-            document.querySelectorAll('aside nav li').forEach((section) => {
-                section.classList.remove('active');
-            });
-        }
-    </script>
-{{end}}
+{{/* TOC scroll spy is handled by yaub.js - removed duplicate observer that caused flickering */}}
     <script type="text/javascript">
         function scrollTopAnimated() {
             $("html, body").animate(
