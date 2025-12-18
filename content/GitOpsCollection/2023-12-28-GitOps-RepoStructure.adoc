@@ -7,7 +7,6 @@ doctype: book
 series: "GitOps Episodes"
 series_part: 2
 
-featured_image: /GitOpsCollection/images/logo/NONE
 show_featured_image_summary: false
 show_featured_image_article: false
 

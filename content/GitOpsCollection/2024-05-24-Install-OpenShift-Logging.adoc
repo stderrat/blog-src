@@ -17,6 +17,7 @@ tags: ["Logging", "OpenShift", "OCP", "GitOps", "Argo CD", "Storage", "S3", "Obj
 
 aliases: [ 
 	 "/posts-output/2024-05-24-installing-openshift-logging/",
+	 "/gitopscollection/2024-05-19-install-openshift-logging",
 ] 
 ---
 

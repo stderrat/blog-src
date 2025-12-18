@@ -6,7 +6,7 @@
 #+variable: value
 #+date: 2023-10-23
 #+list[]: value_1 value_2 value_3
-#+aliases[]: /openshift/2023/10/setting-up-falco-on-openshift-4.12/
+#+aliases[]: /openshift/2023/10/setting-up-falco-on-openshift-4.12/ /openshift/2023-10-23-openshift-falco
 
 [[https://falco.org/][Falco]] is a security tool to monitor kernel events like system calls to
 provide real-time alerts. In this post I'll document the steps taken
@@ -469,6 +469,6 @@ nobody:*:19639:0:99999:7:::
 
 and we can see an event with priority *Warning* in the Falco ui.
 
-[[file:/openshift-platform/security/time-security/images/falco/falco-cat-etc-shadow.png]]
+[[file:/openshift-platform/security/runtime-security/images/falco/falco-cat-etc-shadow.png]]
 
 That's it, seems like Falco is successfully running on OpenShift 4.12.

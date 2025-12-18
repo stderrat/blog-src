@@ -17,6 +17,7 @@ tags: ["ApplicationSet", "Application", "App-of-Apps", "OpenShift", "OCP", "GitO
 
 aliases: [ 
 	 "/posts-output/2024-04-02-configure-argocd-app-of-apps/",
+	 "/gitopscollection/gitopscollection/2024-04-02-configure_app_of_apps",
 ] 
 ---
 

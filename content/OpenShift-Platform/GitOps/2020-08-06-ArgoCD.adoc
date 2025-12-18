@@ -16,6 +16,7 @@ tags: ["Gitops", "OpenShift", "OCP", "ArgoCD"]
 aliases: [ 
 	 "/posts-output/2020-08-06-ArgoCD/",
 	 "/openshift/2020/08/gitops-argo-cd/",
+	 "/openshift/2020-08-06-argocd",
 ] 
 ---
 
