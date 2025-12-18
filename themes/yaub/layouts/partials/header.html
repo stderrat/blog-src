@@ -4,6 +4,11 @@
     <script>
       document.documentElement.className = document.documentElement.className.replace('no-js', 'js');
       
+      // Detect Mac for keyboard shortcuts (runs before paint to prevent flash)
+      if (navigator.platform.toUpperCase().indexOf('MAC') >= 0) {
+        document.documentElement.classList.add('is-mac');
+      }
+      
       var shown = false;
       function showPage() {
         if (shown) return;
@@ -71,6 +76,8 @@
     <link rel="preload" href="{{ "fonts/RedHatText-Regular.woff" | relURL }}" as="font" type="font/woff" crossorigin="anonymous">
     <link rel="preload" href="{{ "fonts/RedHatText-Medium.woff" | relURL }}" as="font" type="font/woff" crossorigin="anonymous">
     <link rel="preload" href="{{ "webfonts/fa-solid-900.woff2" | relURL }}" as="font" type="font/woff2" crossorigin="anonymous">
+    <link rel="preload" href="{{ "webfonts/fa-brands-400.woff2" | relURL }}" as="font" type="font/woff2" crossorigin="anonymous">
+    <link rel="preload" href="{{ "webfonts/fa-regular-400.woff2" | relURL }}" as="font" type="font/woff2" crossorigin="anonymous">
 
     {{ $assetBusting := not .Site.Params.disableAssetsBusting }}
     <meta name="theme-color" content="#317EFB"/>
