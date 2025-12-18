@@ -19,7 +19,7 @@ aliases: [
 ] 
 ---
 
-:imagesdir: /service-mesh/images/
+:imagesdir: /openshift-platform/service-mesh/images/
 :icons: font
 :toc:
 

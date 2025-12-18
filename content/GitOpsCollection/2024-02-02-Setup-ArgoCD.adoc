@@ -20,7 +20,7 @@ aliases: [
 ] 
 ---
 
-:imagesdir: /openshift/images/
+:imagesdir: /openshift-platform/gitops/images/
 :icons: font
 :toc:
 

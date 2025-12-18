@@ -4,7 +4,7 @@ description: "How to configure Cert-Manager Approver Policy in OpenShift"
 date: "2025-06-03"
 doctype: book
 
-featured_image: /openshift/images/cert-manager/cert-approver-policy-header-image-small.jpg
+featured_image: /openshift-platform/security/certificates/images/cert-manager/cert-approver-policy-header-image-small.jpg
 show_featured_image_summary: false
 show_featured_image_article: true
 

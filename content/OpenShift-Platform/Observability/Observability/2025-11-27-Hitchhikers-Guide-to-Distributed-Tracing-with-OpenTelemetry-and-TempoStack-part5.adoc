@@ -8,7 +8,7 @@ weight: 500
 series: "The Hitchhiker's Guide to Observability"
 series_part: 5
 
-featured_image: /day-2/images/observability/Logo_observability_5.png
+featured_image: /openshift-platform/observability/images/observability/Logo_observability_5.png
 show_featured_image_summary: true
 show_featured_image_article: true
 disableBreadcrumb: true
@@ -30,7 +30,7 @@ aliases: [
 ]
 ---
 
-:imagesdir: /day-2/images/observability/
+:imagesdir: /openshift-platform/observability/images/observability/
 :icons: font
 :toc:
 

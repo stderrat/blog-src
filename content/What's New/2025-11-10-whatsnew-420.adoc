@@ -22,7 +22,7 @@ aliases: [
 ]
 ---
 
-:imagesdir: /openshift/images/
+:imagesdir: /whats-new/images/
 :icons: font
 :toc:
 
