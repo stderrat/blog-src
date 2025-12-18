@@ -4,6 +4,7 @@ description: "Helm Charts Repository for GitOps cluster configuration and OpenSh
 layout: "helm-charts"
 weight: 50
 pre: "<i class='fas fa-dharmachakra'></i> "
+divider_before: true
 
 ---
 

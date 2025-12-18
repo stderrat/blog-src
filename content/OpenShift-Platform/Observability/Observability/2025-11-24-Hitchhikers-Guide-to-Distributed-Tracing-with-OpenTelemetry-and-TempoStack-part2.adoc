@@ -1,0 +1,912 @@
+--- 
+title: "The Hitchhiker's Guide to Observability - Grafana Tempo - Part 2"
+description: "Deploy Grafana Tempo and TempoStack - Part 2"
+date: "2025-11-24"
+doctype: book
+weight: 200
+
+series: "The Hitchhiker's Guide to Observability"
+series_part: 2
+
+featured_image: /day-2/images/observability/Logo_observability_2.png?width=420px
+show_featured_image_summary: true
+show_featured_image_article: true
+disableBreadcrumb: true
+
+authors: [Thomas Jungbauer]
+type: post
+categories:
+   - OpenShift
+   - Observability
+   - Distributed Tracing
+   - OpenTelemetry
+   - Tempo
+   - Grafana
+
+tags: ["OCP", "Day-2", "OpenShift", "Observability", "Distributed Tracing", "Tempo", "Grafana", "OTL", "OTLP", "Logging", "Metrics"] 
+
+aliases: [ 
+	 "/day-2/observability/2025-11-24-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part2/",
+]
+---
+
+:imagesdir: /day-2/images/observability/
+:icons: font
+:toc:
+
+After covering the fundamentals and architecture in Part 1, it's time to get our hands dirty! This article walks through the complete implementation of a distributed tracing infrastructure on OpenShift.
+
+We'll deploy and configure the **Tempo Operator** and a multi-tenant **TempoStack** instance. For S3 storage we will use the integrated OpenShift Data Foundation. However, you can use whatever S3-compatible storage you have available. 
+
+
+<!--more--> 
+
+## Grafana Tempo - Step-by-Step Implementation
+
+### Prerequisites
+
+Before starting, ensure you have the following Systems or Operators installed (used Operator versions in this article):
+
+- OpenShift or Kubernetes cluster (OpenShift v4.20)
+- Red Hat build of OpenTelemetry installed (v0.135.0-1)
+- Tempo Operator installed (v0.18.0-2)
+- S3-compatible storage (for TempoStack, based on OpenShift Data Foundation)
+- Cluster Observability Operator (v1.3.0) - for now this Operator is only used to extend the OpenShift UI with the tracing UI.
+
+NOTE: For all configurations I also created a proper GitOps implementation (of course :)). However, first I would like to show the actual configuration. The GitOps implementation can be found at the section link:/day-2/observability/2025-11-24-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part2/#_gitops_deployment[GitOps Deployment].
+
+### Step 1: Verify/Deploy Tempo Operator
+
+Let's first verify if the Tempo Operator is installed and ready to use. If everything is fine, then the Operator will be deployed in the namespace **openshift-tempo-operator**:
+
+image::tempo-operator-installation.png?width=640px[Tempo Operator]
+
+
+### Step 2: Deploy TempoStack Resource
+
+**TempoStack** is the central trace storage backend. We are using the Tempo Operator here, which provides the TempoStack resource and multi-tenancy capability. During my tests I deployed the TempoStack resource and also created a https://github.com/tjungbauer/helm-charts/tree/main/charts/tempo-tracing[Helm Chart^] that is able to render this resource. 
+However, the Operator itself also provides a TempoMonolith resource. This will put everything into one Pod, while the TempoStack rolls out the stack in separate containers (like ingester, gateway, etc.).
+
+NOTE: My Helm Chart currently does not support the TempoMonolith resource yet. If you require this, please ping me and I will try to add it.
+
+CAUTION: Be sure that the S3 bucket is available and a Secret (here called tempo-s3) with the following keys exists (valid for OpenShift Data Foundation): **access_key_id, access_key_secret, bucket, endpoint**. The layout of the Secret will look slightly different depending on the S3 storage backend you are using.
+
+**Create the TempoStack instance:**
+
+The following TempoStack resource has been used
+
+[source,yaml]
+----
+apiVersion: tempo.grafana.com/v1alpha1
+kind: TempoStack
+metadata:
+  name: simplest <1>
+  namespace: tempostack <2>
+spec:
+  managementState: Managed
+  replicationFactor: 1 <3>
+  
+  # Resource limits
+  resources: <4>
+    total:
+      limits:
+        cpu: "2"
+        memory: 2Gi
+  
+  # Trace retention
+  retention: <5>
+    global:
+      traces: 48h0m0s
+  
+  # S3 storage configuration
+  storage:
+    secret:
+      credentialMode: static <6>
+      name: tempo-s3 <7>
+      type: s3
+    tls:
+      enabled: false
+  storageSize: 500Gi
+  
+  # Multi-tenancy configuration
+  tenants:
+    mode: openshift
+    authentication: <8>
+      - tenantId: 1610b0c3-c509-4592-a256-a1871353dbfa
+        tenantName: tenantA
+      - tenantId: 1610b0c3-c509-4592-a256-a1871353dbfb
+        tenantName: tenantB
+      - tenantId: 1610b0c3-c509-4592-a256-a1871353dbfc
+        tenantName: tenantC
+  
+  # Gateway and UI
+  template: <9>
+    gateway:
+      enabled: true
+      component:
+        replicas: 1
+      ingress:
+        type: route
+        route:
+          termination: reencrypt
+    queryFrontend:
+      component:
+        replicas: 1
+      jaegerQuery:
+        enabled: true
+        servicesQueryDuration: 72h0m0s
+----
+<1> Name of the TempoStack instance
+<2> Namespace of the TempoStack instance
+<3> Integer value for the number of ingesters that must acknowledge the data from the distributors before accepting a span.
+<4> Defines resources for the TempoStack instance. Default is (limit only) 2 CPU and 2Gi memory.
+<5> Configuration options for retention of traces. The default value is 48h.
+<6> Credential mode for the S3 storage. Depends how the storage will be integrated. Default is static.
+<7> Secret name for the S3 storage.
+<8> Configuration options for the tenants. In this example: tenantA, tenantB, tenantC. Consists of tenantName and tenantId, both can be defined by the user. 
+<9> Configuration options for the different Tempo components. In this example: gateway, query-frontend. Other components could be: distributor, ingester, compactor or querier.
+
+**Key Configuration Points:**
+
+- **Multi-tenancy**: Supports 3 tenants currently (tenantA, tenantB, tenantC). This part must be modified when a new tenant enters the realm.
+- **Retention**: Traces stored for 48 hours.
+- **Storage**: Uses S3-compatible backend (requires separate secret).
+- **Gateway**: Exposes OTLP endpoint with TLS.
+
+### Step 3: Configure RBAC for TempoStack Trace Access read/write
+
+Set up ClusterRoles to control who can read and write traces.
+
+CAUTION: The ClusterRoles must be updated whenever a new tenant is configured in TempoStack. The name of the tenant must be added in the **resources** array. 
+
+**Traces Reader Role:**
+
+[source,yaml]
+----
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tempostack-traces-reader <1>
+rules:
+  - verbs: <2>
+      - get
+    apiGroups:
+      - tempo.grafana.com
+    resources:
+      - tenantA <3>
+      - tenantB
+      - tenantC
+    resourceNames:
+      - traces
+----
+<1> Name of the ClusterRole
+<2> Verbs for the ClusterRole. 
+* apiGroups: tempo.grafana.com
+* resources:
+  ** List of Tenants
+* resourceNames:
+  ** traces
+* verbs:
+  ** get
+<3> List of tenants that are allowed to read the traces.
+
+**Bind Reader Role to Authenticated Users:**
+
+[source,yaml]
+----
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tempostack-traces-reader
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: 'system:authenticated' <1>
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tempostack-traces-reader
+----
+<1> The Group that is allowed to read the traces. In this example: **system:authenticated**. This means ALL authenticated users will be able to read all the traces (see warning below).
+
+WARNING: With this ClusterRoleBinding, anybody who is authenticated (system:authenticated) will be able to see the traces for the defined tenants (A, B, C). This is for an easy showcase in this article. For production environments, you should implement more granular RBAC controls per tenant.
+
+**Traces Writer Role:**
+
+This ClusterRole is used to write traces into TempoStack. Typically you will use this ClusterRole for the OpenTelemetry Collector, so it can write into TempoStack.
+
+[source,yaml]
+----
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tempostack-traces-write <1>
+rules:
+  - verbs:
+      - create <2>
+    apiGroups:
+      - tempo.grafana.com
+    resources: <3>
+      - tenantB
+      - tenantA
+      - tenantC
+    resourceNames:
+      - traces
+----
+<1> Name of the ClusterRoleBinding
+<2> This time the verb is **create**. This means the user will be able to write new traces into TempoStack.
+<3> List of tenants.
+
+**Bind Writer Role to Central Collector:**
+
+[source,yaml]
+----
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tempostack-traces
+subjects:
+  - kind: ServiceAccount
+    name: otel-collector <1>
+    namespace: tempostack <2>
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tempostack-traces-write
+----
+<1> The ServiceAccount that is allowed to write the traces. In this example: **otel-collector**. We will create this Service Account in the next article.
+<2> The namespace of the ServiceAccount. In this example: **tempostack**.
+
+'''
+
+## GitOps Deployment
+
+While the above is good for quick tests, it always makes sense to have a proper GitOps deployment. I have created a Chart and GitOps configuration that will:
+
+- Deploy the Tempo Operator
+- Configure the TempoStack instance
+- Configure the RBAC configurations for the TempoStack instance
+
+The following sources will be used: 
+
+- https://charts.stderr.at/[Helm Repository^] - to fetch the Helm Chart for the Tempo Operator including required Sub-Charts.
+- https://github.com/tjungbauer/openshift-clusterconfig-gitops/tree/main/clusters/management-cluster/setup-tempo-operator[Setup Tempo Operator^] - To deploy and configure the Tempo Operator, configure object storage, magically create a Secret with the required keys, etc.
+
+NOTE: Feel free to clone or use whatever you need.
+
+The following Sub-Charts are used:
+
+* https://github.com/tjungbauer/helm-charts/tree/main/charts/helper-objectstore[helper-objectstore^] (version ~1.0.0) - Creates S3 Bucket
+* https://github.com/tjungbauer/helm-charts/tree/main/charts/helper-odf-bucket-secret[helper-odf-bucket-secret^] (version ~1.0.0) - Creates the Secret usable by the TempoStack instance
+* https://github.com/tjungbauer/helm-charts/tree/main/charts/helper-operator[helper-operator^] (version ~1.0.18) - Installs the Tempo Operator
+* https://github.com/tjungbauer/helm-charts/tree/main/charts/helper-status-checker[helper-status-checker^] (version ~4.0.0) - Verifies the status of the Tempo Operator
+* https://github.com/tjungbauer/helm-charts/tree/main/charts/tempo-tracing[tempo-tracing^] (version ~1.0.0) - Installs the TempoStack instance
+* https://github.com/tjungbauer/helm-charts/tree/main/charts/tpl[tpl^] (version ~1.0.0) - Template Library
+
+The this Argo CD Application we can deploy the Tempo Operator:
+
+[source,yaml]
+----
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: setup-tempo-operator 
+  namespace: openshift-gitops
+spec:
+  destination:
+    name: in-cluster <1>
+    namespace: openshift-tempo-operator <2>
+  info:
+    - name: Description
+      value: ApplicationSet that Deploys on Management Cluster Configuration (using Git Generator)
+  project: in-cluster <3>
+  source:
+    path: clusters/management-cluster/setup-tempo-operator <4>
+    repoURL: 'https://github.com/tjungbauer/openshift-clusterconfig-gitops' <5>
+    targetRevision: main
+  syncPolicy:
+    retry:
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+      limit: 5
+----
+<1> Target cluster, here the local cluster
+<2> Namespace of the target cluster, here the Operator will be installed.
+<3> Project of the target cluster
+<4> Path to the Git repository
+<5> URL to the Git repository
+
+WARNING: Since many things are moving in the background, it will take a while until the Argo CD Application is synced (i.e. Creation of S3 Bucket)
+
+This will create the Argo CD Application that can be synchronized with the cluster: 
+
+image::tempo-argocd.png?width=640px[Tempo Deployment via Argo CD]
+
+As seen above, many resources are created using a single Helm Chart (ok, with some Sub-Charts). The actual configuration is done in the values.yaml file. The full values file is quite long, so I will break it down to the different Sub-Charts and add the complete file link:/day-2/observability/2025-11-24-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part2/#_complete_values_file[at the end] that latest file I am using for testing can be found at https://github.com/tjungbauer/openshift-clusterconfig-gitops/blob/main/clusters/management-cluster/setup-tempo-operator/values.yaml[values.yaml^]. 
+
+### Values File Snippets for GitOps
+
+#### TempStack Settings
+
+The following will configure the TempoStack resource. Verify the upstream Helm Chart https://github.com/tjungbauer/helm-charts/tree/main/charts/tempo-tracing[tempo-tracing^] for detailed and additional information about the settings. 
+
+[source,yaml]
+----
+tempo-tracing:
+  tempostack: <1>
+    enabled: true
+    name: simplest
+
+    managementState: Managed
+
+    namespace: <2>
+      create: true
+      name: tempostack
+      descr: "Namespace for the TempoStack"
+      display: "TempoStack"
+      additionalAnnotations: {}
+      additionalLabels: {}
+
+    storage: <3>
+      secret:
+        name: tempo-s3
+        type: s3
+        credentialMode: static
+
+    storageSize: 500Gi
+    replicationFactor: 1
+    serviceAccount: tempo-simplest <4>
+
+    tenants: <5>
+      mode: openshift
+      enabled: true
+
+      authentication: <6>
+        - tenantName: 'tenantA'
+          tenantId: '1610b0c3-c509-4592-a256-a1871353dbfc'
+          permissions: <7>
+            - write
+            - read
+
+        - tenantName: 'tenantB'
+          tenantId: '1610b0c3-c509-4592-a256-a1871353dbfd'
+          permissions:
+            - write
+            - read
+
+    observability:
+      enabled: true
+
+      tracing:
+        jaeger_agent_endpoint: 'localhost:6831'
+        otlp_http_endpoint: 'http://localhost:4320'
+
+    template:
+      gateway:
+        enabled: true
+        rbac: false
+
+        ingress:
+          type: 'route'
+          termination: 'reencrypt'
+        component:
+          replicas: 1
+
+      queryFrontend:
+        jaegerQuery:
+          enabled: true
+        component:
+          replicas: 1
+----
+<1> Basic settings, like name of the instance
+<2> Namespace for the TempoStack instance.
+<3> Storage configuration for the TempoStack instance. Here we use type s3 and the Secret called "tempo-s3" which will be generated.
+<4> ServiceAccount for the TempoStack instance.
+<5> Tenant configuration for the TempoStack instance.
+<6> List of tenants. This list must be extended when new tenants shall be configured.
+<7> RBAC permissions for this tenant. This will add the tenant as **resource** to the READ and/or WRITE ClusterRole
+
+#### Tempo Operator Deployment
+
+The following settings will deploy the Operator and verify the status of the Operator installation. Only when the Operator has been installed successfully will Argo CD continue with the synchronization.
+
+[source,yaml]
+----
+helper-operator:
+  operators:
+    tempo-operator: <1>
+      enabled: true
+      namespace: <2>
+        name: openshift-tempo-operator
+        create: true
+      subscription: <3>
+        channel: stable
+        approval: Automatic
+        operatorName: tempo-product
+        source: redhat-operators
+        sourceNamespace: openshift-marketplace
+      operatorgroup:
+        create: true
+        notownnamespace: true
+
+########################################
+# SUBCHART: helper-status-checker
+# Verify the status of a given operator.
+########################################
+helper-status-checker:
+  enabled: true 
+
+  approver: false <4>
+
+  checks:
+    - operatorName: tempo-operator <5>
+      namespace:
+        name: openshift-tempo-operator
+      syncwave: 1
+
+      serviceAccount:
+        name: "status-checker-tempo"
+----
+<1> Install the Operator
+<2> Namespace settings of the Operator
+<3> Settings of the Operator itself, like name, channel and approval strategy.
+<4> Approver settings for the status checker. Here disabled, because we are using automatic approval.
+<5> Operator name to be verified.
+
+#### S3 Bucket Deployment
+
+The following Sub-Chart can be used to automatically create a Bucket in OpenShift Data Foundation. 
+
+[source,yaml]
+----
+########################################
+# SUBCHART: helper-objectstore
+
+# A helper chart that simply creates another backingstore for logging.
+# This is a chart in a very early state, and not everything can be customized for now.
+# It will create the objects:
+#  - BackingStore
+#  - BackingClass
+#  - StorageClass
+
+# NOTE: Currently only PV type is supported
+########################################
+helper-objectstore:
+
+  # -- Enable objectstore configuration
+  # @default -- false
+  enabled: true
+
+  # -- Syncwave for Argo CD
+  # @default - 1
+  syncwave: 1
+
+  # -- Name of the BackingStore
+  backingstore_name: tempo-backingstore
+
+  # -- Size of the BackingStore that each volume shall have.
+  backingstore_size: 400Gi <1>
+
+  # -- CPU Limit for the Noobaa Pod
+  # @default -- 500m
+  limits_cpu: 500m
+
+  # -- Memory Limit for the Noobaa Pod.
+  # @default -- 2Gi
+  limits_memory: 2Gi
+
+  pvPool:
+    # -- Number of volumes that shall be used
+    # @default -- 1
+    numOfVolumes: 1
+
+    # Type of BackingStore. Currently pv-pool is the only one supported by this Helm Chart.
+    # @default -- pv-pool
+    type: pv-pool
+
+  # -- The StorageClass the BackingStore is based on
+  baseStorageClass: gp3-csi <2>
+
+  # -- Name of the StorageClass that shall be created for the bucket.
+  storageclass_name: tempo-bucket-storage-class <3>
+
+  # Bucket that shall be created
+  bucket:
+    # -- Shall a new bucket be enabled?
+    # @default -- false
+    enabled: true
+
+    # -- Name of the bucket that shall be created
+    name: tempo-bucket <4>
+
+    # -- Target Namespace for that bucket.
+    namespace: tempostack <5>
+
+    # -- Syncwave for bucketclaim creation. This should be done very early, but it depends on ODF.
+    # @default -- 2
+    syncwave: 2
+
+    # -- Name of the storageclass for our bucket
+    # @default -- openshift-storage.noobaa.io
+    storageclass: tempo-bucket-storage-class <6>
+----
+<1> Size of the bucket.
+<2> StorageClass the bucket is based on.
+<3> Name of the StorageClass that shall be created for the bucket.
+<4> Name of the bucket that shall be created.
+<5> Namespace for the bucket.
+<6> StorageClass for the bucket.
+
+#### Automatic Secret Creation for TempoStack
+
+TempoStack is expecting a Secret with the following keys:
+
+- access_key_id
+- access_key_secret
+- bucket
+- endpoint
+- region (only for specific settings)
+
+OpenShift Data Foundation creates a secret with access_key_id and access_key_secret and a ConfigMap with endpoint, region and the name of the bucket. 
+Unfortunately, this does not work for TempoStack. Therefore, we are using a **helper-odf-bucket-secret** chart that will create a new Secret with the required keys.
+This chart creates a Job that reads the required information and creates a new Secret with the required keys.
+
+[source,yaml]
+----
+##############################################
+# SUBCHART: helper-odf-bucket-secret
+# Creates a Secret that Tempo requires
+#
+# A Kubernetes Job is created, that reads the
+# data from the Secret and ConfigMap and
+# creates a new secret for Tempo.
+##############################################
+helper-odf-bucket-secret:
+  # -- Enable Job to create a Secret for TempoStack.
+  # @default -- false
+  enabled: true
+
+  # -- Syncwave for Argo CD.
+  # @default -- 3
+  syncwave: 3
+
+  # -- Namespace where TempoStack is deployed and where the Secret shall be created.
+  namespace: tempostack
+
+  # -- Name of Secret that shall be created.
+  secretname: tempo-s3 <1>
+
+  # Bucket Configuration
+  bucket:
+    # -- Name of the Bucket shall has been created.
+    name: tempo-bucket <2>
+
+  # -- Keys that shall be used to create the Secret.
+  keys: <3>
+    # -- Overwrite access_key_id key.
+    # @default -- access_key_id
+    access_key_id: access_key_id
+    # -- Overwrite access_key_secret key.
+    # @default -- access_key_secret
+    access_key_secret: access_key_secret
+    # -- Overwrite bucket key.
+    # @default -- bucket
+    bucket: bucket
+    # -- Overwrite endpoint key.
+    # @default -- endpoint
+    endpoint: endpoint
+    # -- Overwrite region key. Region is only set if set_region is true.
+    # @default -- region
+    region: region
+  
+  # -- Set region key.
+  # @default -- false
+  set_region: false <4>
+----
+<1> Name of the Secret that shall be created.
+<2> Name of the bucket that shall be used.
+<3> Keys that shall be used to create the Secret.
+<4> Set region key. Here disabled, because we are not using a specific region.
+
+CAUTION: Using OpenShift Data Foundation with TempoStack requires you to NOT set a region. Therefore, it is disabled above.
+
+### Complete values file
+
+To see the whole file expand the code:
+
+{{% expand %}}
+[source,yaml]
+----
+tempo: &channel-tempo stable
+tempo-namespace: &tempo-namespace openshift-tempo-operator
+bucketname: &bucketname tempo-bucket
+tempo-secret: &tempo-secret-name tempo-s3
+storageclassname: &storageclassname tempo-bucket-storage-class
+tempostack-namespace: &tempostack-namespace tempostack
+
+tempo-tracing:
+  tempostack:
+    enabled: true
+    name: simplest
+
+    managementState: Managed
+
+    namespace:
+      create: true
+      name: *tempostack-namespace
+      descr: "Namespace for the TempoStack"
+      display: "TempoStack"
+      additionalAnnotations: {}
+      additionalLabels: {}
+
+    storage:
+      secret:
+        name: tempo-s3
+        type: s3
+        credentialMode: static
+
+    storageSize: 500Gi
+    replicationFactor: 1
+    serviceAccount: tempo-simplest
+
+    tenants:
+      mode: openshift
+      enabled: true
+
+      authentication:
+        - tenantName: 'tenantA'
+          tenantId: '1610b0c3-c509-4592-a256-a1871353dbfc'
+          permissions:
+            - write
+            - read
+
+        - tenantName: 'tenantB'
+          tenantId: '1610b0c3-c509-4592-a256-a1871353dbfd'
+          permissions:
+            - write
+            - read
+
+    observability:
+      enabled: true
+
+      tracing:
+        jaeger_agent_endpoint: 'localhost:6831'
+        otlp_http_endpoint: 'http://localhost:4320'
+
+    template:
+      gateway:
+        enabled: true
+        rbac: false
+
+        ingress:
+          type: 'route'
+          termination: 'reencrypt'
+        component:
+          replicas: 1
+
+      queryFrontend:
+        jaegerQuery:
+          enabled: true
+        component:
+          replicas: 1
+
+######################################
+# SUBCHART: helper-operator
+# Operators that shall be installed.
+######################################
+helper-operator:
+  operators:
+    tempo-operator:
+      enabled: true
+      namespace:
+        name: *tempo-namespace
+        create: true
+      subscription:
+        channel: *channel-tempo
+        approval: Automatic
+        operatorName: tempo-product
+        source: redhat-operators
+        sourceNamespace: openshift-marketplace
+      operatorgroup:
+        create: true
+        notownnamespace: true
+
+########################################
+# SUBCHART: helper-status-checker
+# Verify the status of a given operator.
+########################################
+helper-status-checker:
+  enabled: true
+
+  approver: false
+
+  checks:
+    - operatorName: tempo-operator
+      namespace:
+        name: *tempo-namespace
+      syncwave: 1
+
+      serviceAccount:
+        name: "status-checker-tempo"
+
+########################################
+# SUBCHART: helper-objectstore
+
+# A helper chart that simply creates another backingstore for logging.
+# This is a chart in a very early state, and not everything can be customized for now.
+# It will create the objects:
+#  - BackingStore
+#  - BackingClass
+#  - StorageClass
+
+# NOTE: Currently only PV type is supported
+########################################
+helper-objectstore:
+
+  # -- Enable objectstore configuration
+  # @default -- false
+  enabled: true
+
+  # -- Syncwave for Argo CD
+  # @default - 1
+  syncwave: 1
+
+  # -- Name of the BackingStore
+  backingstore_name: tempo-backingstore
+
+  # -- Size of the BackingStore that each volume shall have.
+  backingstore_size: 400Gi
+
+  # -- CPU Limit for the Noobaa Pod
+  # @default -- 500m
+  limits_cpu: 500m
+
+  # -- Memory Limit for the Noobaa Pod.
+  # @default -- 2Gi
+  limits_memory: 2Gi
+
+  pvPool:
+    # -- Number of volumes that shall be used
+    # @default -- 1
+    numOfVolumes: 1
+
+    # Type of BackingStore. Currently pv-pool is the only one supported by this Helm Chart.
+    # @default -- pv-pool
+    type: pv-pool
+
+  # -- The StorageClass the BackingStore is based on
+  baseStorageClass: gp3-csi
+
+  # -- Name of the StorageClass that shall be created for the bucket.
+  storageclass_name: *storageclassname
+
+  # Bucket that shall be created
+  bucket:
+    # -- Shall a new bucket be enabled?
+    # @default -- false
+    enabled: true
+
+    # -- Name of the bucket that shall be created
+    name: *bucketname
+
+    # -- Target Namespace for that bucket.
+    namespace: *tempo-namespace
+
+    # -- Syncwave for bucketclaim creation. This should be done very early, but it depends on ODF.
+    # @default -- 2
+    syncwave: 2
+
+    # -- Name of the storageclass for our bucket
+    # @default -- openshift-storage.noobaa.io
+    storageclass: *storageclassname
+
+##############################################
+# SUBCHART: helper-odf-bucket-secret
+# Creates a Secret that Tempo requires
+#
+# A Kubernetes Job is created, that reads the
+# data from the Secret and ConfigMap and
+# creates a new secret for Tempo.
+##############################################
+helper-odf-bucket-secret:
+  # -- Enable Job to create a Secret for TempoStack.
+  # @default -- false
+  enabled: true
+
+  # -- Syncwave for Argo CD.
+  # @default -- 3
+  syncwave: 3
+
+  # -- Namespace where TempoStack is deployed and where the Secret shall be created.
+  namespace: *tempostack-namespace
+
+  # -- Name of Secret that shall be created.
+  secretname: *tempo-secret-name
+
+  # Bucket Configuration
+  bucket:
+    # -- Name of the Bucket shall has been created.
+    name: *bucketname
+
+  # -- Keys that shall be used to create the Secret.
+  keys:
+    # -- Overwrite access_key_id key.
+    # @default -- access_key_id
+    access_key_id: access_key_id
+    # -- Overwrite access_key_secret key.
+    # @default -- access_key_secret
+    access_key_secret: access_key_secret
+    # -- Overwrite bucket key.
+    # @default -- bucket
+    bucket: bucket
+    # -- Overwrite endpoint key.
+    # @default -- endpoint
+    endpoint: endpoint
+    # -- Overwrite region key. Region is only set if set_region is true.
+    # @default -- region
+    region: region
+  
+  # -- Set region key.
+  # @default -- false
+  set_region: false
+----
+{{% /expand %}}
+
+### The TempoStack
+
+Let's imagine all of the above works and we have a TempoStack instance running in the namespace **tempostack** with the name **simplest**. Several Pods are running, like the distributor, ingester, gateway, query-frontend, compactor and querier.
+I admit it is not highly available, but this can be easily changed in the values file above (replica count).
+
+[source,bash]
+----
+oc get pods -n tempostack | grep simplest
+tempo-simplest-compactor-584689c78f-t7pxb           1/1     Running     0              3d2h
+tempo-simplest-distributor-6fb5d7dc9d-wrzt4         1/1     Running     0              3d2h
+tempo-simplest-gateway-bbcb774b9-p44lq              2/2     Running     0              11h
+tempo-simplest-ingester-0                           1/1     Running     0              3d2h
+tempo-simplest-querier-6cf9d7b6d8-mvc9d             1/1     Running     0              3d2h
+tempo-simplest-query-frontend-7d859f9f9f-xzj97      3/3     Running     0              3d2h
+----
+
+Now we can continue with the OpenTelemetry Collector deployment.
+But before we do this, let's first discuss how to:
+
+* Add Tracing UI to OpenShift
+
+'''
+
+## Extend the OpenShift UI
+While we have Tempo installed, it will not be visible in the OpenShift UI by default. 
+Here a separate Operator has been created by Red Hat, that will take care of this extension: **Cluster Observability Operator**.
+
+This Operator be installed:
+
+image::coo.png?width=640px[Cluster Observability Operator]
+
+NOTE: The Operator can be deployed with the Chart **helper-operator** as well. However, I did not merge this together with the TempoStack deployment, because this Operator also serves different purposes. 
+
+We only require a very small bit of this Operator. Amongst other resources, it also provides a resource called *UIPlugin*.
+
+The resource must be configured as follows:
+
+[source,yaml]
+----
+apiVersion: observability.openshift.io/v1alpha1
+kind: UIPlugincd
+metadata:
+  name: distributed-tracing <1>
+spec:
+  type: DistributedTracing <2>
+----
+<1> The name MUST be *distributed-tracing*.
+<2> The type MUST be *DistributedTracing*.
+
+This will extend the OpenShift UI with a new navigation link **"Observe" > "Traces"**.
+
+image::tempo-UI.png[Tempo UI]
+
+## On the next Episode
+
+The next article will cover the deployment of the Central OpenTelemetry Collector. We will configure the RBAC permissions required for the Central Collector to enrich traces with Kubernetes metadata and deploy the Central OpenTelemetry Collector with its complete configuration.

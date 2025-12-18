@@ -1,0 +1,96 @@
+--- 
+title: "Single log out from Keycloak and OpenShift"
+description: "How to configure Keycloak and OpenShift for Single Log Out"
+date: "2025-05-22"
+doctype: book
+
+authors: [Thomas Jungbauer]
+type: post
+draft: false
+categories:
+   - OpenShift
+   - Security
+   - Authentication
+tags: ["OpenShift", "OCP", "Security", "Authentication", "SSO", "OpenID", "IDP"] 
+
+aliases: [ 
+	 "/posts-output/2025-05-22-keycloak-openshift-singlelogout/",
+   "/openshift/2025/05/keycloak-openshift-singlelogout/",
+   "/openshift/2025/05/single-log-out-from-keycloak-and-openshift/",
+] 
+---
+
+:imagesdir: /openshift-platform/security/authentication/images/keycloak/
+:icons: font
+:toc:
+
+The following 1-minute article is a follow-up to my link:/openshift/2025/05/step-by-step-using-keycloak-authentication-in-openshift/[previous article] about how to use Keycloak as an authentication provider for OpenShift. In this article, I will show you how to configure Keycloak and OpenShift for Single Log Out (SLO). This means that when you log out from Keycloak, you will also be logged out from OpenShift automatically. This requires some additional configuration in Keycloak and OpenShift, but it is not too complicated.
+
+<!--more--> 
+
+## Prerequisites
+
+The following prerequisites are required to follow this article:
+
+* OpenShift 4.16 or higher with cluster-admin privileges
+* Keycloak installed and configured, as described in the link:/openshift/2025/05/step-by-step-using-keycloak-authentication-in-openshift/[Step by Step - Using Keycloak Authentication in OpenShift]
+
+## Keycloak Configuration
+
+Configure the logout URL in Keycloak. This is done by adding a new **Valid post logout redirect URIs** to the Keycloak client configuration. In this case, we want to call the OpenShift logout URL.
+Which is: **https://oauth-openshift.apps.<your-cluster-name>/logout**
+
+This is done in the client settings:
+
+image::set-logout-url.png[Set Logout URL]
+
+## OpenShift Configuration
+
+Now we need to configure OpenShift to use the logout URL. This is done by adding a new **Post Logout Redirect URI** to the OpenShift Console configuration.
+
+Modify the existing Console resource named cluster and add the logoutRedirect parameter to the authentication section.
+The important pieces of the logout URL are the **client_id** and the **post_logout_redirect_uri**. The client ID must be the same as the Keycloak client ID, and the post logout redirect URI must be the OpenShift logout URL.
+(Also change the <keycloakURL> and <realm> to your Keycloak URL and realm name.)
+
+CAUTION: Actually, instead of **client_id**, the **id_token_hint** should be used. But OpenShift does not store the token, so we are using the client ID instead.
+
+[source,yaml]
+----
+apiVersion: config.openshift.io/v1
+kind: Console
+metadata:
+  name: cluster
+spec:
+  authentication:
+    logoutRedirect: 'https://<keycloakURL>/realms/<realm>/protocol/openid-connect/logout?client_id=<realm>&post_logout_redirect_uri=https://console-openshift-console.apps.ocp.aws.ispworld.at' <1>
+----
+<1> The logout URL for OpenShift. This is the URL that will be called when you log out from Keycloak. The URL must contain the client ID and the post logout redirect URI (console of OpenShift).
+
+Wait a few moments until the OpenShift Console Operator applies the new configuration.
+
+## Testing the configuration
+
+Now that the configuration is done, we can test the Single Log Out functionality.
+
+. We are logged into OpenShift already as user **testuser**
++
+image::logged-in.png[Logged in to OpenShift]
+
+. Now we log out from OpenShift using the **Log out** button in the upper right corner.
++ 
+image::logging-out.png[Log out from OpenShift]
+
+. This will redirect us to the Keycloak logout page where we need to confirm the logout.
++
+image::keycloak-logout.png?width=420[Keycloak Logout]
+
+. This will log us out from Keycloak and redirect us back to the OpenShift logout page.
++
+image::logged-out.png?width=420[Logged out from OpenShift]
+
+
+This is it. You are now logged out from both Keycloak and OpenShift. You can also check the Sessions in Keycloak to see that the session for the user is terminated.
+
+## Conclusion
+As promised, this was a short article about how to configure Keycloak and OpenShift for Single Log Out. This is a beneficial feature if you want to ensure that users are logged out from all applications when they log out from Keycloak. It is also a good security practice to ensure that users are logged out from all applications when they are done using them.
+

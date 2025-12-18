@@ -1,0 +1,228 @@
+--- 
+title: "NodeSelector"
+description: "Placeing Pods Using the NodeSelector"
+date: "2021-08-26"
+doctype: book
+
+series: "Pod Placement"
+series_part: 2
+
+authors: [Thomas Jungbauer]
+type: post
+categories:
+   - OpenShift
+   - Pod Placement
+tags: ["OCP", "Day-2", "OpenShift", "Pod Placement", "NodeSelector"] 
+
+aliases: [ 
+	 "/openshift/day-2/pod-placement-nodeselector",
+	 "/day-2/pod-placement/2021-08-27-podplacement/",
+] 
+---
+
+:imagesdir: /day-2/images/
+:icons: font
+:toc:
+
+One of the easiest ways to tell your Kubernetes cluster where to put certain pods is to use a `nodeSelector` specification. A nodeSelector defines a key-value pair and are defined inside the specification of the pods and as a label on one or multiple nodes (or machine set or machine config). Only if selector matches the node label, the pod is allowed to be scheduled on that node. 
+
+<!--more--> 
+
+Kubernetes distingushes between 2 types of selectors: 
+
+. _cluster-wide node selectors_: defined by the cluster administrators and valid for the whole cluster
+. _project node selectors_: to place new pods inside projects into specific nodes.
+
+== Pod Placement Series 
+
+Please check out other ways of pod placements:
+
+{{% expand %}}
+. link:/openshift/day-2/pod-placement-nodeselector/[NodeSelector]
+. link:/openshift/day-2/pod-placement-pod-affinity/[Pod Affinity and Anti Affinity]
+. link:/openshift/day-2/pod-placement-node-affinity/[Node Affinity]
+. link:/openshift/day-2/pod-placement-taints-and-tolerations[Taints and Tolerations]
+. link:/openshift/day-2/pod-placement-topology-spread-constraints/[Topology Spread Constraints]
+. link:/openshift/day-2/descheduler/[Descheduler]
+{{% /expand %}}
+
+== Using nodeSelector
+
+As previously described, we have a cluster with an example application scheduled accross the worker nodes evenly by the scheduler. 
+
+[source,bash]
+----
+oc get pods -n podtesting -o wide | grep Running
+
+django-psql-example-1-842fl    1/1     Running             0          2m7s   10.131.0.65   compute-3   <none>           <none>
+django-psql-example-1-h6kst    1/1     Running             0          24m    10.130.2.97   compute-2   <none>           <none>
+django-psql-example-1-pxhlv    1/1     Running             0          2m7s   10.128.2.13   compute-0   <none>           <none>
+django-psql-example-1-xms7x    1/1     Running             0          2m7s   10.129.2.10   compute-1   <none>           <none>
+postgresql-1-4pcm4             1/1     Running             0          26m    10.131.0.51   compute-3   <none>           <none>
+----
+
+However, our 4 compute nodes are assembled with different hardware specification and are using different harddisks (sdd vs hdd).
+
+.Nodes with Different Specifications
+image::nodeselector-disktypes.png[Node with different disktypes]
+
+Since our web application must run on fast disks must configure the cluster to schedule the pods on nodes with SSD only. 
+
+To start using nodeSelectors we first *label our nodes* accordingly: 
+
+* compute-0 and compute-1 are faster nodes with an SSD attached.
+* compute-2 and compute-2 have a HDD attached. 
+
+[source,bash]
+----
+oc label nodes compute-0 compute-1 disktype=ssd <1>
+
+oc label nodes compute-2 compute-3 disktype=hdd
+----
+<1> as key we are using *disktype*
+
+As crosscheck we can list nodes with a specific label: 
+
+[source,bash]
+----
+oc get nodes -l disktype=ssd
+NAME        STATUS   ROLES    AGE     VERSION
+compute-0   Ready    worker   7h32m   v1.19.0+d59ce34
+compute-1   Ready    worker   7h31m   v1.19.0+d59ce34
+
+oc get nodes -l disktype=hdd
+NAME        STATUS   ROLES    AGE     VERSION
+compute-2   Ready    worker   7h32m   v1.19.0+d59ce34
+compute-3   Ready    worker   7h32m   v1.19.0+d59ce34
+----
+
+WARNING: If no matching label is found, the pod cannot be scheduled. Therefore, *always* label the nodes first.
+
+The 2nd step is to add the node selector to the specification of the pod. In our example we are using a DeploymentConfig, so let's add it there: 
+
+[source,bash]
+----
+oc patch dc django-psql-example -n podtesting --patch '{"spec":{"template":{"spec":{"nodeSelector":{"disktype":"ssd"}}}}}'
+----
+
+This adds the nodeSelector into: spec/template/spec 
+
+[source,yaml]
+----
+       nodeSelector:
+         disktype: ssd
+----
+
+Kubernetes will now trigger a restart of the pods on the supposed nodes. 
+
+[source,bash]
+----
+oc get pods -n podtesting -o wide | grep Running
+
+django-psql-example-3-4j92k    1/1     Running       0          42s   10.129.2.7    compute-1   <none>           <none>
+django-psql-example-3-d7hsd    1/1     Running       0          42s   10.129.2.8    compute-1   <none>           <none>
+django-psql-example-3-fkbfm    1/1     Running       0          14m   10.128.2.18   compute-0   <none>           <none>
+django-psql-example-3-psskb    1/1     Running       0          14m   10.128.2.17   compute-0   <none>           <none>
+----
+
+As you can see, only nodes with a SSD (compute-0 and compute-1) are being used. 
+
+== Controlling pod placement with project-wide selector 
+
+Adding a nodeSelector to a deployment seems fine... until somebody forgets to add it. Then the pods would be started anywhere the scheduler finds suitable. Therefore, it might make sense to use a project-wide node selector, which will automatically be applied on all pods on that project. The project selector is added by the cluster administrator to the *Namespace* object (no matter what the OpenShift documentation says in it's example) as `openshift.io/node-selector` parameter. 
+
+Let's remove our previous configuration and add the setting to our namespace _podtesting_: 
+
+. Cleanup
++
+Remove the nodeSelector from the deployment configuration and wait until all pods have been reshuffeld 
++
+[source,bash]
+----
+oc patch dc django-psql-example -n podtesting --type='json' -p='[{"op": "remove", "path": "/spec/template/spec/nodeSelector", "value": "disktype=ssd" }]'
+----
+
+. Add the label to the project
++
+[source,bash]
+----
+oc annotate ns/podtesting openshift.io/node-selector="disktype=ssd"
+----
+
+The OpenShift scheduler will now spread the Pods accross compute-0 or compute-1 again, but not on compute-2 or 3.
+
+We can prove that by stressing our cluster (and nodes) a little bit and scale our frontend application to 10: 
+
+[source,bash]
+----
+oc get pods -n podtesting -o wide | grep Running
+django-psql-example-4-2jn2l    1/1     Running     0          27s     10.128.2.8    compute-0   <none>           <none>
+django-psql-example-4-6g7ks    1/1     Running     0          7m47s   10.129.2.23   compute-1   <none>           <none>
+django-psql-example-4-752nm    1/1     Running     0          7m47s   10.128.2.7    compute-0   <none>           <none>
+django-psql-example-4-c5jvm    1/1     Running     0          27s     10.129.2.4    compute-1   <none>           <none>
+django-psql-example-4-f5kwg    1/1     Running     0          27s     10.129.2.5    compute-1   <none>           <none>
+django-psql-example-4-g7bcs    1/1     Running     0          7m47s   10.129.2.24   compute-1   <none>           <none>
+django-psql-example-4-h5tgb    1/1     Running     0          27s     10.129.2.6    compute-1   <none>           <none>
+django-psql-example-4-spvpp    1/1     Running     0          28s     10.128.2.5    compute-0   <none>           <none>
+django-psql-example-4-v9qwj    1/1     Running     0          7m48s   10.129.2.22   compute-1   <none>           <none>
+django-psql-example-4-zgwcv    1/1     Running     0          27s     10.128.2.6    compute-0   <none>           <none>
+----
+
+As you can see compute-0 and compute-1 are the only nodes which are used. 
+
+
+== Well-Known Labels
+
+nodeSelector is one of the easiest ways to control where an application shall be started. Working with labels is therefore very important as soon as workload shall be added to the cluster. 
+Kubernetes reserves some labels which can be leveraged and some are already predefined on the nodes, for example: 
+
+* beta.kubernetes.io/arch=amd64
+* kubernetes.io/hostname=compute-0
+* kubernetes.io/os=linux
+* node-role.kubernetes.io/worker=
+* node.openshift.io/os_id=rhcos
+
+A list of all known can be found at: [<<source_1,1>>]
+
+Two of them I would like to mention here, since they might become very important when designing the placement of pods: 
+
+* topology.kubernetes.io/zone
+* topology.kubernetes.io/region
+
+With these two labels you can create availability zones for your cluster. A *zone* can be seen a logical failure domain and a cluster is typically spanned across multiple zones. This could be a rack in a data center for example, hardware which is sharing the same switch or simply different data centers. Zones are seen as independent to each other.
+
+A *region* is made up of one or more zones. A cluster is usually not spanned across multiple region. 
+
+Kubernetes makes a few assumptions about the structure of zones and regions:
+
+* regions and zones are hierarchical: zones are strict subsets of regions and no zone can be in 2 regions
+* zone names are unique across regions; for example region "africa-east-1" might be comprised of zones "africa-east-1a" and "africa-east-1b"
+
+== Cleanup 
+
+This concludes the chapter about nodeSelectors. For the next chapter of the Pod Placement Series (link:/openshift/day-2/pod-placement-pod-affinity/[Pod Affinity and Anti Affinity]) we need to cleanup our configuration. 
+
+. Scale the frontend down to 2
++
+[source,bash]
+----
+oc scale --replicas=2 dc/django-psql-example -n podtesting
+----
+
+. Remove the label from the namespace
++
+[source,bash]
+----
+oc annotate ns/podtesting openshift.io/node-selector- <1>
+----
+<1> The minus at the end defines that this annotation shall be removed
+
+. And, just to be sure if you have not done this before, remove the nodeSelector from the DeploymentConfig
++
+[source,bash]
+----
+oc patch dc django-psql-example -n podtesting --type='json' -p='[{"op": "remove", "path": "/spec/template/spec/nodeSelector", "value": "disktype=ssd" }]'
+----
+
+== Sources
+* [[source_1]][1]: https://kubernetes.io/docs/reference/labels-annotations-taints/[Well-Known Labels, Annotations and Taints^]

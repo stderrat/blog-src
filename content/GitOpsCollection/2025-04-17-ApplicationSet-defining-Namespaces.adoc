@@ -1,5 +1,5 @@
 --- 
-title: "Using ApplicationSet with Matrix Generator and define individual Namespaces"
+title: "[Ep.13] ApplicationSet with Matrix Generator"
 description: "Using ApplicationSet with Matrix Generator and define individual Namespaces."
 date: "2025-04-17"
 doctype: book

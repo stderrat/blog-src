@@ -1,42 +1,88 @@
 {
-    "name": "Yet Another Useless Blog",
-    "short_name": "yaub",
-    "icons": [
-      {
-        "src": "/images/apple-touch-icon-128x128.png",
-        "sizes": "128x128",
-        "type": "image/png"
-      },
-      {
-        "src": "/images/apple-touch-icon-144x144.png",
-        "sizes": "144x144",
-        "type": "image/png"
-      },
-      {
-        "src": "/images/apple-touch-icon-152x152.png",
-        "sizes": "152x152",
-        "type": "image/png"
-      },
-      {
-        "src": "/images/favicon-196x196.png",
-        "sizes": "196x196",
-        "type": "image/png"
-      },
-      {
-        "src": "/images/android-chrome-512x512.png",
-        "sizes": "512x512",
-        "type": "image/png"
-      },
-      {
-          "src": "/images/maskable_icon.png",
+  "name": "Yet Another Useless Blog",
+  "short_name": "yaub",
+  "description": "TechBlog about OpenShift, Ansible, Kubernetes and more",
+  "categories": ["technology", "education", "programming"],
+  "icons": [
+    {
+      "src": "/images/apple-touch-icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png"
+    },
+    {
+      "src": "/images/apple-touch-icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png"
+    },
+    {
+      "src": "/images/apple-touch-icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png"
+    },
+    {
+      "src": "/images/favicon-196x196.png",
+      "sizes": "196x196",
+      "type": "image/png"
+    },
+    {
+      "src": "/images/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/images/maskable_icon.png",
+      "sizes": "196x196",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Search Articles",
+      "short_name": "Search",
+      "description": "Search through all blog articles",
+      "url": "/search/",
+      "icons": [
+        {
+          "src": "/images/favicon-196x196.png",
           "sizes": "196x196",
-          "type": "image/png",
-          "purpose": "any maskable"
-      }
-    ],
-    "start_url": "/",
-    "display": "standalone",
-    "orientation": "portrait",
-    "background_color": "#FFFFFF",
-    "theme_color": "#FFFFFF"
-  }
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "GitOps Collection",
+      "short_name": "GitOps",
+      "description": "GitOps articles and tutorials",
+      "url": "/gitopscollection/",
+      "icons": [
+        {
+          "src": "/images/favicon-196x196.png",
+          "sizes": "196x196",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Helm Charts",
+      "short_name": "Helm",
+      "description": "Helm chart documentation and changelog",
+      "url": "/helm-charts/",
+      "icons": [
+        {
+          "src": "/images/favicon-196x196.png",
+          "sizes": "196x196",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#303030",
+  "theme_color": "#303030",
+  "lang": "en",
+  "dir": "ltr"
+}

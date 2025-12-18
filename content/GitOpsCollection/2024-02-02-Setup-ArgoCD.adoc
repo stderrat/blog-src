@@ -1,5 +1,5 @@
 --- 
-title: "Setup OpenShift GitOps/Argo CD"
+title: "[Ep.3] Setup OpenShift GitOps/Argo CD"
 description: "Openshift 4.x - Install GitOps to the cluster"
 date: "2024-02-02"
 doctype: book

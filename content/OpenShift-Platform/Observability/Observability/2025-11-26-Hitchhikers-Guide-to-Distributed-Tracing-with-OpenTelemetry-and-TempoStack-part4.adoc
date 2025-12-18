@@ -1,0 +1,669 @@
+--- 
+title: "The Hitchhiker's Guide to Observability - Example Applications - Part 4"
+description: "Deploy Example Applications - Part 4"
+date: "2025-11-26"
+doctype: book
+weight: 400
+
+series: "The Hitchhiker's Guide to Observability"
+series_part: 4
+
+featured_image: /day-2/images/observability/Logo_observability_3.png
+show_featured_image_summary: true
+show_featured_image_article: true
+disableBreadcrumb: true
+
+authors: [Thomas Jungbauer]
+type: post
+categories:
+   - OpenShift
+   - Observability
+   - Distributed Tracing
+   - OpenTelemetry
+   - Tempo
+   - Grafana
+
+tags: ["OCP", "Day-2", "OpenShift", "Observability", "Distributed Tracing", "Tempo", "Grafana", "OTL", "OTLP", "Logging", "Metrics"] 
+
+aliases: [ 
+	 "/day-2/observability/2025-11-26-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part4/",
+]
+---
+
+:imagesdir: /day-2/images/observability/
+:icons: font
+:toc:
+
+With the link:/day-2/observability/2025-11-23-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part1/[architecture defined], link:/day-2/observability/2025-11-24-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part2/[TempoStack deployed], and the link:/day-2/observability/2025-11-25-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part3/[Central Collector configured], we're now ready to complete the distributed tracing pipeline. It's time to deploy real applications and see traces flowing through the entire system!
+
+In this fourth installment, we'll focus on the **application layer** - deploying **Local OpenTelemetry Collectors** in team namespaces and configuring example applications to generate traces. You'll see how applications automatically get enriched with Kubernetes metadata, how namespace-based routing directs traces to the correct TempoStack tenants, and how the entire two-tier architecture comes together.
+
+
+<!--more--> 
+
+We'll deploy an example application (**Mockbin**) into two different namespaces. Together with the application, we will deploy a local OpenTelemetry Collector. One with sidecar mode, one with deployment mode.
+
+You'll learn how to configure local collectors to add namespace attributes, forward traces to the central collector, and verify that traces appear in the UI with full Kubernetes context.
+
+By the end of this article, you'll have a fully functional distributed tracing system with applications generating traces, local collectors forwarding them, and the central collector routing everything to the appropriate TempoStack tenants. Let's bring this architecture to life!
+
+
+## Application Mockbin - Step-by-Step Implementation
+
+### Prerequisites
+
+Before starting, ensure you have the following Systems or Operators installed (used Operator versions in this article):
+
+- OpenShift or Kubernetes cluster (OpenShift v4.20)
+- Red Hat build of OpenTelemetry installed (v0.135.0-1)
+- Tempo Operator installed (v0.18.0-2)
+- S3-compatible storage (for TempoStack, based on OpenShift Data Foundation)
+- Cluster Observability Operator (v1.3.0) for now this Operator is only used to extend the OpenShift UI with the tracing UI)
+
+
+## Mockbin Application Introduction 
+
+The Mockbin Application was created and provided by https://www.linkedin.com/in/michaela-lang-900603b9/[Michaela Lang^]. She is doing a lot of testings with Service Mesh and Observability. I forked the source code for the Mockbin application to https://github.com/tjungbauer/mockbin[Mockbin^] and created an images to test everything at: https://quay.io/repository/tjungbau/mockbin?tab=tags[Mockbin Image^]. Mockbin is a simple, OpenTelemetry-instrumented HTTP testing service built with Python's `aiohttp` async framework. It serves as both a demonstration tool and a practical testing service for distributed tracing infrastructure.
+
+### Why Mockbin?
+
+Unlike simple "hello world" examples, Mockbin demonstrates **real-world OpenTelemetry implementation patterns** that you can apply to your own Python applications. It shows how to properly instrument an async Python web service with full observability capabilities.
+
+### Key Features
+
+* **Full OpenTelemetry Integration**: Implements the complete observability stack - traces, metrics, and logs
+* **Automatic Instrumentation**: Uses OpenTelemetry's auto-instrumentation for `aiohttp`
+* **Manual Span Creation**: Demonstrates how to create custom spans with attributes and events
+* **Trace Context Propagation**: Supports both W3C Trace Context (`traceparent`) and Zipkin B3 (`x-b3-*`) formats
+* **OTLP Export**: Sends all telemetry data via OpenTelemetry Protocol (OTLP) to collectors
+* **Prometheus Metrics with Exemplars**: Links high-cardinality traces to aggregated metrics
+* **Structured Logging via OTLP**: Logs are automatically correlated with traces
+* **Nested Spans**: Creates parent-child span relationships for complex operations
+* **Exception Recording**: Captures and records exceptions with full stack traces
+
+### Technical Architecture
+
+The application consists of several Python modules:
+
+* **`proxy.py`**: Main application with HTTP endpoint handlers
+* **`tracing.py`**: OpenTelemetry configuration and trace context management
+* **`promstats.py`**: Prometheus metrics collection with trace exemplars
+* **`logfilter.py`**: OTLP logging with automatic trace correlation
+
+### HTTP Endpoints for Testing
+
+[%autowidth,cols="1,3,2"]
+|===
+|Endpoint |Purpose |Use Case
+
+|/ 
+|Echo service - returns headers and environment variables
+|Basic trace generation
+
+|/logging/*
+|Generates multiple log entries linked to trace
+|Demonstrate trace-to-log correlation
+
+|/proxy/*
+|Chains multiple HTTP requests with nested spans
+|Test distributed trace propagation
+
+|/exception/{status}
+|Intentionally raises exception and returns custom status code
+|Test error trace capture
+
+|/webhook/alert-receiver
+|Converts AlertManager webhooks to traces
+|Alert-to-trace correlation
+
+|/outlier
+|Enables/disables failure mode (PUT/DELETE)
+|Test Service Mesh outlier detection
+
+|/metrics
+|Exposes Prometheus metrics
+|Metrics scraping
+
+|/health
+|Health check endpoint
+|Kubernetes liveness/readiness probes
+|===
+
+
+### OpenTelemetry Implementation Highlights
+
+The application demonstrates several critical OpenTelemetry patterns:
+
+. **Middleware-Based Instrumentation:**
+Every HTTP request is automatically wrapped in a trace span via `aiohttp` middleware, capturing request metadata (method, URL, headers, etc.) as span attributes.
+
+. **Context Propagation:**
+Incoming requests have their trace context extracted from HTTP headers, and outgoing requests inject the context to maintain trace continuity across service boundaries.
+
+. **Resource Attributes:**
+Service metadata (name, namespace, version) is attached to all telemetry data for proper identification in the backend.
+
+. **Manual Span Creation:**
+Shows how to create nested spans for complex operations, add custom attributes, record events, and set span status (OK/ERROR).
+
+### Configuration via Environment Variables
+
+The application is configured entirely through environment variables, making it easy to adapt to different environments, for example:
+
+[source,bash]
+----
+# OpenTelemetry Configuration
+OTEL_EXPORTER_OTLP_ENDPOINT=http://otelcol-collector:4317
+OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://otelcol-collector:4317
+OTEL_SPAN_SERVICE=mockbin
+----
+
+NOTE: We will test OpenTelemetry Collector in deployment mode and in sidecar mode. When using sidecar mode, then the sidecar will try to automatically inject the OpenTelemetry Collector into the pod.
+
+'''
+
+## Deploy Mockbin Application & OpenTelemetry Collector - team-a
+
+Let's start with the deployment of the Mockbin Application and the OpenTelemetry Collector in the team-a namespace. Here we will use the OpenTelemetry Collector in deployment mode. 
+
+NOTE: The deployment in sidecar mode will be done in the team-b namespace and is almost the same, just with the difference that we will use a different mode in the OTC resource and that we do not need to take care of the environment variables for the OTC.
+
+### Step 1a: Use Kustomize Manually
+
+You can deploy the Mockbin Application and the OpenTelemetry Collector manually using Kustomize or by using a GitOps tool like ArgoCD (preferred). 
+In the repository https://github.com/tjungbauer/mockbin[Mockbin^] your will find the sub-folder `k8s` with the Kustomize files for the Mockbin Application and the OpenTelemetry Collector.
+
+You can manually deploy the application:
+
+#### Step 1a.1: Create Namespace team-a
+
+First create the namespace team-a.
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: team-a <1>
+----
+<1> Namespace name
+
+#### Step 1a.2: Deploy the Mockbin Application
+
+Use the following command to deploy the application (assuming you cloned the repository to your local machine):
+
+[source,bash]
+----
+kustomize build . | kubectl apply -f -
+----
+
+This will deploy the required resources:
+
+* ServiceAccount
+* Service
+* Route 
+* Deployment using the image: quay.io/tjungbau/mockbin:1.8.1
+
+NOTE: It is possible to kustomize the deployment by modifying the `kustomization.yaml` file. For example, you can change the image, or change from Route to Ingress object.
+
+### Step 1b: Use ArgoCD
+
+Above can be achieved by using ArgoCD, which allows a more declarative approach. Create the following ArgoCD Application:
+
+[source,yaml]
+----
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mockbin-team-a <1>
+  namespace: openshift-gitops <2>
+spec:
+  destination:
+    namespace: team-a <3>
+    server: 'https://kubernetes.default.svc' <4>
+  info:
+    - name: Description
+      value: Deploy Mockbin in team-a namespace
+  project: in-cluster
+  source:
+    path: k8s/ <5>
+    repoURL: 'https://github.com/tjungbauer/mockbin' <6>
+    targetRevision: main <7>
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true <8>
+----
+<1> Name of the Argo CD Application resource.
+<2> Namespace of the ArgoCD Application resource, here it is *openshift-gitops*. In your environment it might be different.
+<3> Namespace of the target application
+<4> Kubernetes API server URL. Here it is the local cluster where Argo CD is hosted.
+<5> Path to the Kustomize files
+<6> URL to the Git repository
+<7> Target revision
+<8> Create the namespace if it does not exist
+
+Argo CD will leverage Kustomize to render the resources. It is the same as you would do manually, with the exception that the Namespace will be created automatically. The approach above will deploy the required resources:
+
+* Namespace
+* ServiceAccount
+* Service
+* Route 
+* Deployment
+
+In the Argo CD UI you can see the application and the resources that have been deployed.
+
+image::mockbin-argocd.png?width=640px[Argo CD Application for Mockbin]
+
+### Step 2: Verify the Deployment
+
+Verify the Pods, Service and Route of the Mockbin Application:
+
+[source,bash]
+----
+kubectl get pods -n team-a
+NAME                          READY   STATUS    RESTARTS   AGE
+pod/mockbin-c4587558b-ftvsd   2/2     Running   0          3d15h
+pod/mockbin-c4587558b-zrxgc   2/2     Running   0          3d15h
+
+kubectl get services -n team-a
+NAME                                         TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)             AGE
+service/mockbin                              ClusterIP   172.30.202.223   <none>        8080/TCP            3d16h
+
+kubectl get routes -n team-a
+NAME                               HOST/PORT                                 PATH   SERVICES   PORT   TERMINATION     WILDCARD
+route.route.openshift.io/mockbin   mockbin-team-a.apps.ocp.aws.ispworld.at          mockbin    http   edge/Redirect   None
+----
+
+Access the route URL to see the Mockbin Application:
+[source,bash]
+----
+curl -k https://mockbin-team-a.apps.ocp.aws.ispworld.at
+----
+
+This will return a response looking like this:
+
+[source,json]
+----
+{"headers": {"User-Agent": "curl/8.7.1", "Accept": "*/*", "Host": "mockbin-team-a.apps.ocp.aws.ispworld.at", .... lot's of header stuff"}
+----
+
+### Step 3: Deploy the Local OpenTelemetry Collector - Mode Deployment
+
+NOTE: All steps below can be applied using GitOps again, using the Chart https://github.com/tjungbauer/helm-charts/tree/main/charts/rh-build-of-opentelemetry[rh-build-of-opentelemetry^]. An example of a GitOps configuration (for the Central Collector) can be found at https://github.com/tjungbauer/openshift-clusterconfig-gitops/tree/main/clusters/management-cluster/setup-otel-operator[Setup OTEL Operator^].
+
+#### Create a ServiceAccount for the OpenTelemetry Collector
+
+Let us first create a ServiceAccount for the OpenTelemetry Collector.
+
+[source,yaml]
+----
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: otelcol-agent
+  namespace: team-a
+----
+
+#### Create the OpenTelemetry Collector Resource
+
+Create the following OpenTelemetry Collector Resource. The mode shall be "deployment" The serviceAccount shall be the one we created in the previous step, and the namespace is "team-a".
+
+[source,yaml]
+----
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: otelcol-agent <1>
+  namespace: team-a <2>
+spec:
+  mode: deployment <3>
+  replicas: 1 <4>
+  serviceAccount: otelcol-agent <5>
+  
+  config:
+    # Receivers - accept traces from applications
+    receivers: <6>
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+    
+    # Processors
+    processors: <7>
+      # Add namespace identifier
+      attributes:
+        actions:
+          - action: insert
+            key: k8s.namespace.name
+            value: team-a
+      
+      # Batch for efficiency
+      batch: {}
+    
+    # Exporters - forward to central collector
+    exporters:
+      otlp/central: <8>
+        endpoint: otel-collector.tempostack.svc.cluster.local:4317
+        tls:
+          insecure: true
+    
+    # Service pipeline
+    service:
+      pipelines: <9>
+        traces:
+          receivers:
+            - otlp
+          processors:
+            - batch
+            - attributes
+          exporters:
+            - otlp/central
+----
+<1> Name of the OpenTelemetry Collector Resource.
+<2> Namespace *team-a*of the OpenTelemetry Collector Resource.
+<3> Mode *deployment* of the OpenTelemetry Collector Resource.
+<4> Number of replicas of the OpenTelemetry Collector Resource. For HA setup increase the number of replicas.
+<5> ServiceAccount of the OpenTelemetry Collector Resource, that was created in the previous step.
+<6> Receivers of the OpenTelemetry Collector Resource. We will receive traces using the OTLP protocol on gRPC and HTTP.
+<7> Processors of the OpenTelemetry Collector Resource. We will add the namespace identifier as an attribute and batch the traces for efficiency.
+<8> Exporters of the OpenTelemetry Collector Resource. We will forward the traces to the Central Collector.
+<9> Service pipeline of the OpenTelemetry Collector Resource.
+
+Since we choose the *deployment* mode, the OpenTelemetry Collector will be deployed as a Deployment resource.
+
+[source,yaml]
+----
+oc deployment all -n team-a
+
+NAME                                      READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/otelcol-agent-collector   1/1     1            1           3d2h
+----
+
+
+### Step 4: Cool, and now what? - Environment Variables
+
+If you came that far, then you have deployment TempoStack, the Central Collector, the Mockbin Application and the Local Collector. 
+However, you will not receive any traces yet. We need to tell the Mockbin Application WHERE to send the traces.
+
+To do this, we need to set the environment variables for the Mockbin Deployment resource. Edit the Deployment resource and add the following environment variables:
+[source,yaml]
+----
+          env:
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: 'http://otelcol-agent-collector:4317' <1>
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: grpc <2>
+            - name: OTEL_SERVICE_NAME
+              value: mockbin <3>
+----
+<1> The endpoint (service) of the Local Collector.
+<2> The protocol we would like to use.
+<3> The service name of the Mockbin Application.
+
+This will trigger a restart of the Deployment. Once done, the environment variables should show up:
+
+[source,bash]
+----
+curl -k https://mockbin-team-a.apps.ocp.aws.ispworld.at
+
+{"headers": {"...., "OTEL_EXPORTER_OTLP_ENDPOINT": "http://otelcol-agent-collector:4317", "OTEL_EXPORTER_OTLP_PROTOCOL": "grpc", ...."}}
+----
+
+This will now start sending traces to the Local Collector and from there to the Central Collector.
+
+
+### Traces, Traces, Traces
+
+Now we have a working setup. We have a Central Collector, a Local Collector and a Mockbin Application.
+Our application is permanently sending requests to the Local Collector.
+
+We can review the traces in the OpenShift UI: **Observe > Traces**.
+
+Select the tempostack instance and select the tenant *tenantA*. If everything is working, you should see traces from the Mockbin Application.
+
+WARNING: If no traces show up, then most probably the RBAC rules are not configured correctly or the environment variables are not set correctly. You can check the logs of the OTC pods for errors.
+
+image::mockbin-1-traces.png?width=1200px[Mock Team A - Traces]
+
+'''
+
+## Deploy Mockbin Application & OpenTelemetry Collector - team-b
+
+Let us now deploy the Mockbin Application and the OpenTelemetry Collector in the team-b namespace. Here we will use the OpenTelemetry Collector in sidecar mode.
+
+
+### Step 1: Deploy the Application using Argo CD
+
+### Step 1b: Use ArgoCD
+
+Above can be achieved by using ArgoCD, which allows a more declarative approach. Create the following ArgoCD Application (This is the same approach as above)
+
+[source,yaml]
+----
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mockbin-team-b <1>
+  namespace: openshift-gitops <2>
+spec:
+  destination:
+    namespace: team-b <3>
+    server: 'https://kubernetes.default.svc' <4>
+  info:
+    - name: Description
+      value: Deploy Mockbin in team-b namespace
+  project: in-cluster
+  source:
+    path: k8s/ <5>
+    repoURL: 'https://github.com/tjungbauer/mockbin' <6>
+    targetRevision: main <7>
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true <8>
+----
+<1> Name of the Argo CD Application resource.
+<2> Namespace of the ArgoCD Application resource, here it is *openshift-gitops*. In your environment it might be different.
+<3> Namespace of the target application
+<4> Kubernetes API server URL. Here it is the local cluster where Argo CD is hosted.
+<5> Path to the Kustomize files
+<6> URL to the Git repository
+<7> Target revision
+<8> Create the namespace if it does not exist
+
+### Step 2: Deploy the Local OpenTelemetry Collector - Sidecar Deployment
+
+NOTE: All steps below can be applied using GitOps again, using the Chart https://github.com/tjungbauer/helm-charts/tree/main/charts/rh-build-of-opentelemetry[rh-build-of-opentelemetry^]. An example of a GitOps configuration (for the Central Collector) can be found at https://github.com/tjungbauer/openshift-clusterconfig-gitops/tree/main/clusters/management-cluster/setup-otel-operator[Setup OTEL Operator^].
+
+#### Create a ServiceAccount for the OpenTelemetry Collector
+
+Let us first create a ServiceAccount for the OpenTelemetry Collector.
+
+[source,yaml]
+----
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: otelcol-agent
+  namespace: team-b
+----
+
+#### Create the OpenTelemetry Collector Resource
+
+Create the following OpenTelemetry Collector Resource. The mode shall be "sidecar" The serviceAccount shall be the one we created in the previous step, and the namespace is "team-b".
+
+[source,yaml]
+----
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: otelcol-agent <1>
+  namespace: team-b <2>
+spec:
+  mode: sidecar <3>
+  replicas: 1 <4>
+  serviceAccount: otelcol-agent <5>
+  
+  config:
+    # Receivers - accept traces from applications
+    receivers: <6>
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+    
+    # Processors
+    processors: <7>
+      # Add namespace identifier
+      attributes:
+        actions:
+          - action: insert
+            key: k8s.namespace.name
+            value: team-b
+      
+      # Batch for efficiency
+      batch: {}
+    
+    # Exporters - forward to central collector
+    exporters:
+      otlp/central: <8>
+        endpoint: otel-collector.tempostack.svc.cluster.local:4317
+        tls:
+          insecure: true
+    
+    # Service pipeline
+    service:
+      pipelines: <9>
+        traces:
+          receivers:
+            - otlp
+          processors:
+            - batch
+            - attributes
+          exporters:
+            - otlp/central
+----
+<1> Name of the OpenTelemetry Collector Resource.
+<2> Namespace *team-a*of the OpenTelemetry Collector Resource.
+<3> Mode *sidecar* of the OpenTelemetry Collector Resource.
+<4> Number of replicas of the OpenTelemetry Collector Resource. For HA setup increase the number of replicas.
+<5> ServiceAccount of the OpenTelemetry Collector Resource, that was created in the previous step.
+<6> Receivers of the OpenTelemetry Collector Resource. We will receive traces using the OTLP protocol on gRPC and HTTP.
+<7> Processors of the OpenTelemetry Collector Resource. We will add the namespace identifier as an attribute and batch the traces for efficiency.
+<8> Exporters of the OpenTelemetry Collector Resource. We will forward the traces to the Central Collector.
+<9> Service pipeline of the OpenTelemetry Collector Resource.
+
+
+### Step 3: Enable Sidecar Injection for Team-B
+
+The big advantage of the *sidecar* mode is that the OpenTelemetry Collector is deployed as a sidecar container in the same pod as the application. This happens fully automatically, means you do not need to set any extra environment variables or anything like that. 
+
+To enable the sidecar injection, we need to add the following annotation to the namespace. This will automatically inject the OpenTelemetry Collector as a sidecar container into the ALL pods of the namespace:
+
+NOTE: Do not forget this to add it into GitOps process :)
+
+First verify the current state of the deployment:
+
+[source,bash]
+----
+oc deployment all -n team-b
+
+NAME                                      READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/otelcol-agent-collector   1/1     1            1           3d2h
+----
+
+As you can see one container out of 1 is running (Read 1/1)
+
+Now lets modify the namespace to enable the sidecar injection:
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: team-b
+  annotations:
+    sidecar.opentelemetry.io/inject: "true"
+----
+
+NOTE: This can also be done by annotate the Deployment resource. In this case, the OpenTelemetry Collector will be injected into the specific pod.
+
+Restart the deployment to apply the changes:
+
+[source,bash]
+----
+oc rollout restart deployment/mockbin -n team-b
+deployment.apps/mockbin restarted
+----
+
+Now, when you check again, the sidecar container should be injected into the pods. The Deployment has now 2/2 containers ready:
+
+[source,bash]
+----
+NAME                      READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/mockbin   2/2     1            2           3m53s
+----
+
+### Traces, Traces, Traces - Again
+
+Again, we can review the traces in the OpenShift UI: **Observe > Traces**.
+
+Select the tempostack instance and select the tenant *tenantB* this time. 
+
+image::mockbin-2-traces.png[Mock Team B - Traces]
+
+### Argo CD Stays in Progressing State
+
+If you have deployed the Mockbin Application and the OpenTelemetry Collector **as a sidecar** deployment in the team-b namespace, you might notice that the Argo CD Application stays in the *Progressing* state.
+
+This is because the OpenTelemetry Collector does not really return a state. The status is simply: 
+
+[source,yaml]
+----
+status:
+  version: 0.140.0
+----
+
+Nothing else ... thats too less for Argo CD to work with.
+
+In order to fix this, we need to add a custom health check to the Argo CD instance.
+
+The Argo CD instance knows the following part:
+
+[source,yaml]
+----
+apiVersion: argoproj.io/v1beta1
+kind: ArgoCD
+metadata:
+  name: openshift-gitops   
+  namespace: openshift-gitops
+spec:
+[...]
+  resourceHealthChecks: <1>
+    - check: |
+        hs = {}
+        if obj.status ~= nil then
+          if obj.status.version ~= nil and obj.status.version ~= "" then
+            hs.status = "Healthy"
+            hs.message = "Running version " .. obj.status.version
+          else
+            hs.status = "Progressing"
+            hs.message = "Waiting for version report"
+          end
+        else
+          hs.status = "Progressing"
+          hs.message = "Status not available"
+        end
+        return hs
+      group: opentelemetry.io
+      kind: OpenTelemetryCollector
+[...]
+----
+<1> Custom health check for the OpenTelemetry Collector.
+
+NOTE: Above will end up in a ConfigMap that is managed by the OpenShift GitOps operator.
+
+This will make Argo CD happy and the Application will be in the *Progressing* state.

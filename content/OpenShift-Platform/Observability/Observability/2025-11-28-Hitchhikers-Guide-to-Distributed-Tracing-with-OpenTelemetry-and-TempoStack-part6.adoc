@@ -1,0 +1,242 @@
+--- 
+title: "The Hitchhiker's Guide to Observability - Adding A New Tenant - Part 6"
+description: "Adding A New Tenant - Part 6"
+date: "2025-11-28"
+doctype: book
+weight: 600
+
+series: "The Hitchhiker's Guide to Observability"
+series_part: 6
+
+featured_image: /day-2/images/observability/Logo_observability_6.png
+show_featured_image_summary: true
+show_featured_image_article: true
+disableBreadcrumb: true
+
+authors: [Thomas Jungbauer]
+type: post
+categories:
+   - OpenShift
+   - Observability
+   - Distributed Tracing
+   - OpenTelemetry
+   - Tempo
+   - Grafana
+
+tags: ["OCP", "Day-2", "OpenShift", "Observability", "Distributed Tracing", "Tempo", "Grafana", "OTL", "OTLP", "Logging", "Metrics"] 
+
+aliases: [ 
+	 "/day-2/observability/2025-11-28-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part6/",
+]
+---
+
+:imagesdir: /day-2/images/observability/
+:icons: font
+:toc:
+
+While we have created our distributed tracing infrastructure, we created two tenants as an example. In this article, I will show you how to add a new tenant and which changes must be made in the TempoStack and the OpenTelemetry Collector.
+
+This article was mainly created as a quick reference guide to see which changes must be made when adding new tenants.
+
+<!--more--> 
+
+
+## Quick Checklist for Adding a New Tenant
+
+Use this checklist to ensure you haven't missed any steps:
+
+- [ ] **TempoStack**: Add tenant to `spec.tenants.authentication[]`
+- [ ] **ClusterRole (write)**: Add tenant name to `tempostack-traces-write` resources
+- [ ] **ClusterRole (read)**: Add tenant name to `tempostack-traces-reader` resources
+- [ ] **Central OTC Routing**: Add routing rule in `connectors.routing/traces.table[]`
+- [ ] **Central OTC Exporter**: Add `otlp/[tenant-name]` exporter with correct `X-Scope-OrgID`
+- [ ] **Central OTC Pipeline**: Add `traces/[tenant-name]` pipeline
+- [ ] **Namespace**: Create namespace for the team
+- [ ] **ServiceAccount**: Create ServiceAccount for local collector
+- [ ] **Local OTC**: Deploy OpenTelemetryCollector in team namespace
+- [ ] **Application**: Deploy application with OTEL configuration
+- [ ] **Verify**: Check logs, generate traces, view in Jaeger UI
+
+NOTE: You do NOT need to create new ClusterRoles for each tenant. The `k8sattributes-otel-collector` ClusterRole already grants the central collector cluster-wide read access to pods, namespaces, and replicasets across all namespaces. This single ClusterRole serves all tenants.
+
+
+## Common Mistakes to Avoid
+
+1. **Mismatched Tenant Names**: Ensure the tenant name in TempoStack matches the `X-Scope-OrgID` header in the exporter
+2. **Wrong Namespace Attribute**: The routing rule matches on `k8s.namespace.name` - ensure the local collector sets this correctly
+3. **Forgot RBAC Update**: Without updating ClusterRoles, traces will be rejected
+4. **Typo in Pipeline Names**: Pipeline names in the routing connector must match the actual pipeline definitions
+5. **Missing Exporter in Pipeline**: Each new pipeline must reference the correct exporter (e.g., `otlp/team-d`)
+
+
+## Adding a New Tenant - team-d
+
+Let's add a new tenant called "team-d" with their own namespace, local collector, and route to TempoStack tenant "tenantD".
+
+### Step 1: Update TempoStack Configuration
+
+If the tenant "tenantD" does not already exist in TempoStack, we need to add it to the tenants list.
+
+Edit the TempoStack resource in the tempostack namespace and add the new tenant to the authentication list:
+
+
+[source,yaml]
+----
+spec:
+  tenants:
+    mode: openshift
+    authentication:
+      - tenantId: 1610b0c3-c509-4592-a256-a1871353dbfc
+        tenantName: tenantA
+      - tenantId: 1610b0c3-c509-4592-a256-a1871353dbfd
+        tenantName: tenantB
+      - tenantId: 1610b0c3-c509-4592-a256-a1871353dbfe
+        tenantName: tenantC
+      # Add new tenant
+      - tenantId: 1610b0c3-c509-4592-a256-a1871353dbff <1>
+        tenantName: tenantD
+----
+<1> Our new tenantID with the tenantName "tenantD"
+
+### Step 2: Update RBAC Permissions - write
+
+Update the ClusterRoles to grant write permissions for the new tenant. Edit the ClusterRole *tempostack-traces-write*:
+
+[source,bash]
+----
+oc edit clusterrole tempostack-traces-write
+----
+
+[source,yaml]
+----
+rules:
+  - verbs:
+      - create
+    apiGroups:
+      - tempo.grafana.com
+    resources:
+      - tenantA
+      - tenantB
+      - tenantC
+      - tenantD <1>
+    resourceNames:
+      - traces
+----
+<1> Our new tenant with the tenantName "tenantD"
+
+### Step 3: Update RBAC Permissions - read
+
+Update the ClusterRoles to grant read permissions for the new tenant. Edit the ClusterRole *tempostack-traces-reader*:
+
+[source,bash]
+----
+oc edit clusterrole tempostack-traces-reader
+----
+
+[source,yaml]
+----
+rules:
+  - verbs:
+      - get
+    apiGroups:
+      - tempo.grafana.com
+    resources:
+      - dev
+      - tenantA
+      - tenantB
+      - tenantC
+      - tenantD <1>
+    resourceNames:
+      - traces
+----
+<1> Our new tenant with the tenantName "tenantD"
+
+### Step 4: Update Central OpenTelemetry Collector
+
+The central collector needs configuration changes to route traces from the new namespace to the appropriate TempoStack tenant. Edit the OpenTelemetry Collector in the `tempostack` namespace and add the new routing rule:
+
+[source,bash]
+----
+oc edit otelcol otel -n tempostack
+----
+
+#### Add the New Routing Rule
+
+Add the new routing rule to the `connectors` section:
+
+[source,yaml]
+----
+spec:
+  config:
+    connectors:
+      routing/traces:
+        default_pipelines:
+          - traces/Default
+        error_mode: ignore
+        table:
+          - statement: route() where attributes["k8s.namespace.name"] == "team-a"
+            pipelines:
+              - traces/tenantA
+          - statement: route() where attributes["k8s.namespace.name"] == "team-b"
+            pipelines:
+              - traces/tenantB
+          - statement: route() where attributes["k8s.namespace.name"] == "team-c"
+            pipelines:
+              - traces/tenantC
+          # Add new routing rule
+          - statement: route() where attributes["k8s.namespace.name"] == "team-d" <1>
+            pipelines:
+              - traces/tenantD
+----
+<1> Our new tenant with the tenantName "tenantD"
+
+#### Add Exporter for the New Tenant
+
+Add the new exporter to the `exporters` section:
+
+[source,yaml]
+----
+spec:
+  config:
+    exporters:
+      # ... existing exporters ...
+      
+      # New tenant exporter
+      otlp/tenantD: <1>
+        endpoint: tempo-simplest-gateway:8090
+        auth:
+          authenticator: bearertokenauth
+        headers:
+          X-Scope-OrgID: tenantD <2>
+        tls:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+          insecure_skip_verify: true
+          server_name_override: tempo-simplest-gateway.tempostack.svc.cluster.local
+----
+<1> Our new exporter with the name "otlp/tenantD"
+<2> The `X-Scope-OrgID` header value that identifies the tenant
+
+#### Add Pipeline for the New Tenant
+
+Add the new pipeline to the `pipelines` section:
+
+[source,yaml]
+----
+spec:
+  config:
+    service:
+      pipelines:
+        # ... existing pipelines ...
+        
+        # New tenant pipeline
+        traces/tenantD: <1>
+          receivers:
+            - routing/traces
+          exporters:
+            - otlp/tenantD
+----
+<1> Our new tenant with the tenantName "tenantD"
+
+### Step 5: Install the Application and Local OpenTelemetry Collector
+
+Follow the steps from the link:/day-2/observability/2025-11-26-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part4/[previous article] to install the application and local OpenTelemetry Collector in the new namespace.

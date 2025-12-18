@@ -1,0 +1,181 @@
+#+title: Stumbling into Azure Part II: Setting up a private ARO cluster
+#+authors[]: Toni-Schmidbauer
+#+lastmod: [2021-10-29 Sat 16:40]
+#+categories[]: OpenShift
+#+draft: false
+#+variable: value
+#+date: 2021-10-29
+#+imagesdir: /integrations/azure/images/
+#+list[]: value_1 value_2 value_3
+#+aliases[]: /azure/2021-10-29-private-aro/
+
+In Part I of our blog post we covered setting up required resources in
+Azure. Now we are finally going to set up a private cluster. Private
+
+As review from Part I here is our planned setup, this time including
+the ARO cluster.
+
+# more
+
+* Azure Setup
+
+  The diagram below depicts our planned setup:
+
+  #+attr_html: :width 100px
+  #+attr_latex: :width 100px
+  [[file:/integrations/azure/images/azure_network_setup_with_aro.png]]
+
+  On the right hand side can see the resources required for our lab:
+
+  - a virtual network (vnet 192.168.128.0/19). This vnet will be split
+    into 3 separate subnets
+  - a master subnet (192.168.129.0/24) holding the ARO control plane nodes
+  - a node subnet (192.168.130.0/24) holding ARO worker nodes
+  - and finally a subnet call ~GatewaySubnet~ where we are going to
+    deploy our Azure VPN gateway (called a ~vnet-gateway~)
+
+    {{% notice warning %}}
+
+    The subnet where the Azure VPN gateway is located needs to have
+    the name ~GatewaySubnet~. Otherwise creating the Azure VPN gateway
+    will fail.
+
+    {{% /notice %}}
+
+  - we also need a ~publicIP~ resource that we are going to connect to
+    our ~vnet-gateway~ (the VPN gateway)
+  - and finally a ~local-gateway~ resource that tells the
+    ~vnet-gateway~ which networks are reachable on the left, in our
+    case the Hetzner server.
+
+** Creating the private Azure Red Hat OpenShift cluster
+
+ 1) Register required resource providers
+
+    #+begin_src
+az provider register -n Microsoft.RedHatOpenShift --wait
+az provider register -n Microsoft.Compute --wait
+az provider register -n Microsoft.Storage --wait
+az provider register -n Microsoft.Authorization --wait
+    #+end_src
+
+
+  1) First we are going to set some environment variable. Those
+     variables are used in the upcoming commands:
+
+     #+begin_src sh
+export RESOURCEGROUP=aro-rg
+export CLUSTER="aro1"
+export GATWAY_SUBNET="192.168.128.0/24"
+export MASTER_SUBNET="192.168.129.0/24"
+export WORKER_SUBNET="192.168.130.0/24"
+export HETZNER_VM_NETWORKS="10.0.0.0/24 192.168.122.0/24 172.16.100.0/24"
+     #+end_src
+
+  2) Disable subnet private endpoint policies
+
+     #+begin_src sh
+az network vnet subnet update \
+--name master-subnet \
+--resource-group $RESOURCEGROUP \
+--vnet-name aro-vnet \
+--disable-private-link-service-network-policies true
+     #+end_src
+
+  3) Create a private DNS zone for our cluster
+
+     #+begin_src sh
+az network private-dns zone create -n private2.tntinfra.net -g aro-rg
+     #+end_src
+
+  4) Create the cluster
+
+     #+begin_src sh
+az aro create \
+  --resource-group $RESOURCEGROUP \
+  --name $CLUSTER \
+  --vnet aro-vnet \
+  --master-subnet master-subnet \
+  --worker-subnet worker-subnet \
+  --apiserver-visibility Private \
+  --ingress-visibility Private \
+  --domain private.tntinfra.net
+  # --pull-secret @pull-secret.txt # [OPTIONAL]
+     #+end_src
+
+  5) After successful cluster creating add DNS entry for the API and Ingress
+
+     Query the Azure API for the API server IP and the ingress IP addresses:
+
+     #+begin_src
+az aro show -n aro1 -g aro-rg --query '{api:apiserverProfile.ip, ingress:ingressProfiles[0].ip}'
+     #+end_src
+
+     Example output
+
+     #+begin_src
+Api            Ingress
+-------------  ---------------
+192.168.129.4  192.168.130.254
+     #+end_src
+
+     Add entries to Azure private DNS
+
+     #+begin_src sh
+az network private-dns record-set a add-record -g aro-rg -z private.tntinfra.net -a "192.168.129.4" -n api
+az network private-dns record-set a add-record -g aro-rg -z private.tntinfra.net -a "192.168.130.254" -n "*.apps"
+     #+end_src
+
+     List entries to verify configuration
+
+     #+begin_src sh
+az network private-dns record-set a list -g aro-rg -z private.tntinfra.net
+     #+end_src
+
+     Output:
+
+     #+begin_src sh
+Name    ResourceGroup    Ttl    Type    AutoRegistered    Metadata
+------  ---------------  -----  ------  ----------------  ----------
+api     aro-rg           3600   A       False
+*.apps  aro-rg           3600   A       False
+     #+end_src
+
+  5) List cluster credentials after successful setup
+
+    #+begin_src sh
+az aro list-credentials \
+  --name $CLUSTER \
+  --resource-group $RESOURCEGROUP
+   #+end_src
+
+  6) Get the console URL
+
+     #+begin_src sh
+az aro show \
+  --name $CLUSTER \
+  --resource-group $RESOURCEGROUP \
+  --query "consoleProfile.url" -o tsv
+     #+end_src
+
+
+* DNS, curl
+
+  this works, dunno why?
+
+  #+begin_src sh
+dig @192.168.129.7 console-openshift-console.apps.xm7rdz4r.westeurope.aroapp.io
+  #+end_src
+
+  use _curl_ to access the internal API and see if it works:
+
+  #+begin_src
+curl -kv https://192.168.129.4:6443
+  #+end_src
+
+* Additional Resources
+  - [[https://blog.notnot.ninja/2020/09/19/azure-site-to-site-vpn/][Build an Azure site-to-site VPN for DevTest]]
+  - [[https://docs.microsoft.com/en-us/azure/vpn-gateway/vpn-gateway-howto-site-to-site-resource-manager-cli][Create a virtual network with a Site-to-Site VPN connection using CLI]]
+  - [[https://libreswan.org/wiki/FAQ#Why_is_it_recommended_to_disable_rp_filter_in_.2Fproc.2Fsys.2Fnet_.3F][Libreswan: Disable rp_filter for IPsec]]
+  - [[https://libreswan.org/wiki/FAQ#NAT_.2B_IPsec_is_not_working][Libreswan: NAT and IPsec not working]]
+  - [[https://libreswan.org/wiki/Subnet_to_subnet_VPN][Libreswan: Subnet to subnet VPN]]

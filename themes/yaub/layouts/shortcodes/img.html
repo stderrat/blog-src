@@ -2,6 +2,7 @@
 {{- $src := .Get "src" }}
 {{- $alt := .Get "alt" | default "" }}
 {{- $width := .Get "width" | default "" }}
+{{- $height := .Get "height" | default "" }}
 {{- $class := .Get "class" | default "" }}
 
 {{- /* Try to load the image resource */ -}}
@@ -18,18 +19,20 @@
   {{- /* Image processing available - create WebP version */ -}}
   {{- $webp := $img.Resize (printf "%s webp q85" $width) }}
   {{- $fallback := $img.Resize (printf "%s q85" $width) }}
+  {{- $imgWidth := $fallback.Width }}
+  {{- $imgHeight := $fallback.Height }}
   
   <picture{{ with $class }} class="{{ . }}"{{ end }}>
     <source srcset="{{ $webp.RelPermalink }}" type="image/webp">
     <source srcset="{{ $fallback.RelPermalink }}" type="image/{{ $img.MediaType.SubType }}">
-    <img src="{{ $fallback.RelPermalink }}" alt="{{ $alt }}" loading="lazy"{{ with $width }} width="{{ . }}"{{ end }}>
+    <img src="{{ $fallback.RelPermalink }}" alt="{{ $alt }}" loading="lazy" decoding="async" width="{{ $imgWidth }}" height="{{ $imgHeight }}" style="aspect-ratio:{{ $imgWidth }}/{{ $imgHeight }};">
   </picture>
 {{- else }}
   {{- /* Fallback for external or static images */ -}}
   {{- $webpSrc := replace $src ".png" ".webp" | replace ".jpg" ".webp" | replace ".jpeg" ".webp" }}
   <picture{{ with $class }} class="{{ . }}"{{ end }}>
     <source srcset="{{ $webpSrc | relURL }}" type="image/webp">
-    <img src="{{ $src | relURL }}" alt="{{ $alt }}" loading="lazy"{{ with $width }} width="{{ . }}"{{ end }}>
+    <img src="{{ $src | relURL }}" alt="{{ $alt }}" loading="lazy" decoding="async"{{ with $width }} width="{{ . }}"{{ end }}{{ with $height }} height="{{ . }}"{{ end }}>
   </picture>
 {{- end }}
 

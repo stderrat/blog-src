@@ -161,6 +161,7 @@
         {{if .IsAncestor $currentNode }}parent{{end}}
         {{if eq .File.UniqueID $currentFileUniqueID}}active{{end}}
         {{if .Params.alwaysopen}}parent{{end}}
+        {{if .Params.divider_before}}divider-before{{end}}
         ">
       {{ $numberOfPages := (add (len ( where .Pages "Params.hidden" "ne" true )) (len ( where .Sections "Params.hidden" "ne" true ))) }}
       <a href="{{.RelPermalink}}" class="{{ if ne $numberOfPages 0 }}has-children{{ end }}">

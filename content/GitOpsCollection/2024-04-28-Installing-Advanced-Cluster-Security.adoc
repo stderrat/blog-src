@@ -1,5 +1,5 @@
 --- 
-title: "Setup & Configure Advanced Cluster Security using GitOps"
+title: "[Ep.6] Setup & Configure Advanced Cluster Security"
 description: "Installing and configuring ACS using GitOps approach."
 date: "2024-04-28"
 doctype: book

@@ -1,0 +1,125 @@
+--- 
+title: "Using Descheduler"
+description: "Evicting pods using the Descheduler"
+date: "2021-08-26"
+doctype: book
+
+series: "Pod Placement"
+series_part: 7
+
+authors: [Thomas Jungbauer]
+type: post
+categories:
+   - OpenShift
+   - Pod Placement
+tags: ["OCP", "Day-2", "OpenShift", "Descheduler"] 
+
+aliases: [ 
+	 "/openshift/day-2/descheduler/",
+	 "/day-2/pod-placement/2021-09-01-descheduler/",
+] 
+---
+
+:imagesdir: /day-2/images/
+:icons: font
+:toc:
+
+*Descheduler* is a new feature which is GA since OpenShift 4.7. It can be used to evict pods from nodes based on specific strategies. The evicted pod is then scheduled on another node (by the Scheduler) which is more suitable. 
+
+This feature can be used when: 
+
+* nodes are under/over-utilized 
+* pod or node affinity, taints or labels have changed and are no longer valid for a running pod 
+* node failures 
+* pods have been restarted too many times
+
+<!--more--> 
+
+== Pod Placement Series 
+
+Please check out other ways of pod placements:
+
+{{% expand %}}
+. link:/openshift/day-2/pod-placement-nodeselector/[NodeSelector]
+. link:/openshift/day-2/pod-placement-pod-affinity/[Pod Affinity and Anti Affinity]
+. link:/openshift/day-2/pod-placement-node-affinity/[Node Affinity]
+. link:/openshift/day-2/pod-placement-taints-and-tolerations[Taints and Tolerations]
+. link:/openshift/day-2/pod-placement-topology-spread-constraints/[Topology Spread Constraints]
+. link:/openshift/day-2/descheduler/[Descheduler]
+{{% /expand %}}
+
+== Descheduler Profiles 
+
+The following descheduler profiles are known and one or multiple can be configured for the Descheduler. Each profiles enables certain strategies which the Descheduler is leveraging. 
+Since the strategies names are more or less self explaining, I did not add their full description here. Instead detailed information can be found at: https://docs.openshift.com/container-platform/4.8/nodes/scheduling/nodes-descheduler.html#nodes-descheduler-profiles_nodes-descheduler[Descheduler Profiles^]
+
+* `AffinityAndTaints` - removes pods that violates affinity and anti-affinity rules or taints
+** RemovePodsViolatingInterPodAntiAffinity
+** RemovePodsViolatingNodeAffinity
+** RemovePodsViolatingNodeTaints
+* `TopologyAndDuplicates` - evicts pods which are not evenly spreaded or which are violating the topology domain 
+** RemovePodsViolatingTopologySpreadConstraint
+** RemoveDuplicates
+* `LifecycleAndUtilization` - evicts long-running pods to balance resource usage of nodes
+** RemovePodsHavingTooManyRestarts - Pods that are restarted more than 100 times
+** LowNodeUtilization - removes pods from overutilized nodes. 
+*** A node is considered underutilized if its usage is below 20% for all thresholds (CPU, memory, and number of pods).
+*** A node is considered overutilized if its usage is above 50% for any of the thresholds (CPU, memory, and number of pods).
+** PodLifeTime - evicts pods that are too old
+
+== Descheduler mechanism 
+
+The following rules are followed by the Descheduler to ensure that eviction of pods does not go wild. Therefore the following pods will never be evicted:  
+
+* pods in openshift-* or kube-system namespaces
+* pods with priorityClassName equal to `system-cluster-critical` or `system-node-critical`
+* pods which cannot be recreated, for example: static or stand-alone pods/jobs or pods without a replication controller or replica set 
+* pods of a daemon set
+* pods with local storage
+* pods which are violating the pod disruption budget
+
+
+== Installing the Descheduler 
+
+The Descheduler is not installed by default and must be installed after the cluster has been initiated. This is done by installed the *Kube Descheduler* Operator. 
+
+First we create a separate namespace for our operator, including a label: 
+
+[source,bash]
+----
+oc adm new-project openshift-kube-descheduler-operator
+
+oc label ns/openshift-kube-descheduler-operator openshift.io/cluster-monitoring=true
+----
+
+Then we search for the *Kube Descheduler* operator and install it, using the newly created namespace: 
+
+.Install Descheduler Operator
+image::descheduler-install.png?height=400px[Install Descheduler Operator]
+
+
+After a few moments the operator will be installed. 
+
+You can now create a Descheduler instance either via UI (wizard) or by using the following specification: 
+
+[source,yaml]
+----
+apiVersion: operator.openshift.io/v1
+kind: KubeDescheduler
+metadata:
+  name: cluster
+  namespace: openshift-kube-descheduler-operator
+spec:
+  deschedulingIntervalSeconds: 3600 <1>
+  logLevel: Normal <2> 
+  managementState: Managed
+  operatorLogLevel: Normal <3>
+  profiles: <4>
+  - AffinityAndTaints       
+  - TopologyAndDuplicates   
+  - LifecycleAndUtilization 
+----
+<1> Defines the time interval the descheduler is running. Default is 3600 seconds 
+<2> Defines logging for overall component. Can be Normal, Debug, Trace or TraceAll 
+<3> Defines logging for the operator itself. Can be Normal, Debug, Trace or TraceAll 
+<4> Enables on or multiple profiles the Descheduler should consider

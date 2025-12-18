@@ -1,5 +1,5 @@
 --- 
-title: "Multiple Sources for Applications in Argo CD"
+title: "[Ep.9] Multiple Sources for Applications"
 description: "Using Multiple Sources for Applications in Argo CD"
 date: "2024-06-02"
 doctype: book

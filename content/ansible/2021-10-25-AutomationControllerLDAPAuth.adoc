@@ -12,7 +12,9 @@ categories:
 tags: ["Ansible", "Controller", "Automation Controller", "LDAP", "Authentication"]
 
 aliases: [
-	 "/posts-output/2020-07-31-AnsibleTowerCollectionsdownload/",
+   "/posts-output/2020-07-31-AnsibleTowerCollectionsdownload/",
+	 "/posts-output/2021-10-25-AutomationControllerLDAPAuth/",
+	 "/ansible/2021/10/automation-controller-and-ldap-authentication/",
 ]
 ---
 

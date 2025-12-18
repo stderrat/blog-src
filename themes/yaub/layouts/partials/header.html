@@ -1,26 +1,85 @@
 <!DOCTYPE html>
 <html lang="{{ .Page.Language | default "en" }}" class="no-js">
   <head>
-    <script>document.documentElement.className = document.documentElement.className.replace('no-js', 'js');</script>
+    <script>
+      document.documentElement.className = document.documentElement.className.replace('no-js', 'js');
+      
+      var shown = false;
+      function showPage() {
+        if (shown) return;
+        shown = true;
+        document.documentElement.classList.remove('fonts-loading');
+        document.documentElement.classList.add('fonts-ready');
+        // Mark fonts as cached for future visits
+        try { localStorage.setItem('fonts-cached', '1'); } catch(e) {}
+      }
+      
+      // Check if returning visitor with cached fonts
+      var fontsCached = false;
+      try { fontsCached = localStorage.getItem('fonts-cached') === '1'; } catch(e) {}
+      
+      if (fontsCached) {
+        // Fonts should be cached, show immediately
+        document.documentElement.classList.add('fonts-ready');
+        shown = true;
+      } else {
+        // First visit - hide content until ALL fonts load
+        document.documentElement.classList.add('fonts-loading');
+        
+        if (document.fonts && document.fonts.ready) {
+          // Wait for ALL fonts to be ready
+          document.fonts.ready.then(showPage).catch(showPage);
+          // Fallback timeout
+          setTimeout(showPage, 1000);
+        } else {
+          setTimeout(showPage, 800);
+        }
+      }
+    </script>
     {{- with .Site.Params.googleSiteVerification }}
     <meta name="google-site-verification" content="{{ . }}" />
     {{- end }}
     <meta name="color-scheme" content="dark light">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Content Security Policy for XSS protection -->
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src 'self';
+        script-src 'self' 'unsafe-inline' 'unsafe-eval' https://giscus.app https://pagefind.app;
+        style-src 'self' 'unsafe-inline' https://giscus.app;
+        img-src 'self' data: https: blob:;
+        font-src 'self' data:;
+        connect-src 'self' https://giscus.app https://charts.stderr.at;
+        frame-src https://giscus.app;
+        object-src 'none';
+        base-uri 'self';
+        form-action 'self';
+    ">
+    
     {{ hugo.Generator }}
     {{ partial "meta.html" . }}
     {{ partial "favicon.html" . }}
     <title>{{ .Title }} {{ default "::" .Site.Params.titleSeparator }} {{ .Site.Title }}</title>
     <link rel="manifest" href="/manifest.json">
 
-    <!-- Preload critical fonts for better LCP -->
-    <link rel="preload" href="{{ "fonts/Work_Sans_300.woff2" | relURL }}" as="font" type="font/woff2" crossorigin>
-    <link rel="preload" href="{{ "fonts/Work_Sans_500.woff2" | relURL }}" as="font" type="font/woff2" crossorigin>
-    <link rel="preload" href="{{ "webfonts/fa-solid-900.woff2" | relURL }}" as="font" type="font/woff2" crossorigin>
+    <!-- DNS prefetch and preconnect for third-party resources -->
+    <link rel="dns-prefetch" href="https://giscus.app">
+    <link rel="preconnect" href="https://giscus.app" crossorigin>
+    
+    <!-- Preload critical fonts for better LCP - RedHatText is the primary body font -->
+    <!-- Note: crossorigin="anonymous" is required for font preloads even for same-origin -->
+    <link rel="preload" href="{{ "fonts/RedHatText-Regular.woff" | relURL }}" as="font" type="font/woff" crossorigin="anonymous">
+    <link rel="preload" href="{{ "fonts/RedHatText-Medium.woff" | relURL }}" as="font" type="font/woff" crossorigin="anonymous">
+    <link rel="preload" href="{{ "webfonts/fa-solid-900.woff2" | relURL }}" as="font" type="font/woff2" crossorigin="anonymous">
 
     {{ $assetBusting := not .Site.Params.disableAssetsBusting }}
     <meta name="theme-color" content="#317EFB"/>
 
+    <!-- Preload critical CSS for faster First Contentful Paint -->
+    {{with .Site.Params.themeVariant}}
+    <link rel="preload" href="{{(printf "css/theme-%s-modular.css" .) | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" as="style">
+    {{end}}
+    
     <link href="{{"css/fontawesome-all.min.css" | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" rel="stylesheet">
     <link href="{{"css/featherlight.min.css" | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" rel="stylesheet">
 
@@ -40,6 +99,36 @@
     <script src="{{"js/jquery.waypoints.min.js"| relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}"></script>
 
     <style>
+      /* Hide content until fonts are ready to prevent FOUT */
+      .fonts-loading body { visibility: hidden; }
+      .fonts-ready body { visibility: visible; }
+      
+      /* Critical CSS - prevent image flash/layout shift (CLS) - must load first */
+      img { max-width: 100% !important; height: auto !important; }
+      #body img, #body-inner img, .imageblock img, picture img, article img { 
+        max-width: 100% !important; 
+        height: auto !important; 
+        max-height: 80vh !important;
+        opacity: 0;
+      }
+      .featured-img-container { overflow: hidden; }
+      .featured-img { max-width: 100% !important; height: auto !important; box-shadow: none !important; max-height: none !important; opacity: 0; }
+      /* Fade-in animation */
+      @keyframes imgFadeIn { from { opacity: 0; } to { opacity: 1; } }
+      #body-inner img, .imageblock img, picture img, .featured-img { animation: imgFadeIn 0.3s ease-out 0.05s forwards; }
+      /* Skip animation for images replaced by JS */
+      img[data-webp-upgraded], img.no-animate { opacity: 1 !important; animation: none !important; }
+      
+      /* Critical CSS - prevent code block flash (bold to normal, size change) before highlight.js */
+      pre code, pre.highlight code, .listingblock pre code {
+        font-weight: normal !important;
+        font-size: 14px !important;
+        line-height: 1.3em !important;
+        color: #abb2bf !important;
+        background: #282c34 !important;
+      }
+      pre { background: #282c34 !important; min-height: 48px; }
+      
       :root #header + #content > #left > #rlblock_left{
           display:none !important;
       }

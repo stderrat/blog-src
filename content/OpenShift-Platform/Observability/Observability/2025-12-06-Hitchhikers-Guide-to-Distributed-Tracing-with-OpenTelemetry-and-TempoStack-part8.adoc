@@ -1,0 +1,199 @@
+--- 
+title: "The Hitchhiker's Guide to Observability - Limit Read Access to Traces - Part 8"
+description: "Limit Read Access to Traces - Part 8"
+date: "2025-12-06"
+doctype: book
+weight: 98
+
+series: "The Hitchhiker's Guide to Observability"
+series_part: 8
+
+featured_image: /day-2/images/observability/Logo_observability_8.png
+show_featured_image_summary: true
+show_featured_image_article: true
+disableBreadcrumb: true
+
+authors: [Thomas Jungbauer]
+type: post
+categories:
+   - OpenShift
+   - Observability
+   - Distributed Tracing
+   - OpenTelemetry
+   - Tempo
+   - Grafana
+
+tags: ["OCP", "Day-2", "OpenShift", "Observability", "Distributed Tracing", "Tempo", "Grafana", "OTL", "OTLP", "Logging", "Metrics"] 
+
+aliases: [ 
+	 "/day-2/observability/2025-12-06-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part8/",
+]
+---
+
+:imagesdir: /day-2/images/observability/
+:icons: font
+:toc:
+
+
+In the previous articles, we deployed a distributed tracing infrastructure with TempoStack and OpenTelemetry Collector. We also deployed a Grafana instance to visualize the traces. The configuration was done in a way that allows everybody to read the traces. Every link:/day-2/observability/2025-11-24-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part2/#_step_3_configure_rbac_for_tempostack_trace_access_readwrite[*system:authenticated*] user is able to read **ALL** traces.
+This is usually not what you want. You want to limit trace access to only the appropriate namespace.
+
+In this article, we'll limit the read access to traces. The users of the *team-a* namespace will only be able to see their own traces. 
+
+<!--more--> 
+
+## Prerequisites
+
+Before we begin, make sure you have:
+
+- TempoStack deployed and configured (from link:/day-2/observability/2025-11-24-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part2/[Part 2])
+- Team-a namespace with traces flowing (from link:/day-2/observability/2025-11-26-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part4/[Part 4])
+- A separate user for the team-a namespace.
+
+
+## Verify Trace Access
+
+Let's verify what a user can see when they are authenticated. 
+We have **user1** who is a member of the *team-a* namespace. Let's log in as this user and verify what they can see.
+
+Navigate to **Observability > Traces** and select the tempostack/simplest datasource: 
+
+image::observability-traces-tenanta.png[Observability Traces Team-a]
+
+You should see the traces for the *team-a* namespace. This is fine—that's what we want. 
+
+But now let's change the tenant to *tenantB* and verify what the user can see.
+
+image::observability-traces-tenantb.png[Observability Traces Team-b]
+
+As you can see, the user can see traces from the *tenantB* namespace, although they are a member of the *team-a* namespace. This is not what we want. We want to limit trace access to only the appropriate namespace.
+
+## The Original RBAC Configuration
+
+In link:/day-2/observability/2025-11-24-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part2/[Part 2], we created a ClusterRoleBinding to grant read access to traces for everybody who is authenticated.
+
+[source,yaml]
+----
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tempostack-traces-reader
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: 'system:authenticated'  
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tempostack-traces-reader
+----
+
+This ClusterRoleBinding allows *system:authenticated* users to read all traces from all tenants and is bound to the ClusterRole *tempostack-traces-reader*.
+
+[source,yaml]
+----
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tempostack-traces-reader  
+rules:
+  - verbs:  
+      - get
+    apiGroups:
+      - tempo.grafana.com
+    resources:
+      - tenantA  
+      - tenantB
+    resourceNames:
+      - traces
+----
+
+This is the configuration we want to change. We want to limit read access to traces to only the appropriate namespace.
+
+## Change the RBAC Configuration
+
+We will change the RBAC configuration to limit read access to traces.
+To do so, we will first create a new ClusterRole for the *team-a* namespace and bind it to users of that namespace.
+
+### Create the new ClusterRole:
+
+[source,yaml]
+----
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tempostack-traces-reader-team-a <1>
+rules:
+  - verbs:  
+      - get
+    apiGroups:
+      - tempo.grafana.com
+    resources:
+      - tenantA <2>
+    resourceNames:
+      - traces
+----
+<1> Name of the ClusterRole, now with the prefix *team-a*.
+<2> The Tenant that is allowed to read the traces. This time it is only the *tenantA* tenant.
+
+### Create the new ClusterRoleBinding:
+
+[source,yaml]
+----
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tempostack-traces-reader-team-a <1>
+subjects:
+  - kind: User <2>
+    apiGroup: rbac.authorization.k8s.io
+    name: user1
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tempostack-traces-reader-team-a <3>
+----
+<1> Name of the ClusterRoleBinding, now with the prefix *team-a*.
+<2> The User that is allowed to read the traces. In this example: **user1**.
+<3> The ClusterRole that is allowed to read the traces.
+
+NOTE: In this example, we are using a single user. In a real-world scenario, you would most likely have a group of users. In that case, you would use a Group instead of a User.
+
+### Modify the Original ClusterRole:
+
+As a final step, we need to modify the original ClusterRole to remove *tenantB* from the list of tenants that are allowed to read the traces.
+
+[source,yaml]
+----
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tempostack-traces-reader  
+rules:
+  - verbs:  
+      - get
+    apiGroups:
+      - tempo.grafana.com
+    resources:
+      - tenantB <1>
+    resourceNames:
+      - traces
+----
+<1> Only *tenantA* remains. Remove *tenantB* from the list of resources.
+
+This removes the permission to read traces from the *tenantB* namespace for the *system:authenticated* group.
+
+NOTE: Eventually, the original ClusterRoleBinding might be deleted once every user has been assigned to a separate ClusterRole.
+
+### Verify the Changes
+
+Let's see what these changes do. 
+As *user1*, you should still be able to see the traces from the *tenantA* namespace.
+
+image::observability-traces-tenanta-user1.png[Observability Traces Team-a for user1]
+
+But if you change the tenant to *tenantB*, you should see an error message like this:
+
+image::observability-traces-tenantb-user1.png[Observability Traces Team-b for user1]
+
+NOTE: The user will still see the list of tenants. Hopefully, this will be fixed in a future version of TempoStack.

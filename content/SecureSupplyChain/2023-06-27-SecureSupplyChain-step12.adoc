@@ -13,6 +13,7 @@ tags: ["OCP", "Tekton", "OpenShift", "Pipelines", "CI/CD", "Supply Chain", "Reko
 
 aliases: [ 
 	 "/openshift/securesupplychain/step12",
+	 "/securesupplychain/2023-06-27-securesupplychain-step12/",
 ] 
 ---
 

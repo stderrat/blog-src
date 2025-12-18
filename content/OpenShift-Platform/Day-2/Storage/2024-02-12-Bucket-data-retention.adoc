@@ -1,0 +1,161 @@
+--- 
+title: "OpenShift Data Foundation - Noobaa Bucket Data Retention (Lifecycle)"
+description: "How to configure a bucket lifecycle for Noobaa and OpenShift Data Foundation"
+date: "2024-02-12"
+doctype: book
+
+authors: [Thomas Jungbauer]
+type: post
+draft: false
+categories:
+   - OpenShift
+   - Other
+tags: ["OpenShift", "OCP", "ODF", "OpenShift Data Foundation", "Noobaa", "Bucket", "Lifecycle"] 
+
+aliases: [ 
+	 "/posts-output/2024-11-12-odf-bucket-data-retention/",
+   "/openshift/2024/02/openshift-data-foundation-noobaa-bucket-data-retention-lifecycle/",
+] 
+---
+
+:imagesdir: /openshift-platform/day-2/storage/images/
+:icons: font
+:toc:
+
+Data retention or lifecycle configuration for S3 buckets is done by the S3 provider directly. The provider keeps track and files are automatically rotated after the requested time.
+
+This article is a simple step-by-step guide to configure such lifecycle for OpenShift Data Foundation (ODF), where buckets are provided by Noobaa. Knowledge about ODF is assumed, however similar steps can be reproduced for any S3-compliant storage operator.
+
+<!--more--> 
+
+== Prerequisites
+. Installed OpensShift 4.x cluster (latest version during the creation of this article 4.14)
+. Installed Open Data Foundation Operator (4.14+)
+. Configured Multi-Cloud Gateway (for example) to provide OpenShift with object storage.
+. Installed aws command line tool. The deployment for different operating system is explained at: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html#cliv2-linux-install[Installing AWS Client]
+. A configured bucket and running openshift logging.
+
+NOTE: In the further steps we use the bucket that is created for OpenShift Logging (using Lokistack) as a reference.
+
+== Working with aws client
+The first thing to do to work with the aws client is to retrieve the **access key** and **secret key** to be able to authenticate against the S3 API. During the deployment of OpenShift logging and the Lokistack a bucket has been created. The secret to authenticate against this bucket can be found in the openshift-logging namespace. In my example the name of this secret is **logging-loki-s3** and it contains the following values:
+
+image::lokisecret.png?width=220[Loki Secret]
+
+The easiest way to authenticate against the S3 API is to create the following configuration file:
+
+[source,bash]
+....
+> vim ~/.aws/credentials
+[default]
+aws_access_key_id     = <value of access_key_id>
+aws_secret_access_key = <value of access_key_secret>
+....
+
+NOTE: Be sure that this file is not globally accessible. 
+
+=== Listing Objects
+
+As a first test, we can try to list objects. The following command uses the S3 endpoint and the name of the bucket. Again, these values can be found in the Loki secret, mentioned above:
+
+[source,bash]
+....
+$ aws --endpoint https://s3-openshift-storage.apps.ocp.local --no-verify-ssl s3 ls s3://logging-bucket-d39a258c-e971-4a0f-a1fa-302cb7e76a56
+                           PRE application/
+                           PRE audit/
+                           PRE index/
+                           PRE infrastructure/
+....
+
+This command simply lists the current content (some folders in our case) of this bucket.
+
+=== Copy a file into the bucket
+
+For further testing we copy a test file into the bucket. This can be any file, I have created an empty one called **testfile.txt**
+
+[source,bash]
+....
+$ aws --endpoint https://s3-openshift-storage.apps.ocp.local --no-verify-ssl s3 cp testfile.txt s3://logging-bucket-d39a258c-e971-4a0f-a1fa-302cb7e76a56
+
+upload: ./testfile.txt to s3://logging-bucket-d39a258c-e971-4a0f-a1fa-302cb7e76a56/testfile.txt
+....
+
+Listing the content again, will now show the uploaded testfile.txt
+
+[source,bash]
+....
+$ aws --endpoint https://s3-openshift-storage.apps.ocp.local --no-verify-ssl s3 ls s3://logging-bucket-d39a258c-e971-4a0f-a1fa-302cb7e76a56
+                           PRE application/
+                           PRE audit/
+                           PRE index/
+                           PRE infrastructure/
+2024-02-10 04:23:14         32 testfile.txt
+....
+
+=== Verifying current Lifecycle configuration
+
+To verify the current lifecycle configuration, execute the following command. It will show any configuration that is currently available, or an empty value if there is no such setting yet.
+
+[source,bash]
+....
+$ aws --endpoint https://s3-openshift-storage.apps.ocp.local --no-verify-ssl s3api get-bucket-lifecycle-configuration --bucket logging-bucket-d39a258c-e971-4a0f-a1fa-302cb7e76a56
+....
+
+=== Put a lifecycle configuration in place
+
+To configure a data retention of 4 days for our bucket we first need to create the following JSON file:
+
+[source,json]
+....
+cat logging-bucket-lifecycle.json
+{
+    "Rules": [
+        {
+            "Expiration": {
+                "Days": 4 <1>
+            },
+            "ID": "123", <2>
+            "Filter": {
+                "Prefix": "" <3>
+            },
+            "Status": "Enabled"
+        }
+    ]
+}
+....
+<1> Defines the retention period is days.
+<2> A simple ID for this Rule. (string).
+<3> A filter used to identify objects that a Lifecycle Rule applies to, here the filter is empty, so all objects are affected.
+
+NOTE: There are much more setting possible as describe at https://docs.aws.amazon.com/cli/latest/reference/s3api/put-bucket-lifecycle-configuration.html[AWS S3API].
+
+The following command will put the defined rule in place:
+
+CAUTION: Already defined rules will be overwritten by the JSON file. If there have been previous configurations, put them into the JSON file as well.
+
+[source,bash]
+....
+$ aws --endpoint https://s3-openshift-storage.apps.ocp.local --no-verify-ssl s3api put-bucket-lifecycle-configuration --bucket logging-bucket-d39a258c-e971-4a0f-a1fa-302cb7e76a56 --lifecycle-configuration file://logging-bucket-lifecycle.json
+....
+
+Checking again with the previous command, the rule should now be configured:
+
+[source,bash]
+....
+$ aws --endpoint https://s3-openshift-storage.apps.ocp.local --no-verify-ssl s3api get-bucket-lifecycle-configuration --bucket logging-bucket-d39a258c-e971-4a0f-a1fa-302cb7e76a56
+....
+
+=== What now? 
+
+Now you have to wait. With the configuration used above, it takes 4 days until the file is rotated. I have tested this using a 1 day retention period and saw that the file will be rotated after about 30 hours. So the rotation will not happen exactly at 24 hours but a bit afterwards.
+
+== Consclusion
+
+This article describes very, and I mean very, briefly how to configure such data retention for OpenShift Data Foundation. Unfortunately, public documentation can be confusing, so I summarized here the commands I have used. 
+
+There are some limitations with the Noobaa integration though. For example file transition (to a different storage class) is (currently) not supported. 
+
+Also, there are much more possible API calls that might be interesting. Please follow the AWS documentation:
+
+- https://docs.aws.amazon.com/cli/latest/reference/s3api/[S3 API]
+- https://docs.aws.amazon.com/cli/latest/reference/s3/[S3]

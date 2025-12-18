@@ -1,5 +1,5 @@
 --- 
-title: "GitOps - Choosing the right Git repository structure"
+title: "[Ep.2] Choosing the right Git repository structure"
 description: "Choosing the right Git repository/folder structure"
 date: "2023-12-28"
 doctype: book

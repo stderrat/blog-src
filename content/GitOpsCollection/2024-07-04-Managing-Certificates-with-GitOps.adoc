@@ -1,5 +1,5 @@
 --- 
-title: "Managing Certificates using GitOps approach"
+title: "[Ep.11] Managing Certificates"
 description: "Managing Certificates using a GitOps approach."
 date: "2024-07-04"
 doctype: book

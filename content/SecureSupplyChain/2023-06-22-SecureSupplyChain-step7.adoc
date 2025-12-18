@@ -13,6 +13,7 @@ tags: ["OCP", "Tekton", "OpenShift", "Pipelines", "CI/CD", "Supply Chain", "SBOM
 
 aliases: [ 
 	 "/openshift/securesupplychain/step7",
+	 "/securesupplychain/2023-06-22-securesupplychain-step7/",
 ] 
 ---
 

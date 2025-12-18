@@ -1,0 +1,510 @@
+--- 
+title: "Secrets Management - Vault on OpenShift"
+description: "Secrets Management with HashiCorp Vault"
+date: "2022-08-16"
+doctype: book
+
+authors: [Thomas Jungbauer]
+type: post
+categories:
+   - OpenShift
+   - Security
+tags: ["OCP", "Day-2", "OpenShift", "Vault", "Secrets"] 
+
+aliases: [ 
+    "/openshift/day-2/secrets-management",
+    "/openshift/2022/08/secrets-management-vault-on-openshift/",
+] 
+---
+
+:imagesdir: /openshift-platform/security/secrets-management/images/
+:icons: font
+:toc:
+
+Sensitive information in OpenShift or Kubernetes is stored as a so-called Secret. The management of these Secrets is one of the most important questions, 
+when it comes to OpenShift. Secrets in Kubernetes are encoded in base64. This is *not* an encryption format. 
+Even if etcd is encrypted at rest, everybody can decode a given base64 string which is stored in the Secret. 
+
+For example: The string `Thomas` encoded as base64 is `VGhvbWFzCg==`. This is simply a masked plain text and it is not secure to share these values, especially not on Git. 
+To make your CI/CD pipelines or Gitops process secure, you need to think of a secure way to manage your Secrets. Thus, your Secret objects must be encrypted somehow. HashiCorp Vault is one option to achieve this requirement. 
+
+<!--more--> 
+
+== HashiCorp Vault
+HashiCorp Vault is a solution to solve our Secret management problem.  It stores and encrypts our sensitive information at rest and in transit and enables you to create fine grained access 
+controls (ACL). This defines who has access to a specific secret. Application A should only get access to secret A and so on. However, that is just the tip of the iceberg. Vault can do much more. 
+If you are interested in further details, check out the introduction video by Armon, the Co-Founder of Hashicorp Vault at: https://learn.hashicorp.com/tutorials/vault/getting-started-intro?in=vault/getting-started 
+
+For this article we will keep it simple and cover:
+
+* Installing HashiCorp Vault to OpenShift
+* Integrating the plugin "Kubernetes Authentication" to access the Secrets 
+* Accessing a static secret stored in HashiCorp Vault by an example application 
+
+== Installing Vault 
+The easiest way to install Vault is by using the supported Helm chart. 
+
+Add the Helm repository to your repo: 
+
+[source,bash]
+----
+helm repo add hashicorp https://helm.releases.hashicorp.com
+----
+
+Update the repository to get the latest updates. 
+
+[source,bash]
+----
+helm repo update
+----
+
+Before we install Vault, we need to create a values file to set certain variables. Let's create a file called "overwrite-values.yaml" with the following content 
+
+[source,yaml]
+----
+global:
+  openshift: true
+
+server:
+  ha:
+    enabled: true
+    replicas: 3
+    raft:
+      enabled: true
+----
+
+This will tell HashiCorp Vault the environment we are going to install is (OpenShift), enables high availability with 3 replicas and enables RAFT (see below for some introduction). 
+
+Finally, let us deploy HashiCorp Vault into the namespace *vault* using the values file we have created in the previous step:
+
+[source,bash]
+----
+helm upgrade --install vault hashicorp/vault --values bootstrap/vault/overwrite-values.yaml --namespace=vault --create-namespace
+----
+
+This will start the agent-injector and 3 vault-pods: 
+
+[source,bash]
+----
+oc get pods -n vault
+
+NAME                                    READY   STATUS    RESTARTS   AGE
+vault-0                                 0/1     Running   0          36s
+vault-1                                 0/1     Running   0          36s
+vault-2                                 0/1     Running   0          36s
+vault-agent-injector-74c848f67b-sq4dq   1/1     Running   0          37s
+----
+
+*  vault agent injector: detecting applications with annotations that require vault agent which will get injected 
+*  vault-0: vault server 
+
+The vault servers remain in *not-ready* state until Vault has been unsealed by you. 
+
+When you check the logs of one of the pods you will see:
+
+[source,bash]
+----
+oc logs vault-0 -n vault
+...
+2022-08-11T12:31:22.497Z [INFO]  core: security barrier not initialized
+2022-08-11T12:31:22.497Z [INFO]  core: seal configuration missing, not initialized 
+----
+
+Vault always starts uninitialized and sealed, to protect the secrets. You need to give at least three different unseal-keys in order to be able to use Vault. 
+
+NOTE: Vault's seal mechanism uses https://en.wikipedia.org/wiki/Shamir%27s_Secret_Sharing[Shamir's secret sharing^]. This is a manual process to secure the cluster if it restarts. You can use auto-unseal for specific cloud providers to bypass the manual requirement.
+
+== Raft Storage 
+During the deployment we have enabled Raft which is the integrated HA storage for Vault. Vault can use several different styles of storage backends, but when it comes to HA and Kubernetes, Raft is 
+easiest one since it has no other dependencies, and it is well known inside OpenShift. Etcd is using Raft as well. It is a distributed Consensus Algorithm where multiple members form a cluster and elect one leader. The leader has the responsibility to replicate everything to the followers. Since this leader election requires a majority an odd number of cluster members must be available to ensure there is a minimum number left if a member is failing. 
+
+== Initialize and Unseal Vault
+
+As mentioned, the Vault Pods are not fully available yet, since Vault it currently sealed and cannot be used. The first thing to do is to initialize and unseal it. 
+
+NOTE: The following commands will login into one Pod and execute commands from there. 
+
+Let's get the status of our Vault fist: 
+
+[source,bash]
+----
+oc -n vault exec -it vault-0 -- vault operator init -status
+----
+
+This will return the message: 
+`Vault is not initialized`
+
+The following command will initialize Vault for further usage: 
+
+[source,bash]
+----
+oc exec -ti -n vault vault-0 -- vault operator init -format=json > unseal.json
+----
+
+This will create the file *unseal.json* locally on your machine. *Keep this file secure* It contains by default 5 key shards and the root token you will need to unseal Vault and authenticate as root. 
+
+CAUTION: Keep this file secure, it contains keys to unseal Vault and the root_token to authenticate against. 
+
+Never share this file. It will look like this: 
+
+[source,json]
+----
+{
+  "unseal_keys_b64": [
+    "key_1",
+    "key_2",
+    "key_3",
+    "key_4",
+    "key_5"
+  ],
+  "unseal_keys_hex": [
+    "key_hex_1",
+    "key_hex_2",
+    "key_hex_3",
+    "key_hex_4",
+    "key_hex_5"
+  ],
+  "unseal_shares": 5,
+  "unseal_threshold": 3,
+  "recovery_keys_b64": [],
+  "recovery_keys_hex": [],
+  "recovery_keys_shares": 5,
+  "recovery_keys_threshold": 3,
+  "root_token": "root.token"
+}
+----
+
+With the initialization in place Vault is put into a sealed mode. This means Vault cannot decrypt secrets at this moment. 
+To unseal Vault you need the unseal key, which is split into multiple shards using https://en.wikipedia.org/wiki/Shamir%27s_Secret_Sharing[Shamir's secret sharing^]. A certain number of individual shards (default 3) must be provided to reconstruct the unseal key. 
+
+To unseal Vault lets login to our Pod "vault-0" and unseal it. Use the following command and provide one of the keys:
+
+[source,bash]
+----
+oc exec -ti -n vault vault-0 -- vault operator unseal
+
+Unseal Key (will be hidden):
+Key                Value
+---                -----
+Seal Type          shamir
+Initialized        true <1>
+Sealed             true <2>
+Total Shares       5 
+Threshold          3
+Unseal Progress    1/3 <3>
+Unseal Nonce       08b01535-be15-e865-251c-f948ed0661c9
+Version            1.11.2
+Build Date         2022-07-29T09:48:47Z
+Storage Type       raft
+HA Enabled         true
+----
+<1> Vault is initialized
+<2> Vault is still sealed 
+<3> The unseal progress: Currently 1 out of 3 keys have been provided
+
+Use the same command another 2 times using *different* keys to complete the unseal process: 
+
+At the end the following output should be shown: 
+
+[source,bash]
+----
+Unseal Key (will be hidden):
+Key                     Value
+---                     -----
+Seal Type               shamir
+Initialized             true
+Sealed                  false <1>
+Total Shares            5
+Threshold               3
+Version                 1.11.2
+Build Date              2022-07-29T09:48:47Z
+Storage Type            raft
+Cluster Name            vault-cluster-f7402e5b <2>
+Cluster ID              aff648f0-b3a2-1fdd-12f6-492842b08b2b
+HA Enabled              true
+HA Cluster              https://vault-0.vault-internal:8201
+HA Mode                 active <3>
+Active Since            2022-08-16T07:20:45.828215961Z
+Raft Committed Index    36
+Raft Applied Index      36
+----
+<1> Vault is now unsealed 
+<2> Name of our cluster
+<3> High availability is enabled 
+
+*Vault-0* is now initialized, but there are 2 other members in our HA cluster which must be added. 
+Let *vault-1* and *vault-2* join the cluster and perform the same unseal process as previously: use 3 different keys: 
+
+[source,bash]
+----
+oc exec -ti vault-1 -n vault -- vault operator raft join http://vault-0.vault-internal:8200
+
+# 3 times....
+oc exec -ti vault-1 -n vault -- vault operator unseal
+
+oc exec -ti vault-2 -n vault -- vault operator raft join http://vault-0.vault-internal:8200
+
+# 3 times...
+oc exec -ti vault-2 -n vault -- vault operator unseal
+----
+
+== Verify Vault Cluster
+To verify if the Raft cluster has successfully been initialized, run the following.
+
+First, login using the *root_token*, that was created above, on the vault-0 pod.
+
+[source,bash]
+----
+oc exec -ti vault-0 -n vault -- vault login
+
+Token (will be hidden): <root_token>
+----
+
+[source,bash]
+----
+oc exec -ti vault-0 -n vault -- vault operator raft list-peers
+----
+
+This should return:
+
+[source,bash]
+----
+Node                                    Address                        State       Voter
+----                                    -------                        -----       -----
+16ec7490-f621-42ea-976d-5f054cfaeecc    vault-0.vault-internal:8201    leader      true
+60ba2885-432a-c7d3-d280-a824f0acce42    vault-1.vault-internal:8201    follower    true
+bcc4f551-79bc-47e5-d01b-97fc12d1afa5    vault-2.vault-internal:8201    follower    true
+----
+
+As you can see Vault-0 is the leader while the other two members are followers. 
+
+== Configure Kubernetes Authentication
+
+There are multiple ways how an application can interact with Vault. One example is to use Tokens. This is quite easy but has the disadvantage that it does require additional steps of managing the life cycle of such token, moreover they might be shared, which is not what we want. 
+
+HashiCorp Vault supports different authentication methods. One of which is the *Kubernetes Auth Method* that must be enabled before we can use. 
+The Kubernetes Auth Method makes use of Jason Web Tokens (JWT)s that are bound to a Service Account. When we tell Vault that a Service Account is fine to authenticate, then a Deployment using this account is able to authenticate and
+request Secrets. 
+
+Vault has a plugin ecosystem, which allows to enable certain plugins. To enable *Kubernetes Auth Method* use the following process:
+
+
+. Login vault-0 pods 
+`oc exec -it vault-0 -n vault -- /bin/sh`
+
+. execute the command: 
+`vault auth enable kubernetes` which returns:
+_Success! Enabled kubernetes auth method at: kubernetes/_
+
+. Set up the Kubernetes configuration to use Vault's service account JWT. 
+
+NOTE: the address to the OpenShift API (KUBERNETES_PORT_443_TCP_ADDR) is automatically available via an environment variable.
+
+[source,bash]
+----
+vault write auth/kubernetes/config issuer="" \
+ 	token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+ 	kubernetes_host="https://$KUBERNETES_PORT_443_TCP_ADDR:443" \
+ 	kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+
+Success! Data written to: auth/kubernetes/config
+----
+
+With this step authentication against OpenShift is enabled. 
+
+== Configure a Secret
+
+With the Kubernetes Auth Method in place we can configure a secret to test our setup. We will use an example application called *expenses* that has a MySQL database. 
+The static password to bootstrap this database shall be stored in Vault. A plugin called *key-value secrets* engine will be used to achieve this. 
+
+There are other plugins that are specifically designed to automatically rotate secrets. For example, it is possible to dynamically create user credentials für MySQL. 
+
+NOTE: You can list available engines by using the command: `oc -n vault exec -it vault-0 -- vault secrets list`
+
+There are currently two versions of this key/value engine:
+
+* KV Version 1: does not versionize the key/values, thus updates will overwrite the old values. 
+* KV Version 2: does versionize the key/value pairs
+
+In our example we will use version 2.
+
+Like the authentication method, we need to enable the secrets engine: 
+
+[source,bash]
+----
+oc -n vault exec -it vault-0 -- vault secrets enable \
+  -path=expense/static \ <1>
+  -version=2 \ <2>
+  kv <3>
+----
+<1> API path where our secrets are stored
+<2> Version 2 
+<3> name of our engine
+
+You can list the enabled engines with the following command:
+
+[source,bash]
+----
+oc -n vault exec -it vault-0 -- vault secrets list
+
+Path                Type         Accessor              Description
+----                ----         --------              -----------
+cubbyhole/          cubbyhole    cubbyhole_f1e955f9    per-token private secret storage
+expense/static/    kv           kv_6db09e5d           n/a
+identity/           identity     identity_ca05e6ab     identity store <1>
+sys/                system       system_e34a76c3       system endpoints used for control, policy and debugging
+----
+<1> Enabled KV secrets engine using the path *expense/static/*
+
+Now lets put a secret into our store. We will store our super-secure MySQL password into *expense/static/mysql*
+
+[source,bash]
+----
+MYSQL_DB_PASSWORD=mysuperpassword$
+
+oc -n vault exec -it vault-0 -- vault kv put expense/static/mysql db_login_password=${MYSQL_DB_PASSWORD}
+----
+
+This command will store the key *db_login_password* with the database as value. We can get the secret by calling: 
+
+[source,bash]
+----
+oc -n vault exec -it vault-0 -- vault kv get expense/static/mysql
+
+====== Secret Path ======
+expense/static/data/mysql <1>
+
+======= Metadata =======
+Key                Value
+---                -----
+created_time       2022-08-17T06:08:05.839663508Z
+custom_metadata    <nil>
+deletion_time      n/a
+destroyed          false
+version            1
+
+========== Data ==========
+Key                  Value
+---                  -----
+db_login_password    mysuperpassword$ <2>
+----
+<1> The data path of our secret
+<2> our password
+
+== Configuring policies 
+
+The Secret is now stored at *expense/static/mysql* but there is no policy in place. Everybody who is authenticated and is calling this path will get to see the secrets. 
+Luckily, one or more policies can be assigned to the authentication method. A policy defines capabilities that allow you to perform certain actions. 
+
+The following capabilities are known: 
+
+* *create* - to create new data 
+* *read* - to read data
+* *delete* - to delete data
+* *list* - to list data
+
+Policies can be written either in JSON or HCL (HashiCorp Configuration Language). Let's create a file with the following content: 
+
+[source,json]
+----
+path "expense/static/data/mysql" {
+  capabilities = ["read", "list"]
+}
+----
+
+CAUTION: KV Version2 stores the secrets in a path with the prefix `data/`
+
+This will limit my access to *read* and *list* only. 
+
+Write the policy: 
+
+[source,bash]
+----
+cat my-policy.hcl | oc -n vault exec -it vault-0 -- vault policy write expense-db-mysql -
+----
+
+Next, we are going to bind the Vault secret to a service account and a namespace. Both objects will be created later, when we deploy the application. 
+
+[source,bash]
+----
+oc -n vault exec -it vault-0 -- vault write auth/kubernetes/role/expense-db-mysql \ <1>
+bound_service_account_names=expense-db-mysql \ <2>
+bound_service_account_namespaces=expenses \ <3>
+policies=expense-db-mysql \ <4>
+ttl=1h <5>
+----
+<1> Path or our new role
+<2> Name of the service account we will create and that will be used by the application
+<3> Name of the namespace we will create
+<4> Name of the policy we created earlier
+<5> The token is valid for 1 hour, after this period the service account must re-authenticate
+
+== Let's start an Application
+
+Now we will create our MySQL application into the namespace *expenses*. Use the following command to create the namespace and the application containing the objects Deployment, ServiceAccount (expense-db-mysql) and Service. 
+
+NOTE: See at the https://raw.githubusercontent.com/joatmon08/vault-argocd/part-1/database/deployment.yaml[Github Page^] for a full yaml specification of the three objects. 
+
+[source,bash]
+----
+oc new-project expenses
+
+oc apply -f https://raw.githubusercontent.com/joatmon08/vault-argocd/part-1/database/deployment.yaml
+----
+
+The deployment will start a Pod with a sidecar container *vault-agent*. This sidecar is automatically created and must not be defined inside the Deployment specification.
+Instead, some annotations in the Deployment define what the container should be automatically injected and also where to find our secret: 
+
+[source,yaml]
+----
+      annotations:
+        vault.hashicorp.com/agent-inject: "true" <1>
+        vault.hashicorp.com/role: "expense-db-mysql" <2>
+        vault.hashicorp.com/agent-inject-secret-db: "expense/static/data/mysql" <3>
+        vault.hashicorp.com/agent-inject-template-db: | <4>
+          {{ with secret "expense/static/data/mysql" -}}
+          export MYSQL_ROOT_PASSWORD="{{ .Data.data.db_login_password }}"
+          {{- end }} 
+    ...
+    spec:
+      serviceAccountName: expense-db-mysql <5>
+----
+<1> Defines that the *vault-agent* side car container shall be automatically injected. This is the most important annotation.
+<2> Name of the role that was created created previously 
+<3> The agent will inject the data from *expense/static/data/mysql* and stores it in a file *db* The file name is everything that comes after *vault.hashicorp.com/agent-inject-secret-*
+<4> Configuration... the template that defines how the secret will be rendered
+<5> The service account name we bound our secret to, using the Consul language. In this case the MySQL password is simply exported
+
+The vault-agent is requesting the database password from Vault and provides it to the application where it is stored at `/vault/secrets/db`
+
+[source,bash]
+----
+oc -n expenses exec -it $(oc get pods -l=app=expense-db-mysql -o jsonpath='{.items[0].metadata.name}') -c expense-db-mysql -- cat /vault/secrets/db
+
+# output
+export MYSQL_ROOT_PASSWORD="mysuperpassword$"
+----
+
+The Deployment sources this file when it starts and MySQL will take this information to configure itself. 
+
+== TIP: Using vault CLI on your local environment
+
+All above commands that are dealing with Vault commands, first login to a pod and then execure the commands from there. 
+
+If you have the https://www.vaultproject.io/docs/install[Vault CLI^] installed on your local machine, you can open a port forwarding to your Vault cluster at OpenShift and execute the commands locally: 
+
+[source,bash]
+----
+oc port-forward -n vault svc/vault 8200
+
+export VAULT_ADDR=http://localhost:8200
+
+vault login
+...
+----
+
+== Thanks
+
+Thanks to the wonderful Rosemary Wang and her Github repository: https://github.com/joatmon08/vault-argocd/tree/part-1 
+
+Also check out the Youtube Video: https://www.youtube.com/watch?v=Bce_0qa6ias[GitOps Guide to the Galaxy (Ep 31) | GitOps With Vault Part 1^] in which Rosemary and Christian discuss this setup

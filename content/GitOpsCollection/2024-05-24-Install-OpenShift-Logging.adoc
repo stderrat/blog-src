@@ -1,5 +1,5 @@
 --- 
-title: "Installing OpenShift Logging using GitOps"
+title: "[Ep.8] Installing OpenShift Logging"
 description: "Installing OpenShift Logging using a GitOps approach."
 date: "2024-05-24"
 doctype: book

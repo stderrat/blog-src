@@ -1,5 +1,5 @@
 --- 
-title: "Update Cluster Version using GitOps approach"
+title: "[Ep.10] Update Cluster Version"
 description: "Update an OpenShift cluster using a GitOps approach."
 date: "2024-06-07"
 doctype: book

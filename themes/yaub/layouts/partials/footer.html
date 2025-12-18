@@ -185,71 +185,17 @@
           document.documentElement.scrollTop = 0; // For Chrome, Firefox, IE and Opera
         }
 
-        $(".article-box").click(function() {
+        $(".article-box").click(function(event) {
 //            window.location = $(this).find("a").attr("href");
             window.location = $(this).attr('href');
             // stopPropagation is required, since there are multiple links inside the DIV
-            $this.stopPropagation();
+            event.stopPropagation();
             return false;
             
 
 
 
           });
-    </script>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Select all anchor elements with class "category-link"
-            var elements = document.querySelectorAll("a.category-link");
-
-            // Loop through each anchor element
-            elements.forEach(function(element) {
-                // Get the text content of the anchor element
-                var text = element.textContent.trim().toLowerCase();
-
-                // Add a class based on the text content
-                if (text === "openshift") {
-                    element.classList.add("openshift");
-                }
-                if (text === "compliance") {
-                    element.classList.add("compliance");
-                }
-                if (text === "service mesh") {
-                    element.classList.add("mesh");
-                }
-                if (text === "security") {
-                    element.classList.add("security");
-                }
-                if (text === "other") {
-                    element.classList.add("other");
-                }
-                if (text === "ansible") {
-                    element.classList.add("ansible");
-                }
-                if (text === "supply chain") {
-                    element.classList.add("cicd");
-                }
-                if (text === "gitops") {
-                    element.classList.add("gitops");
-                }
-                if (text === "grafana") {
-                    element.classList.add("grafana");
-                }
-                if (text === "tempo") {
-                    element.classList.add("grafana");
-                }
-                if (text === "opentelemetry") {
-                    element.classList.add("opentelemetry");
-                }
-                if (text === "advanced cluster security") {
-                    element.classList.add("acs");
-                }
-                if (text === "quay") {
-                    element.classList.add("quay");
-                }
-            });
-        });
     </script>
 
     {{ if (or (and (ne .Params.disableMermaid nil) (not .Params.disableMermaid)) (not .Site.Params.disableMermaid)) }}

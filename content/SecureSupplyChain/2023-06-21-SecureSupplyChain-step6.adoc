@@ -13,6 +13,7 @@ tags: ["OCP", "Tekton", "OpenShift", "Pipelines", "CI/CD", "Supply Chain", "ACS"
 
 aliases: [ 
 	 "/openshift/securesupplychain/step6",
+	 "/securesupplychain/2023-06-21-securesupplychain-step6/",
 ] 
 ---
 

@@ -1,30 +1,39 @@
 {{ partial "header.html" . }}
 
 
-{{/* query current .Section to show only posts of current section */}}
-{{/* Define a section to pull recent posts from. For Hugo 0.20 this will default to the section with the most number of pages. */}}
-{{ $currentSection := .Section | default (slice "post") }}
+{{/* 
+  Get pages for the current section only (not parent or sibling sections).
+  This ensures subcategories like /integrations/azure/ only show Azure articles.
+  
+  We filter all site pages by checking if their URL starts with 
+  the current section's URL path.
+*/}}
 
-{{/* Create a variable with that section to use in multiple places. */}}
-{{ $section := where .Site.RegularPages "Section" "in" $currentSection }}
+{{/* Get the current section's URL path */}}
+{{ $currentPath := .RelPermalink }}
 
-{{/* Check to see if the section is defined for ranging through it */}}
+{{/* Collect pages whose URL starts with the current path */}}
+{{ $pages := slice }}
+{{ range site.RegularPages }}
+  {{ if hasPrefix .RelPermalink $currentPath }}
+    {{ $pages = $pages | append . }}
+  {{ end }}
+{{ end }}
+
+{{/* Sort by date descending */}}
+{{ $section := sort $pages "Date" "desc" }}
+
+{{/* Check to see if the section has pages */}}
 {{ $section_count := len $section }}
 
 {{ if ge $section_count 1 }}
-  {{/* Derive the section name  */}}
-
-  {{/* {{ $section_name := index (.Site.Params.mainSections) 0 }} */}}
-  {{ $section_name := $currentSection }}
 
   <div class="flex flex-wrap">
 
-	{{/* Use $section_name to get the section title. Use "with" to only show it if it exists */}}
-	 {{ with .Site.GetPage "section" $section_name }}
-		<h1 class="flex-none recentlist gradient-header article">
-			<em class="gradient-header">{{ $.Param "recent_copy" | default (i18n "summaryTitle" .) }}</em>
-		</h1>
-	  {{ end }}
+	{{/* Section title */}}
+	<h1 class="flex-none recentlist gradient-header article">
+		<em class="gradient-header">{{ .Param "recent_copy" | default (i18n "summaryTitle" .) }}</em>
+	</h1>
 	{{/* fix n_post to 10000 since we want to show ALL on the summary page */}}
 	{{ $n_posts := 10000 }}
 

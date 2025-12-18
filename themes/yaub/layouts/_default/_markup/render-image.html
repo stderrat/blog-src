@@ -2,6 +2,8 @@
   Hugo's automatic image renderer override
   Automatically serves WebP with PNG/JPG fallback
   Works for all Markdown/AsciiDoc images
+  
+  CLS Prevention: Uses aspect-ratio for layout stability
 */ -}}
 
 {{- $src := .Destination }}
@@ -11,9 +13,18 @@
 {{- /* Generate WebP source path */ -}}
 {{- $webpSrc := replace $src ".png" ".webp" | replace ".jpg" ".webp" | replace ".jpeg" ".webp" | replace ".PNG" ".webp" | replace ".JPG" ".webp" | replace ".JPEG" ".webp" }}
 
+{{- /* Try to get image resource for dimensions (works for page resources) */ -}}
+{{- $img := .Page.Resources.GetMatch (printf "*%s*" (path.Base $src)) }}
+{{- $width := "" }}
+{{- $height := "" }}
+{{- if $img }}
+  {{- $width = $img.Width }}
+  {{- $height = $img.Height }}
+{{- end }}
+
 {{- /* Always output picture element - browser will fallback to img if WebP doesn't exist */ -}}
 <picture>
   <source srcset="{{ $webpSrc | relURL }}" type="image/webp">
-  <img src="{{ $src | relURL }}" alt="{{ $alt }}"{{ with $title }} title="{{ . }}"{{ end }} loading="lazy">
+  <img src="{{ $src | relURL }}" alt="{{ $alt }}"{{ with $title }} title="{{ . }}"{{ end }}{{ with $width }} width="{{ . }}"{{ end }}{{ with $height }} height="{{ . }}"{{ end }} loading="lazy" decoding="async" style="max-width:100%;height:auto;max-height:80vh;{{ with $width }}{{ with $height }}aspect-ratio:{{ $width }}/{{ $height }};{{ end }}{{ end }}">
 </picture>
 

@@ -1,0 +1,64 @@
+#+title: How to force a MachineConfig rollout
+#+authors[]: Toni-Schmidbauer
+#+lastmod: [2023-10-18 Wed 18:24]
+#+categories[]: OpenShift
+#+draft: false
+#+variable: value
+#+date: 2023-10-18
+#+list[]: value_1 value_2 value_3
+#+aliases[]: /openshift/2023/10/how-to-force-a-machineconfig-rollout/
+
+While playing around with [[https://falco.org/][Falco]] (worth another post) I had to force a
+MachineConfig update even so the actual configuration of the machine
+did not change.
+
+This posts documents the steps taken.
+
+# more
+
+As this seems to be not clearly documented here it comes
+
+# more
+
+1. Get the list of current MachineConfigs
+   #+begin_src shell
+$ oc get mc
+NAME                                               GENERATEDBYCONTROLLER                      IGNITIONVERSION   AGE
+00-master                                          7101fb0720d05771bdc174af918b64deb4efa604   3.2.0             8d
+00-worker                                          7101fb0720d05771bdc174af918b64deb4efa604   3.2.0             8d
+01-master-container-runtime                        7101fb0720d05771bdc174af918b64deb4efa604   3.2.0             8d
+01-master-kubelet                                  7101fb0720d05771bdc174af918b64deb4efa604   3.2.0             8d
+01-worker-container-runtime                        7101fb0720d05771bdc174af918b64deb4efa604   3.2.0             8d
+01-worker-kubelet                                  7101fb0720d05771bdc174af918b64deb4efa604   3.2.0             8d
+99-kernel-devel-extensions                                                                                      25h
+99-master-generated-registries                     7101fb0720d05771bdc174af918b64deb4efa604   3.2.0             8d
+99-master-ssh                                                                                 3.2.0             8d
+99-worker-generated-registries                     7101fb0720d05771bdc174af918b64deb4efa604   3.2.0             8d
+99-worker-ssh                                                                                 3.2.0             8d
+rendered-master-b8a2011b0b09e36088acf47e225b0ed2   7101fb0720d05771bdc174af918b64deb4efa604   3.2.0             5h49m
+rendered-master-ce464ff45cc049fce3e8a63e36a4ee9e   7101fb0720d05771bdc174af918b64deb4efa604   3.2.0             8d
+rendered-worker-5baefb5bb7ad1d69cd7a0c3dc52ef2f3   7101fb0720d05771bdc174af918b64deb4efa604   3.2.0             25h
+rendered-worker-a0f8f0d915ef01ba4a1ab3047b6c863d   7101fb0720d05771bdc174af918b64deb4efa604   3.2.0             8d
+   #+end_src
+   We want to force the rollout of a worker node, so remember the name of an old worker config, in our case ~rendered-worker-5baefb5bb7ad1d69cd7a0c3dc52ef2f3~
+2. Currently the desiredConfig and the currentConfig should have the same value
+  #+begin_src shell
+$oc get node node1 -o jsonpath='{.metadata.annotations.machineconfiguration\.openshift\.io/desiredConfig}{"\n"}'
+rendered-worker-a0f8f0d915ef01ba4a1ab3047b6c863d
+$ oc get node node1 -o jsonpath='{.metadata.annotations.machineconfiguration\.openshift\.io/currentConfig}{"\n"}'
+rendered-worker-a0f8f0d915ef01ba4a1ab3047b6c863d
+  #+end_src
+3. Touch a file called     4  touch /run/machine-config-daemon-force
+   #+begin_src shell
+oc debug node/node1 --  touch /host/run/machine-config-daemon-force
+   #+end_src
+4. patch the node and set the annotation ~machineconfiguration.openshift.io/currentConfig~ to the *old* rendered config rendered-worker-5baefb5bb7ad1d69cd7a0c3dc52ef2f3
+   #+begin_src shell
+oc patch node ip-10-0-182-18.eu-central-1.compute.internal --patch '{ "metadata": { "annotations": { "machineconfiguration.openshift.io/currentConfig": "rendered-worker-5baefb5bb7ad1d69cd7a0c3dc52ef2f3" } } }'
+   #+end_src
+5. Watch the MachineConfigPool
+   #+begin_src shell
+$ oc get mcp
+   #+end_src
+
+Wait for the config rollout to complete.

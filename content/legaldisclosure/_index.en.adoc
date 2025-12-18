@@ -2,6 +2,7 @@
 title: "Legal Disclosure"
 chapter: true
 weight: 150
+pre: "<i class='fas fa-balance-scale'></i> "
 ---
 
 :imagesdir: /legaldisclosure/images/

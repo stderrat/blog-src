@@ -13,6 +13,7 @@ tags: ["Ansible", "Controller", "Automation Controller", "Style", "StyleGuide", 
 
 aliases: [
 	 "/posts-output/2021-11-30-AnsibleStyleGuide/",
+	 "/ansible/2021/11/ansible-style-guide/",
 ]
 ---
 

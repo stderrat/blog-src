@@ -1,0 +1,90 @@
+--- 
+title: "Helpful oc / kubectl commands"
+description: "Openshift 4.x - Collection of usefull oc/kubectl commands."
+date: "2020-04-01"
+doctype: book
+
+
+authors: [Toni Schmidbauer]
+type: post
+draft: false
+categories:
+   - OpenShift
+tags: ["oc", "kubectl", "OpenShift", "OCP"] 
+
+aliases: [ 
+	 "/posts-output/2020-04-01-oc-commands/",
+	 "/openshift/2020/04/helpful-oc-/-kubectl-commands/",
+] 
+---
+
+:imagesdir: /openshift-platform/day-2/fundamentals/images/
+:icons: font
+:toc:
+
+This is a list of useful oc and/or kubectl commands so they won't be forgotton. No this is not a joke...
+
+<!--more--> 
+
+
+== List all pods in state _Running_
+
+[source, bash]
+-------
+oc get pods --field-selector=status.phase=Running
+-------
+
+
+=== List all pods in state _Running_ and show there resource usage
+
+[source, bash]
+-------
+oc get pods --field-selector=status.phase=Running -o json|jq ".items[] | {name: .metada
+ta.name, res: .spec.containers[].resources}"
+-------
+
+== List events sort by time created
+
+[source, bash]
+-------
+ oc get events --sort-by='.lastTimestamp'
+-------
+
+== Explain objects while specifing the api version
+
+Sometimes when you run `oc explain` you get a message in DESCRIPTION that this particular version is deprecated, e.g. you are running `oc explain deployment` and get
+
+[source,bash]
+----------
+DESCRIPTION:
+     DEPRECATED - This group version of Deployment is deprecated by
+     apps/v1/Deployment. See the release notes for more information. Deployment
+     enables declarative updates for Pods and ReplicaSets.
+----------
+
+NOTE: Note the DEPRECTATED message above
+
+if you want to see the documentation for the object that has not been deprecated you can use
+
+[source, bash]
+-------
+oc explain deployment --api-version=apps/v1
+-------
+
+== Magic with oc set
+
+`oc set` is actually a very versatile command. Studying `oc set -h` is a good idea, here are some examples
+
+=== Set route weights when alternateBackends in a route are defined
+
+[source, bash]
+-------
+oc set route-backends bluegreen blue=1 green=9
+-------
+
+=== Set resources on the command line
+
+[source, bash]
+-------
+oc set resources dc cakephp-mysql-example --limits=memory=1Gi,cpu=200m
+-------

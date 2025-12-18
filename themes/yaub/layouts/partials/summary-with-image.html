@@ -8,7 +8,8 @@
         {{ $featured_image := (trim $featured_image "/") | absURL }}
         <div class="pr3-ns mb4 mb0-ns w-100 w-40-ns">
           <a href="{{.RelPermalink}}">
-            <img src="{{ $featured_image }}" class="img recentlist" alt="image from {{ .Title }}">
+            {{/* Add width/height and aspect-ratio for CLS prevention */}}
+            <img src="{{ $featured_image }}" class="img recentlist" alt="image from {{ .Title }}" loading="lazy" decoding="async" width="640" height="360" style="aspect-ratio:16/9;object-fit:cover;">
           </a>
         </div>
       {{ end }}
@@ -19,7 +20,7 @@
         {{ if .Params.categories }}
         <div class="categories">    
           {{range .Params.categories}}
-              <a id="{{ "category-" }}{{ . | urlize }}-{{ $.Title | urlize }}" class="category-link no-highlight" href="{{ "/categories/" | relLangURL }}{{ . | urlize }}">{{ . }}</a>
+              <a id="{{ "category-" }}{{ . | urlize }}-{{ $.Title | urlize }}" class="category-link no-highlight {{ . | urlize }}" href="{{ "/categories/" | relLangURL }}{{ . | urlize }}">{{ . }}</a>
             {{end}}
         </div>
         {{end}}

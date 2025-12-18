@@ -1,5 +1,5 @@
 --- 
-title: "Introducing the GitOps Approach"
+title: "[Ep.1] Introducing the GitOps Approach"
 description: "Introduction to the GitOps Approach"
 date: "2023-12-01"
 doctype: book

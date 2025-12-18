@@ -1,5 +1,5 @@
 --- 
-title: "Reusable Argo CD Application Helm Template"
+title: "[Ep.14] Reusable Argo CD Application Template"
 description: "Reusable Argo CD Application Helm Template"
 date: "2025-07-17"
 doctype: book

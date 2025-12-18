@@ -1,0 +1,619 @@
+--- 
+title: "Working with Environments"
+description: "Create separate environments on one OpenShift cluster"
+date: "2022-01-12"
+doctype: book
+
+authors: [Thomas Jungbauer]
+type: post
+categories:
+   - OpenShift
+   - Pod Placement
+tags: ["OCP", "Day-2", "OpenShift", "Pod Placement", "NodeSelector", "Environments", "Ingress", "IngressController", "Labels", "Annotations"] 
+
+aliases: [ 
+	 "/openshift/day-2/working-with-environments",
+	 "/day-2/labels_environmets/2022-01-12-creatingenvironment/",
+] 
+---
+
+:imagesdir: /day-2/images/
+:icons: font
+:toc:
+
+Imagine you have one OpenShift cluster and you would like to create 2 or more environments inside this cluster, but also separate them and force the environments to specific nodes, or use specific inbound routers. All this can be achieved using labels, IngressControllers and so on. The following article will guide you to set up dedicated compute nodes for infrastructure, development and test environments as well as the creation of IngressController which are bound to the appropriate nodes. 
+
+<!--more--> 
+
+== Prerequisites
+
+Before we start we need an OpenShift cluster of course. In this example we have a cluster with typical 3 control plane nodes (labelled as master) and 7 compute nodes (labelled as worker)
+
+[source,bash]
+----
+oc get nodes
+
+NAME                                         STATUS   ROLES    AGE   VERSION
+ip-10-0-138-104.us-east-2.compute.internal   Ready    master   13h   v1.21.1+6438632
+ip-10-0-149-168.us-east-2.compute.internal   Ready    worker   13h   v1.21.1+6438632 # <-- will become infra
+ip-10-0-154-244.us-east-2.compute.internal   Ready    worker   16m   v1.21.1+6438632 # <-- will become infra
+ip-10-0-158-44.us-east-2.compute.internal    Ready    worker   15m   v1.21.1+6438632 # <-- will become infra
+ip-10-0-160-91.us-east-2.compute.internal    Ready    master   13h   v1.21.1+6438632
+ip-10-0-188-198.us-east-2.compute.internal   Ready    worker   13h   v1.21.1+6438632 # <-- will become worker-test
+ip-10-0-191-9.us-east-2.compute.internal     Ready    worker   16m   v1.21.1+6438632 # <-- will become worker-test
+ip-10-0-192-174.us-east-2.compute.internal   Ready    master   13h   v1.21.1+6438632
+ip-10-0-195-201.us-east-2.compute.internal   Ready    worker   16m   v1.21.1+6438632 # <-- will become worker-dev
+ip-10-0-199-235.us-east-2.compute.internal   Ready    worker   16m   v1.21.1+6438632 # <-- will become worker-dev
+----
+
+We will use the 7 nodes to create the environments for: 
+
+* Infrastructure Services (3 nodes) - will be labelled as `infra`
+* Development Environment (2 nodes) - will be labelled as `worker-dev`
+* Test Environment (2 nodes) - will be labelled as `worker-test`
+
+To do this, we will label the nodes and create dedicated roles for them. 
+
+== Create Nodes Labels and MachineConfigPools 
+
+Let's create a maschine config pool for the different environments. 
+
+The pool inherits the configuration from `worker` nodes by default, which means that any new update on the worker configuration will also update custom labeled nodes. 
+Or in other words: it is possible to remove the worker label from the custom pools. 
+
+Create the following objects: 
+
+[source,yaml]
+----
+# Infrastructure 
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfigPool
+metadata:
+  name: infra
+spec:
+  machineConfigSelector:
+    matchExpressions:
+      - {key: machineconfiguration.openshift.io/role, operator: In, values: [worker,infra]} <1>
+  maxUnavailable: 1 <2>
+  nodeSelector:
+    matchLabels:
+      node-role.kubernetes.io/infra: "" <3>
+  paused: false
+---
+# Worker-DEV 
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfigPool
+metadata:
+  name: worker-dev
+spec:
+  machineConfigSelector:
+    matchExpressions:
+      - {key: machineconfiguration.openshift.io/role, operator: In, values: [worker,worker-dev]}
+  nodeSelector:
+    matchLabels:
+      node-role.kubernetes.io/worker-dev: ""
+---
+# Worker-TEST 
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfigPool
+metadata:
+  name: worker-test
+spec:
+  machineConfigSelector:
+    matchExpressions:
+      - {key: machineconfiguration.openshift.io/role, operator: In, values: [worker,worker-test]}
+  nodeSelector:
+    matchLabels:
+      node-role.kubernetes.io/worker-test: ""
+----
+<1> User worker and infra so that the default worker configuration gets applied during upgrades
+<2> Whenever an update happens, do only 1 at a time
+<3> This pool is valid for nodes which are labelled as `infra`
+
+Now let's label our nodes. 
+First add the new, additional label: 
+
+[source,bash]
+----
+# Add the label "infra"
+oc label node ip-10-0-149-168.us-east-2.compute.internal ip-10-0-154-244.us-east-2.compute.internal ip-10-0-158-44.us-east-2.compute.internal node-role.kubernetes.io/infra=
+
+# Add the label "worker-dev"
+oc label node ip-10-0-195-201.us-east-2.compute.internal ip-10-0-199-235.us-east-2.compute.internal node-role.kubernetes.io/worker-dev=
+
+# Add the label "worker-test"
+oc label node ip-10-0-188-198.us-east-2.compute.internal ip-10-0-191-9.us-east-2.compute.internal node-role.kubernetes.io/worker-test=
+----
+
+This will result in: 
+
+[source,bash]
+----
+NAME                                         STATUS   ROLES                AGE   VERSION
+ip-10-0-138-104.us-east-2.compute.internal   Ready    master               13h   v1.21.1+6438632
+ip-10-0-149-168.us-east-2.compute.internal   Ready    infra,worker         13h   v1.21.1+6438632
+ip-10-0-154-244.us-east-2.compute.internal   Ready    infra,worker         20m   v1.21.1+6438632
+ip-10-0-158-44.us-east-2.compute.internal    Ready    infra,worker         19m   v1.21.1+6438632
+ip-10-0-160-91.us-east-2.compute.internal    Ready    master               13h   v1.21.1+6438632
+ip-10-0-188-198.us-east-2.compute.internal   Ready    worker,worker-test   13h   v1.21.1+6438632
+ip-10-0-191-9.us-east-2.compute.internal     Ready    worker,worker-test   20m   v1.21.1+6438632
+ip-10-0-192-174.us-east-2.compute.internal   Ready    master               13h   v1.21.1+6438632
+ip-10-0-195-201.us-east-2.compute.internal   Ready    worker,worker-dev    20m   v1.21.1+6438632
+ip-10-0-199-235.us-east-2.compute.internal   Ready    worker,worker-dev    20m   v1.21.1+6438632
+----
+
+We can remove the worker label from the worker-dev and worker-test nodes now. 
+
+WARNING: Keep the label "worker" for the infra nodes as this is the default worker label which is used when no nodeselector is in use. You can use any other node, just keep in mind that per default new applications will be started on nodes with the labels "worker". As an alternative, you can also define a cluster-wide default node selector. 
+
+[source,bash]
+----
+oc label node ip-10-0-195-201.us-east-2.compute.internal ip-10-0-199-235.us-east-2.compute.internal node-role.kubernetes.io/worker-
+oc label node ip-10-0-188-198.us-east-2.compute.internal ip-10-0-191-9.us-east-2.compute.internal node-role.kubernetes.io/worker-
+----
+
+The final node labels will look like the following: 
+
+[source,bash]
+----
+NAME                                         STATUS   ROLES         AGE   VERSION
+ip-10-0-138-104.us-east-2.compute.internal   Ready    master        13h   v1.21.1+6438632
+ip-10-0-149-168.us-east-2.compute.internal   Ready    infra,worker  13h   v1.21.1+6438632
+ip-10-0-154-244.us-east-2.compute.internal   Ready    infra,worker  22m   v1.21.1+6438632
+ip-10-0-158-44.us-east-2.compute.internal    Ready    infra,worker  21m   v1.21.1+6438632
+ip-10-0-160-91.us-east-2.compute.internal    Ready    master        13h   v1.21.1+6438632
+ip-10-0-188-198.us-east-2.compute.internal   Ready    worker-test   13h   v1.21.1+6438632
+ip-10-0-191-9.us-east-2.compute.internal     Ready    worker-test   21m   v1.21.1+6438632
+ip-10-0-192-174.us-east-2.compute.internal   Ready    master        13h   v1.21.1+6438632
+ip-10-0-195-201.us-east-2.compute.internal   Ready    worker-dev    21m   v1.21.1+6438632
+ip-10-0-199-235.us-east-2.compute.internal   Ready    worker-dev    22m   v1.21.1+6438632
+----
+
+NOTE: Since the custom pools (infra, worker-test and worker-dev) inherit their configuration from the default worker pool, no changes on the files on the nodes themselves are triggered at this point. 
+
+== Create Custom Configuration
+Let's test our setup by deploying a configuration on specific nodes. The following MaschineConfig objects will create a file at */etc/myfile* on the nodes labelled either _infra_, _worker-dev_ or _worker_test_. 
+Dependent on the node role the content of the file will vary. 
+
+[source,yaml]
+----
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: infra <1>
+  name: 55-infra
+spec:
+  config:
+    ignition:
+      version: 2.2.0
+    storage:
+      files:
+      - contents:
+          source: data:,infra <2>
+        filesystem: root
+        mode: 0644
+        path: /etc/myfile <3>
+---
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker-dev
+  name: 55-worker-dev
+spec:
+  config:
+    ignition:
+      version: 2.2.0
+    storage:
+      files:
+      - contents:
+          source: data:,worker-dev
+        filesystem: root
+        mode: 0644
+        path: /etc/myfile
+---
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker-test
+  name: 55-worker-test
+spec:
+  config:
+    ignition:
+      version: 2.2.0
+    storage:
+      files:
+      - contents:
+          source: data:,worker-test
+        filesystem: root
+        mode: 0644
+        path: /etc/myfile
+----
+<1> Valid for node with the role xyz
+<2> Content of the file
+<3> File to be created
+
+Since this is a new configuration, all nodes will get reconfigured. 
+
+[source,bash]
+----
+NAME                                         STATUS                        ROLES         AGE   VERSION
+ip-10-0-138-104.us-east-2.compute.internal   Ready                         master        13h   v1.21.1+6438632
+ip-10-0-149-168.us-east-2.compute.internal   Ready,SchedulingDisabled      infra,worker  13h   v1.21.1+6438632
+ip-10-0-154-244.us-east-2.compute.internal   Ready                         infra,worker  28m   v1.21.1+6438632
+ip-10-0-158-44.us-east-2.compute.internal    Ready                         infra,worker  27m   v1.21.1+6438632
+ip-10-0-160-91.us-east-2.compute.internal    Ready                         master        13h   v1.21.1+6438632
+ip-10-0-188-198.us-east-2.compute.internal   Ready                         worker-test   13h   v1.21.1+6438632
+ip-10-0-191-9.us-east-2.compute.internal     NotReady,SchedulingDisabled   worker-test   27m   v1.21.1+6438632
+ip-10-0-192-174.us-east-2.compute.internal   Ready                         master        13h   v1.21.1+6438632
+ip-10-0-195-201.us-east-2.compute.internal   Ready                         worker-dev    27m   v1.21.1+6438632
+ip-10-0-199-235.us-east-2.compute.internal   NotReady,SchedulingDisabled   worker-dev    28m   v1.21.1+6438632 
+----
+
+Wait until all nodes are ready and test the configuration by verifying the content of _/etc/myfile_:  
+
+[source,bash]
+----
+###
+# infra nodes: 
+###
+oc get pods -n openshift-machine-config-operator -l k8s-app=machine-config-daemon --field-selector "spec.nodeName=ip-10-0-149-168.us-east-2.compute.internal"
+NAME                          READY   STATUS    RESTARTS   AGE
+machine-config-daemon-f85kd   2/2     Running   6          16h
+
+# Get file content
+oc rsh -n openshift-machine-config-operator machine-config-daemon-f85kd chroot /rootfs cat /etc/myfile
+Defaulted container "machine-config-daemon" out of: machine-config-daemon, oauth-proxy
+infra
+
+###
+#worker-dev: 
+###
+oc get pods -n openshift-machine-config-operator -l k8s-app=machine-config-daemon --field-selector "spec.nodeName=ip-10-0-195-201.us-east-2.compute.internal"
+NAME                          READY   STATUS    RESTARTS   AGE
+machine-config-daemon-s6rr5   2/2     Running   4          3h5m
+
+# Get file content
+oc rsh -n openshift-machine-config-operator machine-config-daemon-s6rr5 chroot /rootfs cat /etc/myfile
+Defaulted container "machine-config-daemon" out of: machine-config-daemon, oauth-proxy
+worker-dev
+
+###
+# worker-test: 
+###
+oc get pods -n openshift-machine-config-operator -l k8s-app=machine-config-daemon --field-selector "spec.nodeName=ip-10-0-188-198.us-east-2.compute.internal"
+NAME                          READY   STATUS    RESTARTS   AGE
+machine-config-daemon-m22rf   2/2     Running   6          16h
+
+# Get file content
+oc rsh -n openshift-machine-config-operator machine-config-daemon-m22rf chroot /rootfs cat /etc/myfile
+Defaulted container "machine-config-daemon" out of: machine-config-daemon, oauth-proxy
+worker-test
+----
+
+The file /etc/myfile exists on all nodes and depending on their role the files have a different content.
+
+== Bind an Application to a Specific Environment
+
+The following will label the nodes with a specific environment and will deploy an example application, which should only be executed on the appropriate nodes. 
+
+
+. Let's label the nodes with *environment=worker-dev* and *environment=worker-test*: 
++
+[source,bash]
+----
+oc label node ip-10-0-195-201.us-east-2.compute.internal ip-10-0-199-235.us-east-2.compute.internal environment=worker-dev
+oc label node ip-10-0-188-198.us-east-2.compute.internal ip-10-0-191-9.us-east-2.compute.internal environment=worker-test
+----
+
+. Create a namespace for the example application
++
+[source,bash]
+----
+oc new-project bookinfo 
+----
+
+. Create an annotation and a label for the namespace. The annotation will make sure that the application will only be started on nodes with the same label. The label will be later used for the IngressController setup.
++
+[source,bash]
+----
+oc annotate namespace bookinfo environment=worker-dev
+oc annotate namespace bookinfo openshift.io/node-selector: environment=worker-test
+
+oc label namespace bookinfo environment=worker-dev 
+----
+
+. Deploy the example application. In this article the sample application of Istio was used: 
++
+[source,bash]
+----
+oc apply -f https://raw.githubusercontent.com/istio/istio/release-1.11/samples/bookinfo/platform/kube/bookinfo.yaml 
+----
+
+This will start the application on `worker-dev`` nodes only, because the annotation in the namespace was created accordingly.
+
+[source,bash]
+----
+oc get pods -n bookinfo -o wide
+
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                                         NOMINATED NODE   READINESS GATES
+details-v1-86dfdc4b95-v8zfv      1/1     Running   0          9m19s   10.130.2.17   ip-10-0-199-235.us-east-2.compute.internal   <none>           <none>
+productpage-v1-658849bb5-8gcl7   1/1     Running   0          7m17s   10.128.4.21   ip-10-0-195-201.us-east-2.compute.internal   <none>           <none>
+ratings-v1-76b8c9cbf9-cc4js      1/1     Running   0          9m19s   10.130.2.19   ip-10-0-199-235.us-east-2.compute.internal   <none>           <none>
+reviews-v1-58b8568645-mbgth      1/1     Running   0          7m44s   10.128.4.20   ip-10-0-195-201.us-east-2.compute.internal   <none>           <none>
+reviews-v2-5d8f8b6775-qkdmz      1/1     Running   0          9m19s   10.130.2.21   ip-10-0-199-235.us-east-2.compute.internal   <none>           <none>
+reviews-v3-666b89cfdf-8zv8w      1/1     Running   0          9m18s   10.130.2.22   ip-10-0-199-235.us-east-2.compute.internal   <none>           <none>
+----
+
+== Create Dedicated IngressController
+
+IngressController are responsible to bring the traffic into the cluster. OpenShift comes with one default controller, but it is possible to create more in order to use different domains and separate the incoming traffic to different nodes. 
+
+Bind the default ingress controller to the infra labeled nodes, so we can be sure that the default router pods are executed only on these nodes: 
+
+[source,bash]
+----
+oc patch ingresscontroller default -n openshift-ingress-operator --type=merge --patch='{"spec":{"nodePlacement":{"nodeSelector": {"matchLabels":{"node-role.kubernetes.io/infra":""}}}}}'
+----
+
+The pods will get restarted, to be sure they are running on infra: 
+
+[sourcebash]
+----
+oc get pods -n openshift-ingress -o wide
+NAME                              READY   STATUS              RESTARTS   AGE   IP           NODE                                         NOMINATED NODE   READINESS GATES
+router-default-78f8dd6f69-dbtbv   0/1     ContainerCreating   0          2s    <none>       ip-10-0-149-168.us-east-2.compute.internal   <none>           <none>
+router-default-78f8dd6f69-wwpgb   0/1     ContainerCreating   0          2s    <none>       ip-10-0-158-44.us-east-2.compute.internal    <none>           <none>
+router-default-7bbbc8f9bd-vfh84   1/1     Running             0          22m   10.129.4.6   ip-10-0-158-44.us-east-2.compute.internal    <none>           <none>
+router-default-7bbbc8f9bd-wggrx   1/1     Terminating         0          19m   10.128.2.8   ip-10-0-149-168.us-east-2.compute.internal   <none>           <none> 
+----
+
+Create the following IngressController objects for *worker-dev* and *worker-test*. Replace with the domain of your choice
+
+[source,yaml]
+----
+apiVersion: operator.openshift.io/v1
+kind: IngressController
+metadata:
+  name: ingress-worker-dev
+  namespace: openshift-ingress-operator
+spec:
+  domain: worker-dev.<yourdomain> <1>
+  endpointPublishingStrategy:
+    type: HostNetwork
+  httpErrorCodePages:
+    name: ''
+  namespaceSelector:
+    matchLabels:
+      environment: worker-dev <2>
+  nodePlacement:
+    nodeSelector:
+      matchLabels:
+        node-role.kubernetes.io/worker-dev: '' <3>
+  replicas: 3
+  tuningOptions: {}
+  unsupportedConfigOverrides: null
+---
+apiVersion: operator.openshift.io/v1
+kind: IngressController
+metadata:
+  name: ingress-worker-test
+  namespace: openshift-ingress-operator
+spec:
+  domain: worker-test.<yourdomain>
+  endpointPublishingStrategy:
+    type: HostNetwork
+  httpErrorCodePages:
+    name: ''
+  namespaceSelector:
+    matchLabels:
+      environment: worker-test
+  nodePlacement:
+    nodeSelector:
+      matchLabels:
+        node-role.kubernetes.io/worker-test: ''
+  replicas: 3
+  tuningOptions: {}
+  unsupportedConfigOverrides: null
+----
+<1> Domainname which is used by this Controller
+<2> Namespace selector ... namespaces with such label will be handled by this IngressController
+<3> Node Placement ... This Controller should run on nodes with this label/role
+
+This will spin up additional router pods on the collect labelled nodes: 
+
+[source,bash]
+----
+oc get pods -n openshift-ingress -o wide
+
+NAME                                         READY   STATUS    RESTARTS   AGE    IP            NODE                                         NOMINATED NODE   READINESS GATES
+router-default-78f8dd6f69-dbtbv              1/1     Running   0          8m7s   10.128.2.11   ip-10-0-149-168.us-east-2.compute.internal   <none>           <none>
+router-default-78f8dd6f69-wwpgb              1/1     Running   0          8m7s   10.129.4.10   ip-10-0-158-44.us-east-2.compute.internal    <none>           <none>
+router-ingress-worker-dev-76b65cf558-mspvb   1/1     Running   0          113s   10.130.2.13   ip-10-0-199-235.us-east-2.compute.internal   <none>           <none>
+router-ingress-worker-dev-76b65cf558-p2jpg   1/1     Running   0          113s   10.128.4.12   ip-10-0-195-201.us-east-2.compute.internal   <none>           <none>
+router-ingress-worker-test-6bbf9967f-4whfs   1/1     Running   0          113s   10.131.2.13   ip-10-0-191-9.us-east-2.compute.internal     <none>           <none>
+router-ingress-worker-test-6bbf9967f-jht4w   1/1     Running   0          113s   10.131.0.8    ip-10-0-188-198.us-east-2.compute.internal   <none>           <none>
+----
+
+== Verify Ingress Configuration
+
+To test our new ingress router lets create a route object for our example application: 
+
+[source,yaml]
+----
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: productpage
+  namespace: bookinfo
+spec:
+  host: productpage-bookinfo.worker-dev.<yourdomain>
+  to:
+    kind: Service
+    name: productpage
+    weight: 100
+  port:
+    targetPort: http
+  wildcardPolicy: None
+---
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: productpage-worker-test
+  namespace: bookinfo
+spec:
+  host: productpage-bookinfo.worker-test.<yourdomain>
+  to:
+    kind: Service
+    name: productpage
+    weight: 100
+  port:
+    targetPort: http
+  wildcardPolicy: None
+----
+
+WARNING: Be sure that the name is resolvable and a load balancer is configured accordingly
+
+Verify that the router pod has the correct configuration in the file *haproxy.config* :
+
+[source,bash]
+----
+oc get pods -n openshift-ingress
+NAME                                         READY   STATUS    RESTARTS   AGE
+router-default-78f8dd6f69-dbtbv              1/1     Running   0          95m
+router-default-78f8dd6f69-wwpgb              1/1     Running   0          95m
+router-ingress-worker-dev-76b65cf558-mspvb   1/1     Running   0          88m
+router-ingress-worker-dev-76b65cf558-p2jpg   1/1     Running   0          88m
+router-ingress-worker-test-6bbf9967f-4whfs   1/1     Running   0          88m
+router-ingress-worker-test-6bbf9967f-jht4w   1/1     Running   0          88m
+----
+
+Verify the content of the haproxy configuration for one of the `worker-dev` router
+
+[source,bash]
+----
+oc rsh -n openshift-ingress router-ingress-worker-dev-76b65cf558-mspvb cat haproxy.config | grep productpage
+
+backend be_http:bookinfo:productpage
+  server pod:productpage-v1-658849bb5-8gcl7:productpage:http:10.128.4.21:9080 10.128.4.21:9080 cookie 3758caf21badd7e4f729209173eece08 weight 256
+----
+
+Compare with `worker-test` router 
+
+[source,bash]
+----
+oc rsh -n openshift-ingress router-ingress-worker-test-6bbf9967f-jht4w cat haproxy.config | grep productpage
+
+--> Empty result, this router is not configured with that route.
+----
+
+Compare with `default` router:
+
+[source,bash]
+---- 
+backend be_http:bookinfo:productpage
+  server pod:productpage-v1-658849bb5-8gcl7:productpage:http:10.128.4.21:9080 10.128.4.21:9080 cookie 3758caf21badd7e4f729209173eece08 weight 256
+----
+
+Why does this happen? Why are the default router and the router for worker-dev configured? 
+This happens because it is the default router and we must explicitly tell it to ignore certain labels. 
+
+Modify the default IngressController
+
+[source,bash]
+----
+oc edit ingresscontroller.operator default -n openshift-ingress-operator
+----
+
+Add the following
+[source,yaml]
+----
+  namespaceSelector:
+    matchExpressions:
+      - key: environment
+        operator: NotIn
+        values:
+          - worker-dev
+          - worker-test
+----
+
+This will tell the default IngressController to ignore selectors on `worker-dev` and `worker-test`
+
+Wait a few seconds until the route pods have been restarted: 
+
+[source,bash]
+----
+oc get pods -n openshift-ingress
+NAME                                         READY   STATUS    RESTARTS   AGE
+router-default-744998df46-8lh4t              1/1     Running   0          2m32s
+router-default-744998df46-hztgf              1/1     Running   0          2m31s
+router-ingress-worker-dev-76b65cf558-mspvb   1/1     Running   0          96m
+router-ingress-worker-dev-76b65cf558-p2jpg   1/1     Running   0          96m
+router-ingress-worker-test-6bbf9967f-4whfs   1/1     Running   0          96m
+router-ingress-worker-test-6bbf9967f-jht4w   1/1     Running   0          96m
+----
+
+And test again
+
+[source,bash]
+----
+oc rsh -n openshift-ingress router-default-744998df46-8lh4t cat haproxy.config | grep productpage
+--> empty result
+----
+
+CAUTION: At this point the new router feels responsible. Be sure to have a load balancer configured correctly. 
+
+
+== Appendix
+Bind other infra-workload to infrastructure nodes: 
+
+=== Internal Registry
+
+[source,bash]
+----
+oc patch configs.imageregistry.operator.openshift.io/cluster -n openshift-image-registry --type=merge --patch '{"spec":{"nodeSelector":{"node-role.kubernetes.io/infra":""}}}'
+----
+
+=== OpenShift Monitoring Workload
+Create the following file and apply it.
+
+[source,bash]
+----
+cat <<'EOF' > cluster-monitoring-config-cm.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-monitoring-config
+  namespace: openshift-monitoring
+data:
+  config.yaml: |+
+    alertmanagerMain:
+      nodeSelector:
+        node-role.kubernetes.io/infra: ""
+    prometheusK8s:
+      nodeSelector:
+        node-role.kubernetes.io/infra: ""
+    prometheusOperator:
+      nodeSelector:
+        node-role.kubernetes.io/infra: ""
+    grafana:
+      nodeSelector:
+        node-role.kubernetes.io/infra: ""
+    k8sPrometheusAdapter:
+      nodeSelector:
+        node-role.kubernetes.io/infra: ""
+    kubeStateMetrics:
+      nodeSelector:
+        node-role.kubernetes.io/infra: ""
+    telemeterClient:
+      nodeSelector:
+        node-role.kubernetes.io/infra: ""
+EOF
+----
+
+[source,bash]
+----
+oc create -f cluster-monitoring-config-cm.yaml
+----

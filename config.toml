@@ -22,7 +22,7 @@ home = [ "HTML", "RSS", "JSON"]
     openshift = "/:sections/:year/:month/:slug/"
     compliance = "/:sections/:year/:month/:slug/"
     ansible = "/:sections/:year/:month/:slug/"
-    general = "/:sections/:year/:month/:slug/"
+    "integrations/general" = "/:sections/:year/:month/:slug/"
     page = "/:slug/"
 
 [params]
@@ -40,7 +40,7 @@ home = [ "HTML", "RSS", "JSON"]
   disableNextPrev = false
   disableMermaid = false
   titleSeparator = "::"
-  mainSections = ['service-mesh', 'OpenShift', 'ansible', 'compliance', 'general', 'GitOpsCollection', 'Day-2', 'SecureSupplyChain', 'ACS', 'Azure', 'Quay', 'Java', "Whats's New"]
+  mainSections = ['service-mesh', 'OpenShift', 'ansible', 'compliance', 'general', 'GitOpsCollection', 'Day-2', 'SecureSupplyChain', 'ACS', 'Azure', 'Quay', 'Java', "What's New"]
   recent_posts_number = 10
 
 [taxonomies]

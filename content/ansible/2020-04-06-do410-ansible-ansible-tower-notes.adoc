@@ -14,6 +14,7 @@ tags: ["Ansible", "Ansible Tower", "DO410"]
 
 aliases: [ 
 	 "/posts-output/2020-04-06-do410-ansible-ansible-tower-notes/",
+	 "/ansible/2020/04/do410-ansible-and-ansible-tower-training-notes/",
 ] 
 ---
 

@@ -1,5 +1,5 @@
 --- 
-title: "Configure App-of-Apps"
+title: "[Ep.4] Configure App-of-Apps"
 description: "Adding ApplicationSets and Applications to our GitOps"
 date: "2024-04-02"
 doctype: book

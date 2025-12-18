@@ -1,0 +1,282 @@
+--- 
+title: "GitOps - Argo CD"
+description: "Using Argo CD to manage OpenShift resources"
+date: "2020-08-06"
+doctype: book
+
+
+authors: [Thomas Jungbauer]
+type: post
+draft: false
+categories:
+   - OpenShift
+   - GitOps
+tags: ["Gitops", "OpenShift", "OCP", "ArgoCD"]
+
+aliases: [ 
+	 "/posts-output/2020-08-06-ArgoCD/",
+	 "/openshift/2020/08/gitops-argo-cd/",
+] 
+---
+
+:imagesdir: /openshift-platform/gitops/images/
+:icons: font
+:toc:
+
+
+https://argoproj.github.io/argo-cd/[Argo CD] _is a declarative, GitOps continuous delivery tool for Kubernetes. GitOps itself uses Git pull request to manager infrastructure and application configuration._
+
+<!--more--> 
+
+Let's try to install and use a simple usecase in order to demonstrate the basic possibilities.
+
+Without going into the very detail, typical GitOps usecases are:
+
+* Apply configurations from Git
+* Detect, (auto-)sync and notify configuration drifts
+* Manage multiple clusters and keep the configuration equal
+* ... 
+
+and much more. Further information about the theory behind can be found at https://www.openshift.com/blog/introduction-to-gitops-with-openshift. 
+
+*In short*: there is no reason why not to use GitOps and to leverage tools like Argo CD to manage configurations. In this tutorial, the Argo CD operator gets installed 
+and a simple use case is shown to demonstrate the possibilities of this software. 
+
+As for architectural overview of Argo CD, please read the official documentation: https://argoproj.github.io/argo-cd/operator-manual/architecture/, which explains very well the 
+core components. No need to rewrite it here. 
+
+---
+
+## Prerequisites 
+
+You need an Openshift 4 cluster. :)
+
+Watch the video at: https://demo.openshift.com/en/latest/argocd/ 
+
+
+## Install Argo CD operator
+
+Before you begin, create a new project:
+
+[source,bash]
+----
+oc new-project argocd
+----
+
+In this project the operator will be deployed. 
+
+Look for the Operatorhub in the OpenShift WebUI and "_argocd_" and select the "Argo CD Community" operator. Subscribe to this operator. Just be sure that the newly created project is selected. Other settings can stay as default. 
+
+.Argo CD: Operator
+image::argocd/argocd-operator-install.png?width=940px[Operator Install]
+
+This will install the operator. You can monitor this process by clicking "Installed Operators". After a while it should switch from "Installing" to "Succeeded". 
+
+## Deploy ArgoCD instance
+
+Select the installed operator "Argo CD", select the tab "ArgoCD" and hit the button "_Create ArgoCD"_
+
+Enter the following yaml:
+
+[source,yaml]
+----
+apiVersion: argoproj.io/v1alpha1
+kind: ArgoCD
+metadata:
+  name: argocd
+  namespace: argocd
+spec:
+  dex:
+    image: quay.io/redhat-cop/dex
+    openShiftOAuth: true
+    version: v2.22.0-openshift
+  rbac:
+    policy: |
+      g, argocdadmins, role:admin
+    scopes: '[groups]'
+  server:
+    route:
+      enabled: true
+----
+
+This yaml extends the default example by:
+
+* using OpenShift authentication
+* Allow all users from the group "argocdadmins" admin permissions inside Argo CD
+* create a route to access argocd web interface
+
+Once this configuration is created, the operator will automatically start to roll out the different pods, which are required. 
+No worries, it will take quite long until everything is up and running. 
+
+## Create a new group and assign a user to it
+
+In the ArgoCD resource we have defined the group _argocdadmins_ and all users in this group will get administrator privileges in Argo CD. 
+This group must be created and in addition we assign the user _admin_ to it.
+
+For example with the following commands:
+
+[source,bash]
+----
+oc adm groups new argocdadmins
+oc adm groups add-users argocdadmins admin
+----
+
+## Login to Argo CD 
+
+Now it is time to login to Argo CD. Just fetch the route which was created by the operator (for example with: `oc get routes -n argocd`). 
+
+On the login page select "*Login via OpenShift*" and enter the credentials of the user you would like to use. (well, the one which you can admin permissions in the step above).
+
+.Argo CD: Login Screen
+image::argocd/argocd-login.png?width=300px[ArgoCD Login]
+
+This will open the Argo CD Interface. 
+
+
+## First test with Argo CD 
+
+Let's create an application in Argo CD to demonstrate the possibilities about application management with GitOps. 
+We will use a simple application which draws a blue (or green) box in your browser. 
+
+Click on the button "Create App" and enter the following parameters:
+
+* Name: bgd
+* Project: default (This is the project inside Argo CD, not OpenShift)
+* Sync Policy: Can stay at manual for now 
+* Repository URL: https://github.com/tjungbauer/gitops-examples (This is a fork of https://github.com/christianh814/gitops-examples[christianh814/gitops-examples])
+* Revision: master 
+* Path: bgd/
+* Cluster: https://kubernetes.devault.svc (This is the local default cluster Argo CD created. Other Clusters may be defined)
+* Namespace: bgd (This is the OpenShift namespace which will be created)
+
+At the end, it should look like this:
+
+.Argo CD: Create an Application
+image::argocd/argocd-createapp.png?width=940px[ArgoCD Create App, 940]
+
+Press the "Create" button and your application is ready to be synchronized. Since no synchronization happens yet, Argo CD will complain that the application is out of sync. 
+
+### Sync application
+
+Since we set the Sync Policy to manual, the synchronization process must be started, guess what, manually. Click on the "Sync" button and Argo CD will open a side panel, which shows the resources are out of sync and other options. 
+
+.Argo CD: Sync an Application
+image::argocd/argocd-sync-app.png?width=440px[ArgoCD Sync App, 440]
+
+One notable option is the "Prune" setting. By selecting this, changes which have been done directly on OpenShift, are removed and replaced by the ones which are stored at Git. 
+
+TIP: This is a very good option, to force everyone to follow the GitOps process :)
+
+Press the "Synchronize" button and select the application. As you see the sync process has started and after a while, all resources are synced to OpenShift. 
+
+.Argo CD: Application Syncing
+image::argocd/argocd-app-syncing.png?width=940px[ArgoCD App Syncing]
+
+
+.Argo CD: Application Synced
+image::argocd/argocd-app-synced.png?width=940px[ArgoCD App Synced]
+
+## Verifying objects
+
+Now that Argo CD says that the application has been synchronized, we should check the objects, which have been created in OpenShift. 
+
+As you can see in the Git repository, there are 4 objects which should exist now:
+
+* a namespace (bgd)
+* a deployment 
+* a service 
+* a route
+
+.Argo CD: Git Repo
+image::argocd/argocd-example-repo.png?width=240px[ArgoCD Git Repo, 240]
+
+To verify the existence either check via the WebUI or simply try: 
+
+[source,bash]
+----
+oc get all -n bgd
+NAME                       READY   STATUS    RESTARTS   AGE
+pod/bgd-6b9b64d94d-5fqdg   1/1     Running   0          6m2s
+
+NAME          TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE
+service/bgd   ClusterIP   172.30.233.30   <none>        8080/TCP   6m7s 
+
+NAME                  READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/bgd   1/1     1            1           6m4s 
+
+NAME                             DESIRED   CURRENT   READY   AGE
+replicaset.apps/bgd-6b9b64d94d   1         1         1       6m3s
+
+NAME                           HOST/PORT                      PATH   SERVICES   PORT   TERMINATION   WILDCARD
+route.route.openshift.io/bgd   bgd-bgd.apps.ocp.example.test          bgd        8080                 None
+----
+
+Obviously, the namespace exists and with it also the other objects, which hae been synchronized. 
+
+When you now open the route http://bgd-bgd.apps.ocp.example.test in your browser, you will see a nice blue box. 
+
+.Argo CD: The Blue Box
+image::argocd/argocd-bluebox.png[ArgoCD Blue Box]
+
+As you can see all objects have been synchronized and the application has been deployed correctly. The source of truth is in Git and all changes should be done there. 
+
+## I want a green box
+
+So you want a green box? Maybe you think of doing this:
+
+Modify the _Deployment_ and change the environment COLOR from blue to green:
+
+[source,yaml]
+----
+...
+    spec:
+      containers:
+        - name: bgd
+          image: 'quay.io/redhatworkshops/bgd:latest'
+          env:
+            - name: COLOR
+              value: green # change from blue to green
+...
+----
+
+This will trigger a re-deployment and ... fine ... you have a green box:
+
+.Argo CD: The Green Box
+image::argocd/argocd-green.png[ArgoCD Green Box]
+
+But is this the correct way to do that? *NO*, it is not. Argo CD will immediately complain that the application is out of sync. 
+
+.Argo CD: Out of Sync
+image::argocd/argocd-outofsync.png[ArgoCD Out of Sync]
+
+When you sync the application it will end up with a blue box again. 
+
+.Argo CD: The Blue Box
+image::argocd/argocd-bluebox.png[ArgoCD Blue Box]
+
+But you really really want a green box? Fair enough, the correct way would be to change the deployment configuration on Git. 
+Simply change the file *bgd/bgd-deployment.yaml* and set the COLOR to green:
+
+[source,yaml]
+----
+...
+    spec:
+      containers:
+      - image: quay.io/redhatworkshops/bgd:latest
+        name: bgd
+        env:
+        - name: COLOR
+          value: "green"
+        resources: {}
+----
+
+Again Argo CD will complain that it is out of sync. 
+
+.Argo CD: Git Update
+image::argocd/argocd-outofsync-gitupdate.png[ArgoCD Git Update]
+
+By synchronizing the changes, it will deploy the latest version found at Git and ... yes, you have a green box now (When deployment on OpenShift side has finished).
+
+.Argo CD: The Green Box
+image::argocd/argocd-green.png[ArgoCD Green Box]
+

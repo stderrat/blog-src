@@ -1,0 +1,62 @@
+#+title: Stumbling into Quay: Upgrading from 3.3 to 3.4 with the quay-operator
+#+authors[]: Toni-Schmidbauer
+#+lastmod: [2021-10-16 Sat 16:40]
+#+categories[]: Quay
+#+draft: false
+#+variable: value
+#+date: 2021-10-16
+#+list[]: value_1 value_2 value_3
+#+aliases[]: /quay/2021/10/stumbling-into-quay-upgrading-from-3-3-to-3-4-with-the-quay-operator/ /quay/2021-09-07-quay-upgrade-3.4/
+
+We had the task of answering various questions related to upgrading
+Red Hat Quay 3.3 to 3.4 and to 3.5 with the help of the quay-operator.
+
+Thankfully (sic!) everything changed in regards to the Quay operator
+between Quay 3.3 and Quay 3.4.
+
+So this is a brain dump of the things to consider.
+
+* Operator changes
+
+  With Quay 3.4 the operator was completely reworked and it basically
+  changed from opinionated to *very* opinionated. The upgrade works
+  quite well but you have to be aware about the following points:
+
+  - The name of the custom resource changed from ~QuayEcosystem~ to ~QuayRegistry~
+  - The ~configHostname~, used for providing the quay configuration UI, is no longer configurable
+  - The password for the configuration UI is *always* regenerated after a configuration re-deployment
+  - The volume size of the PostgreSQL PVC will change to 50G
+  {{% notice warning %}}
+
+  In my test cluster I was using a 10G Ceph block device and the
+  StorageClass did not support volume expansion. So my upgrade stopped
+  at this point and I had to allow volume expansion in the storage
+  class.
+
+  {{% /notice %}}
+
+  - A horizontal pod autoscaler is also deploy during the upgrade. The
+    default is to scale automatically to 20 pods, you might reconsider this...
+  - With the Quay operator version 3.5 the operator is monitoring all
+    namespaces for custom resources and needs to be installed in the
+    openshift-operators namespace, this is how we upgraded Quay to 3.5
+    including the operator:
+    - change the quay operator channel to 3.5
+    - trigger an upgrade
+    - now Quay gets upgraded to version 3.5
+    - after the Quay upgrade you need to reinstall the operator:
+      - deinstall the quay operator, Quay is *not* affected by this
+      - reinstall the Quay operator (3.5) in all-namespaces
+      - the re-installation of the operator triggers a quay deployment,
+        all Quay pods are restarted!
+  - You have to manually cleanup old
+    - postgres-config-secrets and
+    - quay-config-bundle's
+
+* Backup and restore considerations
+
+  Red Hat is working on providing documentation on how to backup and
+  restore Quay in various scenarios. There's an open task for this
+  that provides more information
+  [[https://issues.redhat.com/browse/PROJQUAY-2242]].
+

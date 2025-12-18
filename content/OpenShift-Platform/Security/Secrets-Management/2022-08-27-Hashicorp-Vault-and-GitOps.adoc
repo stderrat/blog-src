@@ -1,0 +1,283 @@
+--- 
+title: "HashiCorp Vault and GitOps - A declerative way"
+description: "Combining Vault and GitOps using the Vault-Config-Operator and ArgoCD Vault Plugin"
+date: "2022-08-27"
+doctype: book
+draft: true
+
+author: Thomas Jungbauer
+type: post
+categories:
+   - OpenShift
+   - Security
+tags: ["OCP", "Day-2", "OpenShift", "Vault", "Secrets", "GitOps", "ArgoCD"] 
+
+aliases: [ 
+    "/openshift/day-2/secrets-management-gitops",
+    "/openshift/2022/08/hashicorp-vault-and-gitops-a-declerative-way/",
+] 
+---
+
+:imagesdir: /openshift-platform/security/secrets-management/images/vault/
+:icons: font
+:toc:
+
+As described in the previous article, sensitive information (Secrets) should be managed by a Secret Management System. In the example we used a MySQL database, which is a static (root) password for example. In best cases, nobody knows this password and it is rotated automatically. While we configured Vault manually the last time, this article focus on a declarative approach using GitOps mechanism wherever it is possible and does make sense. We will use OpenShift-GitOps, based on ArgoCD, to configure static and dynamics Secrets and the ArgoCD Vault Plugin to connect both and let ArgoCD inject secrets into the application.
+
+<!--more--> 
+
+== References
+
+. link:/openshift/day-2/secrets-management-gitops/[Secrets Management - Vault on OpenShift]
+
+
+== Prerequisites 
+
+. OpenShift and Vault are installed
+. Vault must be initialized and unsealed, so that we can connect to it and know the root_token
+
+NOTE: The *Unsealing process* will still be done manually, due to security concerns. Once Vault is unsealed the secrets can be read and usually it is preferable to have control over that. 
+
+== Introduction
+
+There are 2 things we will discuss in this article
+
+. Vault Config Operator, which helps to configure Vault itself
+.	ArgoCD Vault Plugin, which pulls the secret from Vault and injects it into the application.
+
+The article link:/openshift/day-2/secrets-management-gitops/[Secrets Management - Vault on OpenShift] explained the installation of Vault using several CLI commands, that can either be called locally (using the vault command and a portforwarding) or by logging in into a Vault contains. Some of these configurations can be done using the Vault Config Operator. The commands configured Kubernetes Auth Method or a Key/Value secrets engine and some of them (not all) can be moved into ArgoCD to make it more declarative and repeatable in sense of a GitOps workflow. 
+
+
+== Vault Config Operator 
+
+=== Installation 
+
+The installation of the operator is straight forward and can be done via command line or via OpenShift UI: 
+
+Simply select "Vault Config Operator" and install it with the default values. 
+
+.Install Vault Config Operator
+image::install_vault_config_operator.png?width=480px[Install Vault Config Operator]
+
+In addition to that we need a secret, which tells the operator 2 things using environment variables:
+
+. The address to our Vault server (VAULT_ADDR)
+. The token with admin permission to Vault so we can authenticate against (VAULT_TOKEN)
+
+Therefore, the following secret must be created: 
+
+CAUTION: I use the *root_token* at this step. This means that Vault has been initialized and unsealed already. If you have stored this token in a file unseal.json for example, you can copy/paste the code block. More information about initialization and unsealing can be found at: https://blog.stderr.at/openshift/2022-08-16-hashicorp-vault/#_initialize_and_unseal_vault.
+It is possible and probably recommended to create a separate token with administrative permissions for the Vault Config Operator so the root_token must not be used. 
+
+[source,bash]
+----
+oc create --save-config --dry-run=client secret generic vault \
+  --from-literal=VAULT_ADDR=http://vault.vault:8200 \
+  --from-literal=VAULT_TOKEN=$(shell cat unseal.json | jq -r '.root_token') \
+  -o yaml | oc apply --namespace vault-config-operator -f -
+----
+
+=== Preparing Vault
+
+Not every single configuration can or should be done using GitOps or the Vault Config Operator. For example, the initial configuration or initialization of Vault is not recommended to be done automatically. Moreover, settings like enablement of *Kubernetes Auth Method* are also things which might be prepared upfront before combining Vault and ArgoCD. 
+
+These setting can be done manually before using the Operator and GitOps for further configurations. 
+
+
+
+
+
+
+
+
+
+oc new-project vault-admin
+oc adm policy add-cluster-role-to-user system:auth-delegator -z default -n vault-admin
+1. enable kubernetes auth
+2. add admin policy 
+vault policy write -tls-skip-verify vault-admin  ./config/local-development/vault-admin-policy.hcl
+3. config auth engine
+
+KUBERNETES_PORT_443_TCP_ADDR=$(oc config view -o jsonpath='{.clusters[].cluster.server}')
+
+vault write auth/kubernetes/config issuer="" \
+    kubernetes_host="${KUBERNETES_SA_CA_CERT}"
+
+vault write auth/kubernetes/role/vault-admin \
+    bound_service_account_names=vault-admin \
+    bound_service_account_namespaces=expenses \
+    policies=vault-admin ttl=1h
+
+4. check: 
+❯ vault read -tls-skip-verify -format json sys/auth | jq -r '.data["kubernetes/"].accessor'
+
+create namespace "expenses"
+create SA für that namespace: 
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault-admin
+automountServiceAccountToken: true
+
+vault policy write argocd argocd.hcl
+
+vault write auth/kubernetes/role/argocd \
+    bound_service_account_names=argocd \
+    bound_service_account_namespaces=openshift-gitops \
+    policies=argocd ttl=1h
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argocd
+automountServiceAccountToken: true
+
+
+creates vault operator CRDs ...
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: expense-secrets
+  namespace: openshift-gitops
+spec:
+  destination:
+    namespace: expenses
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    path: secrets
+    repoURL: https://github.com/joatmon08/vault-argocd.git
+    targetRevision: main
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
+#TODO >>
+
+=== Using Vault Config Operator
+
+The installed operator provides a bunch of custom resource definitions that allow us to interact with Vault, commit everything into Git and let GitOps manage it. 
+
+In the last articles we have discussed static and dynamic password for our expense database. Let's try to configure Vault now the same way by using the Vault Config Operator.
+
+==== Static Password - SecretEngineMount 
+
+In our example we are using a static password to connect to a MySQL database. The statis password will be used to configure other users and databases... in other words, it is the administrator password. 
+
+[source,yaml]
+----
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: SecretEngineMount
+metadata:
+  name: static <1>
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  type: kv <2>
+  path: expense <3>
+  authentication: 
+    path: kubernetes <4>
+    role: vault-admin
+    serviceAccount:
+      name: vault-admin
+----
+<1> name must be "static" for static passwords
+<2> We are using Key/Value version 1 
+<3> Path to the password, will be *"expense/static"*
+<4> As authentication method, Kubernetes will be used, with the special user and role named *vault-admin*
+
+NOTE: At this moment the operator suppots KV version 1 only. 
+
+"error": "serviceaccounts \"vault-admin\" not found"}
+
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: PasswordPolicy
+metadata:
+  name: postgresql-password-policy
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  authentication:
+    path: kubernetes
+    role: vault-admin
+    serviceAccount:
+      name: vault-admin
+  passwordPolicy: |
+    length = 12
+    rule "charset" {
+      charset = "abcdefghijklmnopqrstuvwxyz"
+    }
+    rule "charset" {
+      charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+      min-chars = 1
+    }
+    rule "charset" {
+      charset = "0123456789"
+      min-chars = 1
+    }
+    rule "charset" {
+      charset = "!@"
+      min-chars = 1
+    }
+
+
+
+#TODO oc new-project expenses
+
+Check additional config in Subscription  config env variables are added there (vault_addr, vault_token)
+
+
+
+PasswordPolicy:
+Defines the policy of a password (secretFormat) , like length, min upper or lower chars etc. 
+
+RandomSecret: 
+Create a secret based upon a PasswordPolicy- You do not need to be aware of any password. In fact, nobody knows the password. Vault will create a random password for you and provides it to the <path>/<name> and even refreshes it.
+
+DatabaseSecretEngineConfig
+Used to connect to a databas. It uses… the plugin (mysql-database-plugin), allows a Vault roles (not Kubernetes role) and the connectionstring as well as where to find the randomly generated root password … which we defined with the SecretEngine above. Even when the password is rotated, the connection to the DB will cont. to work as the CRD simply checks for the new password at this path. 
+
+Again, nobody knows the root password. The CRD can be stored in Git without any issues to thing about encrypting it. 
+
+
+DatabaseSecretEngineRole
+Creates a username and password for a database (and table) and grant privileges. 
+
+Policy
+Defines API permissions to specific paths. Or example with this policy, you can only read the passwords from the path, but not retrive them (get, list). 
+
+KubernetesAuthEngineRole
+ not explained 
+
+There are some things that are not recommended to do declerative. For example the bootstrap policy you might want to create manually for security reasons or give these permissions to external teams so they can setup or prepare Vault for you. 
+
+These things are still done using the vault CLI. 
+
+For example: enabling the Kubernetes Auth method or to create a vault admin policy. 
+
+The Vault admin service account gets linked into the app namespace (expense). It allows this used to configure vault using the operator.
+
+This minimize what a service account can do in vault and to minimize potential issues when one service account gets compromised. 
+
+
+
+Vault-admin.hcl
+Deines to which paths the user has access and which capabilities are allowd. The admin user 
+•	needs access to a certain path expense/*
+•	access to create mount sys/mounts /*
+•	read mounts 
+•	etc. 
+
+set up argocd-plugin
+vault config op  is setting up the secrets 
+argocd plugin inject the secret into the applications
+
+argocd required its own permissions , therefore we create a new policy with permissions defined in argocd.hcl and bind it to a service account and the namespace. 
+
+The argocd plugin is limited to just read the static password. It does not require access to dynamic password, it just needs to inject the static (root) password. 
+
+
+
+
+

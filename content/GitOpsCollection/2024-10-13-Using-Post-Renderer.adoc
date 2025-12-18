@@ -1,5 +1,5 @@
 --- 
-title: "Using Kustomize to post render a Helm Chart"
+title: "[Ep.12] Using Kustomize Post-Renderer"
 description: "Using Kustomize to post render a Helm Chart."
 date: "2024-10-13"
 doctype: book

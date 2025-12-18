@@ -1,0 +1,295 @@
+--- 
+title: "Taints and Tolerations"
+description: "Placeing Pods Using Taints and Tolerations"
+date: "2021-08-26"
+doctype: book
+
+series: "Pod Placement"
+series_part: 5
+
+authors: [Thomas Jungbauer]
+type: post
+categories:
+   - OpenShift
+   - Pod Placement
+tags: ["OCP", "Day-2", "OpenShift", "Pod Placement", "Taints", "Tolerations"] 
+
+aliases: [ 
+	 "/openshift/day-2/pod-placement-taints-and-tolerations",
+	 "/day-2/pod-placement/2021-08-30-taints/",
+] 
+---
+
+:imagesdir: /day-2/images/
+:icons: font
+:toc:
+
+While Node Affinity is a property of pods that attracts them to a set of nodes, taints are the exact opposite. Nodes can be configured with one or more taints, which mark the node in a way to only accept pods that do tolerate the taints. The tolerations themselves are applied to pods, telling the scheduler to accept a taints and start the workload on a tainted node. 
+
+A common use case would be to mark certain nodes as infrastructure nodes, where only specific pods are allowed to be executed or to taint nodes with a special hardware (i.e. GPU).
+
+<!--more--> 
+
+== Pod Placement Series 
+
+Please check out other ways of pod placements:
+
+{{% expand %}}
+. link:/openshift/day-2/pod-placement-nodeselector/[NodeSelector]
+. link:/openshift/day-2/pod-placement-pod-affinity/[Pod Affinity and Anti Affinity]
+. link:/openshift/day-2/pod-placement-node-affinity/[Node Affinity]
+. link:/openshift/day-2/pod-placement-taints-and-tolerations[Taints and Tolerations]
+. link:/openshift/day-2/pod-placement-topology-spread-constraints/[Topology Spread Constraints]
+. link:/openshift/day-2/descheduler/[Descheduler]
+{{% /expand %}}
+
+== Understanding Taints and Tolerations
+
+Matching taints and tolerations is defined by a key/value pair and a taint effect. 
+
+For example, a node can be tainted as: 
+
+[source,yaml]
+----
+spec:
+[...]
+  template:
+[...]
+    spec:
+      taints:
+      - effect: NoExecute
+        key: key1
+        value: value1
+[...]
+----
+
+And a pod can have the matching toleration: 
+
+[source,yaml]
+----
+spec:
+[...]
+  template:
+[...]
+    spec:
+      tolerations:
+      - key: "key1"
+        operator: "Equal"
+        value: "value1"
+        effect: "NoExecute"
+        tolerationSeconds: 3600
+[...]
+----
+
+This means that the pod is tolerating the taint of the node with the pair *key1=value1*. 
+
+=== Parameter: effect
+
+Above example is using as effect `NoExecute`. The following effects are possible: 
+
+* `NoSchedule` - new pods are not scheduled, existing pods remain
+* `PreferNoSchedule` - new pods are not preferred but can still be scheduled but the scheduler tries to avoid that, existing pods remain
+* `NoExecute` - new pods are not scheduled, existing pods (without matching toleration) are *removed*! The setting `tolerationSeconds` is used to define a maximum time until a pod is allowed to stay.
+
+=== Parameter: operator 
+
+For the operator two options are possible: 
+
+* `Exists` - simply checks if a key exists and key and effect matches. No value should be configured in this case.
+* `Equal` (default) - with this option key, value and effect must match exactly.
+
+== Configuring Taints and Tolerations
+
+Our compute-0 node is a special node with a GPU installed. We would like that our web application is running on this node and ONLY our web application is running on that node. To achieve this, we will taint the node accordingly with the key/value `gpu=enabled` and the effect `NoExecute` and configure a toleration to the DeploymentConfig of our web fronted.  
+
+.Tainting Node
+image::tainting-node.png[Tainting compute-0]
+
+WARNING: Always configure tolerations before you taint a node. Otherwise the scheduler might not be able to start a pod until it has been configured to tolerate the taints.
+
+First we will set the toleration to the DeploymentConfig:
+
+[source,bash]
+----
+oc edit dc/django-psql-example -n podtesting
+----
+
+And add a toleration for the key/value pair, the effect NoExecute and a tolerationSeconds of X seconds. 
+
+[source,yaml]
+----
+spec:
+[...]
+  template:
+[...]
+    spec:
+      tolerations:
+      - key: "gpu" 
+        value: "enabled"
+        operator: "Equal"
+        effect: "NoExecute"
+        tolerationSeconds: 30 <1>
+----
+<1> I am setting the tolerationSeconds to 30 seconds to get it done quicker.
+
+Before we taint our node, let's check which pods are currently running there: 
+
+[source,bash]
+----
+oc get pods -A -o custom-columns=NAME:.metadata.name,NODE:.spec.nodeName,STATE:.status.phase | grep compute-0 | grep Running
+
+tuned-hrvl4                                               compute-0   Running
+dns-default-ln9s4                                         compute-0   Running
+node-resolver-qk24n                                       compute-0   Running
+node-ca-lxrvf                                             compute-0   Running
+ingress-canary-fv5w6                                      compute-0   Running
+machine-config-daemon-558v4                               compute-0   Running
+grafana-78ccdb8c9d-8rqsp                                  compute-0   Running
+node-exporter-rn8h4                                       compute-0   Running
+prometheus-adapter-66976bf759-fxdcd                       compute-0   Running
+multus-additional-cni-plugins-29qgq                       compute-0   Running
+multus-mkd87                                              compute-0   Running
+network-metrics-daemon-64hrw                              compute-0   Running
+network-check-target-l6l7n                                compute-0   Running
+ovnkube-node-hrtln                                        compute-0   Running
+django-psql-example-24-c599b                              compute-0   Running
+django-psql-example-24-l7znv                              compute-0   Running
+django-psql-example-24-zpg77                              compute-0   Running
+----
+
+Multiple different pods are running here, as well as two of our web frontend (django-psql-example)
+
+The other django-psql-example pods are started accross the cluster: 
+
+[source,bash]
+----
+oc get pods -n podtesting -o wide
+
+oc get pods -n podtesting -o wide
+NAME                            READY   STATUS      RESTARTS   AGE     IP             NODE        NOMINATED NODE   READINESS GATES
+django-psql-example-25-8ppxc    1/1     Running     0          21s     10.128.0.61    master-2    <none>           <none>
+django-psql-example-25-8rv76    1/1     Running     0          21s     10.130.2.92    compute-2   <none>           <none>
+django-psql-example-25-9m8k2    1/1     Running     0          21s     10.129.0.67    master-1    <none>           <none>
+django-psql-example-25-fhvxg    1/1     Running     0          31s     10.128.2.126   compute-0   <none>           <none>
+django-psql-example-25-kqgwz    0/1     Running     0          21s     10.130.0.71    master-0    <none>           <none>
+django-psql-example-25-m66nn    1/1     Running     0          21s     10.130.0.70    master-0    <none>           <none>
+django-psql-example-25-ntjqb    1/1     Running     0          21s     10.128.0.60    master-2    <none>           <none>
+django-psql-example-25-nxxqh    1/1     Running     0          21s     10.130.2.93    compute-2   <none>           <none>
+django-psql-example-25-p8nbz    1/1     Running     0          21s     10.131.1.183   compute-3   <none>           <none>
+django-psql-example-25-ttr9g    1/1     Running     0          21s     10.129.2.57    compute-1   <none>           <none>
+django-psql-example-25-xn4fp    1/1     Running     0          21s     10.129.2.56    compute-1   <none>           <none>
+django-psql-example-25-xpqf4    1/1     Running     0          21s     10.128.2.127   compute-0   <none>           <none>
+django-psql-example-25-xwmwv    1/1     Running     0          21s     10.131.1.184   compute-3   <none>           <none>
+----
+
+To taint the node we can simply execute the following command. Be sure to use the same values as in the toleration: 
+
+[source,bash]
+----
+oc adm taint nodes compute-0 gpu=enabled:NoExecute
+----
+
+This will create the following specification in the node object: 
+
+[source,yaml]
+----
+spec:
+[...]
+  taints:
+  - effect: NoExecute
+    key: gpu
+    value: enabled
+----
+
+OpenShift will allow pods, which are not tolerating the taints, to keep on running for 30 seconds. After that, these pods will be evicted and started elsewhere. 
+
+When we check after the tolerationSeconds time has passed which pods are running on the node compute-0, we will see that most pods have disappeared, except the pods for the webapplication and pods which are part of DaemonSets. (DaemonSets are defined to run on all or specific nodes and are not evicted. The cluster-DaemonSets are tolerating everything)
+
+[source,bash]
+----
+oc get pods -A -o custom-columns=NAME:.metadata.name,NODE:.spec.nodeName,STATE:.status.phase | grep compute-0 | grep Running
+
+tuned-hrvl4                                               compute-0   Running
+node-resolver-qk24n                                       compute-0   Running
+node-ca-lxrvf                                             compute-0   Running
+machine-config-daemon-558v4                               compute-0   Running
+node-exporter-rn8h4                                       compute-0   Running
+multus-additional-cni-plugins-29qgq                       compute-0   Running
+multus-mkd87                                              compute-0   Running
+network-metrics-daemon-64hrw                              compute-0   Running
+network-check-target-l6l7n                                compute-0   Running
+ovnkube-node-hrtln                                        compute-0   Running
+django-psql-example-25-8dzqh                              compute-0   Running
+django-psql-example-25-9p4sb                              compute-0   Running
+django-psql-example-25-pqbvn                              compute-0   Running
+django-psql-example-25-sb6hr                              compute-0   Running
+----
+
+== Removing taints 
+
+Taints can be simply removed with the oc command added a trailing `-` 
+
+[source,bash]
+----
+oc adm taint nodes compute-0 gpu=enabled:NoExecute-
+----
+
+== Built-in Taints - Taint Nodes by Condition
+
+Several taints are built into OpenShift and are set during certain events (aka Taint Nodes by Condition) and cleared when the condition is resolved.
+
+The following list is quoted from the OpenShift documentation and provides a list of taints which are automatically set. For example, when a node becomes unavailable:
+
+* `node.kubernetes.io/not-ready`: The node is not ready. This corresponds to the node condition Ready=False.
+* `node.kubernetes.io/unreachable`: The node is unreachable from the node controller. This corresponds to the node condition Ready=Unknown.
+* `node.kubernetes.io/out-of-disk`: The node has insufficient free space on the node for adding new pods. This corresponds to the node condition OutOfDisk=True.
+* `node.kubernetes.io/memory-pressure`: The node has memory pressure issues. This corresponds to the node condition MemoryPressure=True.
+* `node.kubernetes.io/disk-pressure`: The node has disk pressure issues. This corresponds to the node condition DiskPressure=True.
+* `node.kubernetes.io/network-unavailable`: The node network is unavailable.
+* `node.kubernetes.io/unschedulable`: The node is unschedulable.
+* `node.cloudprovider.kubernetes.io/uninitialized`: When the node controller is started with an external cloud provider, this taint is set on a node to mark it as unusable. After a controller from the cloud-controller-manager initializes this node, the kubelet removes this taint.
+
+Depending on the condition, the node will either have the effect `NoSchedule`, which means no new pods will be started there (unless a toleration is configured) or the effect `NoExecute`, which will evict pods with no tolerations from the node. Typical examples for NoSchedule condition would be: memory-pressure or disk-pressure. If a node is unreachable or not-ready, then it will be automatically tainted with the effect NoExecute. `tolerationSeconds` (default 300) will be respected. 
+
+== Tolerating all taints 
+
+Tolerations can be configured to tolerate all possible taints. In such case no `value` or `key` is configured and `operator: "Exists"` is used: 
+
+[source,yaml]
+----
+spec:
+[...]
+ template:
+[...]
+   spec:
+     tolerations:
+     - operator: “Exists”
+----
+
+NOTE: Some cluster daemonsets (i.e. tuned) are configured this way. 
+
+== Cleanup 
+
+Remove the taint from the node: 
+
+[source,bash]
+----
+oc adm taint nodes compute-0 gpu=enabled:NoExecute-
+----
+
+And remove the toleration specification from the DeploymentConfig
+
+[source,yaml]
+----
+spec:
+[...]
+  template:
+[...]
+    spec:
+      tolerations:
+      - key: "gpu" 
+        value: "enabled"
+        operator: "Equal"
+        effect: "NoExecute"
+        tolerationSeconds: 30 <1>
+----
