@@ -107,8 +107,21 @@
 
     <style>
       /* Hide content until fonts are ready to prevent FOUT */
-      .fonts-loading body { visibility: hidden; }
-      .fonts-ready body { visibility: visible; }
+      /* Use opacity instead of visibility to prevent layout recalculation */
+      .fonts-loading body { opacity: 0; }
+      .fonts-ready body { 
+        opacity: 1;
+        animation: contentFadeIn 0.2s ease-out;
+      }
+      @keyframes contentFadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      
+      /* Reserve consistent space for common elements to prevent CLS */
+      #top-nav { min-height: 42px; }
+      .sub-top-nav { min-height: 45px; }
+      h1.gradient-header.article { min-height: 1.2em; }
       
       /* Critical CSS - prevent image flash/layout shift (CLS) - must load first */
       img { max-width: 100% !important; height: auto !important; }

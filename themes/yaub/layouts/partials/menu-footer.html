@@ -1,2 +1,22 @@
-<!-- <p>Built with <a href="https://github.com/matcornic/hugo-theme-learn"><i class="fas fa-heart"></i></a> from <a href="https://getgrav.org">Grav</a> and <a href="https://gohugo.io/">Hugo</a></p>
---> 
+{{/* Site Statistics */}}
+{{/* Get all regular pages (articles), excluding special pages */}}
+{{ $allArticles := where .Site.RegularPages "Type" "post" }}
+{{ if eq (len $allArticles) 0 }}
+    {{/* Fallback: if no "post" type, count all regular pages */}}
+    {{ $allArticles = .Site.RegularPages }}
+{{ end }}
+{{ $totalArticles := len $allArticles }}
+{{ $latestArticle := index (.Site.RegularPages.ByDate.Reverse) 0 }}
+
+<div class="sidebar-stats">
+    <div class="sidebar-stats-item">
+        <i class="fas fa-file-alt fa-fw"></i>
+        <span>{{ $totalArticles }} Articles</span>
+    </div>
+    {{ with $latestArticle }}
+    <div class="sidebar-stats-item">
+        <i class="fas fa-calendar-check fa-fw"></i>
+        <span>Latest: {{ .Date.Format "Jan 2, 2006" }}</span>
+    </div>
+    {{ end }}
+</div>
