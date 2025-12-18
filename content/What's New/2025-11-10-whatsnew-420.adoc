@@ -4,7 +4,7 @@ description: "News in OCP 4.20 that tickles our fancy"
 date: "2025-11-10"
 doctype: book
 
-featured_image: /openshift/images/OpenShift-Teuferl.svg
+featured_image: /whats-new/images/OpenShift-Teuferl.svg
 show_featured_image_summary: false
 show_featured_image_article: true
 

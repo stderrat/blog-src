@@ -18,7 +18,7 @@ aliases: [
 ] 
 ---
 
-:imagesdir: /day-2/images/
+:imagesdir: /openshift-platform/day-2/images/
 :icons: font
 :toc:
 

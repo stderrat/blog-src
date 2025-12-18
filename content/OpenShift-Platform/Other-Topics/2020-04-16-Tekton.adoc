@@ -19,7 +19,7 @@ aliases: [
 ] 
 ---
 
-:imagesdir: /openshift-platform/pipelines/images/
+:imagesdir: /openshift-platform/other-topics/images/
 :icons: font
 :toc:
 
