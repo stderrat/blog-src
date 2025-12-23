@@ -1,0 +1,55 @@
+---
+title: "GitOps Catalog"
+description: "Interactive catalog of all available ArgoCD applications for OpenShift cluster configuration"
+date: 2025-12-22
+weight: 51
+doctype: book
+chapter: false
+pre: "<i class='fas fa-th'></i> "
+tags: ["OCP", "GitOps", "OpenShift", "GitOps Approach", "Argo CD", "ArgoCD", "Catalog"]
+
+featured_image: /gitops-catalog/images/Logo_GitOps-Catalog.png
+show_featured_image_summary: true
+show_featured_image_article: true
+
+authors: [Thomas Jungbauer]
+type: post
+draft: false
+categories:
+   - GitOps
+---
+:icons: font
+:imagesdir: images/
+:toc:
+
+This page provides an interactive visualization of all available ArgoCD applications from the https://github.com/tjungbauer/openshift-clusterconfig-gitops[openshift-clusterconfig-gitops^] repository.
+
+The repository demonstrates the usage of OpenShift GitOps with (mainly) Helm Charts that I use for my own clusters. As easy Secret Management I have Sealed Secrets. 
+It focuses on **main cluster configuration** using a GitOps approach. Some of the charts or configurations are discussied in my blog posts. Please refer to the different GitOps blog posts for more details and to understand why it is done this way.
+
+== How to Use
+
+. **Browse** the catalog below to discover available configurations
+. **Filter** by category using the buttons (Security, Observability, Storage, etc.)
+. **Search** for specific applications using the search box
+. **Click** on "Blog" where available to read detailed documentation or "Source" to view the code on GitHub
+
+== Quick Start
+
+[source,bash]
+----
+# Clone the repository
+git clone https://github.com/tjungbauer/openshift-clusterconfig-gitops.git
+cd openshift-clusterconfig-gitops
+
+# Initialize GitOps (deploys OpenShift GitOps operator and App of Apps)
+./init_GitOps.sh
+----
+
+TIP: Most Helm Charts used in this repository can be found at https://charts.stderr.at/[charts.stderr.at^]
+
+'''
+
+pass:[{{< gitops-catalog >}}]
+
+

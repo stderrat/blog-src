@@ -1,0 +1,240 @@
+{{/*
+  GitOps Application Catalog Shortcode
+  
+  Usage: {{< gitops-catalog >}}
+  
+  This shortcode renders an interactive visualization of all GitOps applications
+  from the openshift-clusterconfig-gitops repository.
+  
+  Data source: data/gitops_applications.json
+*/}}
+
+{{ $data := site.Data.gitops_applications }}
+
+<div class="gitops-catalog">
+  <div class="gitops-catalog-header">
+    <div class="gitops-catalog-info">
+      <h2>OpenShift GitOps Configuration Catalog</h2>
+      <p class="gitops-catalog-subtitle">
+        Available ArgoCD applications for cluster configuration via 
+        <a href="{{ $data.repository }}" target="_blank" rel="noopener">openshift-clusterconfig-gitops</a>
+      </p>
+      <p class="gitops-catalog-updated">
+        <i class="fas fa-clock"></i> Last updated: {{ $data.lastUpdated }}
+        <span class="gitops-app-count"><i class="fas fa-cubes"></i> {{ len $data.applications }} Applications</span>
+      </p>
+    </div>
+  </div>
+
+  <!-- Category Filter -->
+  <div class="gitops-filter-container">
+    <div class="gitops-search-box">
+      <i class="fas fa-search"></i>
+      <input type="text" id="gitops-search" placeholder="Search applications..." autocomplete="off">
+    </div>
+    <div class="gitops-category-filters">
+      <button class="gitops-filter-btn active" data-category="all">
+        <i class="fas fa-th"></i> All
+      </button>
+      {{ range $key, $cat := $data.categories }}
+      <button class="gitops-filter-btn" data-category="{{ $key }}" style="--cat-color: {{ $cat.color }}">
+        <i class="fas fa-{{ $cat.icon }}"></i> {{ $cat.name }}
+      </button>
+      {{ end }}
+    </div>
+  </div>
+
+  <!-- Applications Grid -->
+  <div class="gitops-apps-grid">
+    {{ range $data.applications }}
+    {{ $cat := index $data.categories .category }}
+    <article class="gitops-app-card" data-category="{{ .category }}" data-keywords="{{ delimit .keywords "," }}" data-name="{{ .name | lower }}" data-description="{{ .description | lower }}">
+      <div class="gitops-app-card-header" style="--cat-color: {{ $cat.color }}">
+        <div class="gitops-app-icon">
+          <i class="fas fa-{{ .icon }}"></i>
+        </div>
+        <div class="gitops-app-meta">
+          <span class="gitops-app-category">
+            <i class="fas fa-{{ $cat.icon }}"></i> {{ $cat.name }}
+          </span>
+          <span class="gitops-app-version">v{{ .version }}</span>
+        </div>
+      </div>
+      <div class="gitops-app-card-body">
+        <h3 class="gitops-app-name">{{ .name }}</h3>
+        <p class="gitops-app-description">{{ .description }}</p>
+        
+        <div class="gitops-app-details">
+          <!--
+          <div class="gitops-app-detail">
+            <i class="fas fa-folder"></i>
+            <code>{{ .namespace }}</code>
+          </div>
+          -->
+          <div class="gitops-app-detail gitops-app-path">
+            <i class="fas fa-code-branch"></i>
+            <code>{{ .path }}</code>
+          </div>
+        </div>
+
+        {{/* Display dependencies in the card body */}}
+        {{ if or .helmDependencies .appDependencies }}
+        <div class="gitops-dependencies-section">
+          <div class="gitops-dependencies-header">
+            <i class="fas fa-layer-group"></i> Dependencies / Requirements
+          </div>
+          {{/* Display Helm chart dependencies */}}
+          {{ if .helmDependencies }}
+          <div class="gitops-app-deps gitops-helm-deps">
+            <div class="gitops-deps-header" title="Helm chart dependencies from charts.stderr.at">
+              <i class="fas fa-cubes"></i> Helm Charts:
+            </div>
+            <div class="gitops-deps-list">
+              {{ range .helmDependencies }}
+              <a href="/helm-charts/#{{ . }}" class="gitops-dep-link gitops-dep-helm" title="View {{ . }} Helm chart">
+                {{ . }}
+              </a>
+              {{ end }}
+            </div>
+          </div>
+          {{ end }}
+          
+          {{/* Display GitOps application dependencies */}}
+          {{ if .appDependencies }}
+          <div class="gitops-app-deps gitops-app-app-deps">
+            <div class="gitops-deps-header" title="Other GitOps applications that should be deployed first">
+              <i class="fas fa-project-diagram"></i> Requires:
+            </div>
+            <div class="gitops-deps-list">
+              {{ range .appDependencies }}
+              <a href="#" class="gitops-dep-link gitops-dep-app" data-app-id="{{ . }}" title="Jump to {{ . }}">
+                {{ . }}
+              </a>
+              {{ end }}
+            </div>
+          </div>
+          {{ end }}
+        </div>
+        {{ end }}
+
+        {{ if .keywords }}
+        <div class="gitops-app-tags">
+          {{ range .keywords }}
+          <span class="gitops-tag">{{ . }}</span>
+          {{ end }}
+        </div>
+        {{ end }}
+      </div>
+      <div class="gitops-app-card-footer">
+        <div class="gitops-app-actions">
+          {{ if .blogPost }}
+          <a href="{{ .blogPost }}" class="gitops-btn gitops-btn-blog" title="Read blog post">
+            <i class="fas fa-book"></i> Blog
+          </a>
+          {{ end }}
+          <a href="{{ $data.repository }}/tree/main/{{ .path }}" target="_blank" rel="noopener" class="gitops-btn gitops-btn-github" title="View on GitHub">
+            <i class="fab fa-github"></i> Source
+          </a>
+        </div>
+      </div>
+    </article>
+    {{ end }}
+  </div>
+
+  <!-- No results message -->
+  <div class="gitops-no-results" style="display: none;">
+    <i class="fas fa-search"></i>
+    <p>No applications found matching your criteria.</p>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+  
+  const catalog = document.querySelector('.gitops-catalog');
+  if (!catalog) return;
+  
+  const searchInput = catalog.querySelector('#gitops-search');
+  const filterBtns = catalog.querySelectorAll('.gitops-filter-btn');
+  const cards = catalog.querySelectorAll('.gitops-app-card');
+  const noResults = catalog.querySelector('.gitops-no-results');
+  
+  let activeCategory = 'all';
+  let searchTerm = '';
+  
+  function filterCards() {
+    let visibleCount = 0;
+    
+    cards.forEach(card => {
+      const cardCategory = card.dataset.category;
+      const cardName = card.dataset.name;
+      const cardDescription = card.dataset.description;
+      const cardKeywords = card.dataset.keywords;
+      
+      const matchesCategory = activeCategory === 'all' || cardCategory === activeCategory;
+      const matchesSearch = searchTerm === '' || 
+        cardName.includes(searchTerm) || 
+        cardDescription.includes(searchTerm) ||
+        cardKeywords.includes(searchTerm);
+      
+      if (matchesCategory && matchesSearch) {
+        card.style.display = '';
+        card.classList.add('gitops-card-visible');
+        visibleCount++;
+      } else {
+        card.style.display = 'none';
+        card.classList.remove('gitops-card-visible');
+      }
+    });
+    
+    noResults.style.display = visibleCount === 0 ? 'flex' : 'none';
+  }
+  
+  // Category filter buttons
+  filterBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      filterBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeCategory = btn.dataset.category;
+      filterCards();
+    });
+  });
+  
+  // Search input
+  searchInput.addEventListener('input', (e) => {
+    searchTerm = e.target.value.toLowerCase().trim();
+    filterCards();
+  });
+  
+  // Initialize
+  filterCards();
+  
+  // Handle clicking on app dependency links (scroll to that app)
+  catalog.querySelectorAll('.gitops-dep-app').forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      const appId = link.dataset.appId;
+      const targetCard = catalog.querySelector(`.gitops-app-card[data-category][data-name*="${appId.toLowerCase()}"]`) ||
+                         catalog.querySelector(`.gitops-app-card[data-keywords*="${appId}"]`);
+      
+      if (targetCard) {
+        // Reset filters to show all
+        filterBtns.forEach(b => b.classList.remove('active'));
+        catalog.querySelector('[data-category="all"]').classList.add('active');
+        activeCategory = 'all';
+        searchTerm = '';
+        searchInput.value = '';
+        filterCards();
+        
+        // Scroll to and highlight the target card
+        targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        targetCard.classList.add('gitops-card-highlight');
+        setTimeout(() => targetCard.classList.remove('gitops-card-highlight'), 2000);
+      }
+    });
+  });
+})();
+</script>
+
+

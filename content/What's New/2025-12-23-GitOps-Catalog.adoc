@@ -1,0 +1,24 @@
+---
+title: "GitOps Catalog"
+description: "Interactive catalog of all available ArgoCD applications for OpenShift cluster configuration"
+date: 2025-12-22
+weight: 24
+doctype: book
+chapter: true
+tags: ["OCP", "GitOps", "OpenShift", "GitOps Approach", "Argo CD", "ArgoCD", "Catalog"]
+
+featured_image: /gitops-catalog/images/Logo_GitOps-Catalog.png
+show_featured_image_summary: true
+show_featured_image_article: true
+
+authors: [Thomas Jungbauer]
+type: post
+draft: false
+categories:
+   - GitOps
+---
+:icons: font
+:imagesdir: images/
+:toc:
+
+The link:/gitops-catalog/[GitOps Catalog] page provides an interactive visualization of all available ArgoCD applications from the openshift-clusterconfig-gitops repository. Check out the page *link:/gitops-catalog/[GitOps Catalog]* for more details.

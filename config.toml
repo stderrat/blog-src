@@ -40,7 +40,7 @@ home = [ "HTML", "RSS", "JSON"]
   disableNextPrev = false
   disableMermaid = false
   titleSeparator = "::"
-  mainSections = ['service-mesh', 'OpenShift', 'ansible', 'compliance', 'general', 'GitOpsCollection', 'Day-2', 'SecureSupplyChain', 'ACS', 'Azure', 'Quay', 'Java', "What's New"]
+  mainSections = ['service-mesh', 'OpenShift', 'ansible', 'compliance', 'general', 'GitOpsCollection', 'gitops-catalog', 'Day-2', 'SecureSupplyChain', 'ACS', 'Azure', 'Quay', 'Java', "What's New"]
   recent_posts_number = 10
 
 [taxonomies]
@@ -103,6 +103,7 @@ identifier = "authors"
 
 [[menu.shortcuts]]
 name = 'Thomas Jungbauer'
+pre = "fas fa-user"
 url = "/authors/thomas-jungbauer"
 weight = 1
 parent = "authors"
@@ -112,6 +113,7 @@ parent = "authors"
 
 [[menu.shortcuts]]
 name = 'Toni Schmidbauer'
+pre = "fas fa-user"
 url = "/authors/toni-schmidbauer"
 weight = 2
 parent = "authors"
@@ -120,30 +122,55 @@ parent = "authors"
 
 [[menu.shortcuts]]
 name = 'Legal Disclosure'
+pre = "fas fa-gavel"
 url = "/legaldisclosure"
 weight = 3
 parent = "authors"
   [menu.shortcuts.params]
     class = "left"
 
+# Browse dropdown (Categories, Tags, History)
 [[menu.shortcuts]]
-name = "<i class='far fa-bookmark padding-right-25rem'></i> Categories"
-url = "/categories"
+name = "<i class='fas fa-compass padding-right-25rem'></i> Explore"
+url = "#"
+post = "<i class='fa fa-chevron-down padding-left-25rem''></i>"
 weight = 2
+identifier = "browse"
   [menu.shortcuts.params]
     class = "left"
 
 [[menu.shortcuts]]
-name = "<i class='fas fa-tags padding-right-25rem'></i> Tags"
+name = 'Categories'
+pre = "far fa-bookmark"
+url = "/categories"
+weight = 1
+parent = "browse"
+  [menu.shortcuts.params]
+    class = "left"
+
+[[menu.shortcuts]]
+name = 'Tags'
+pre = "fas fa-tags"
 url = "/tags"
-weight = 10
+weight = 2
+parent = "browse"
   [menu.shortcuts.params]
     class = "left"
 
 [[menu.shortcuts]]
-name = "<i class='fas fa-box padding-right-25rem'></i> History"
+name = 'History'
+pre = "fas fa-box"
 url = "/archive"
-weight = 11
+weight = 3
+parent = "browse"
+  [menu.shortcuts.params]
+    class = "left"
+
+# GitOps Catalog
+[[menu.shortcuts]]
+name = "<i class='fas fa-th padding-right-25rem'></i> GitOps Catalog"
+url = "/gitops-catalog/"
+weight = 10
   [menu.shortcuts.params]
     class = "left"
 

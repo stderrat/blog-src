@@ -3,7 +3,7 @@
             <div id="top-nav" class="margin-bottom-15">
               {{if not .Site.Params.disableLandingPageButton }}
               <section id="homelinks" class="text-align-center">
-                <ul class="list-no-style margin-0 padding-0 overflow-hidden text-align-left vertical-align-middle">
+                <ul class="list-no-style margin-0 padding-0 text-align-left vertical-align-middle">
                   <li class="list-horizontal padding-left-15 padding-right-15">
                     <a class="padding-topnav" href='{{ (cond (and (ne .Site.Params.landingPageURL nil) (hugo.IsMultilingual)) .Site.Params.landingPageURL "/") }}'>{{ safeHTML (cond (ne .Site.Params.landingPageName nil) .Site.Params.landingPageName "<i class='fas fa-home'></i> Home") }}</a>
                   </li>
@@ -14,7 +14,7 @@
 
 {{if .HasChildren}}
 <li class="dropdown list-horizontal {{ .Params.class }} padding-left-15 padding-right-15">
-  <div class="submenu left static inline-block">
+  <div class="submenu left relative inline-block">
     {{.Pre}}<a class="padding-topnav" href="{{.URL | absLangURL }}">{{safeHTML .Name}}{{.Post}}</a>
 
     <div class="absolute submenu-div">

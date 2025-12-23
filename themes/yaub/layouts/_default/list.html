@@ -1,6 +1,18 @@
+{{ $featured_image := partial "func/GetFeaturedImage.html" . }}
+
 {{ partial "header.html" . }}
 
 {{ if eq .Kind "section" }}
+	{{/* Display featured image for section pages */}}
+	{{ if $featured_image }}
+	{{ if .Params.show_featured_image_article }}
+	  <div class="pr3-ns mb4 mb0-ns w-100 featured-img-container">
+	    <a href="{{.RelPermalink}}">
+	      <img src="{{ $featured_image }}" class="img featured-img" alt="image from {{ .Title }}" loading="eager" decoding="async" style="max-width:100%;height:auto;box-shadow:none;">
+	    </a>
+	  </div>
+	{{ end }}
+	{{ end }}
 	{{ .Content }}
 {{end}}
 
