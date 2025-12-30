@@ -140,15 +140,6 @@
     
     <!-- Keyboard Shortcuts Help Modal (?) -->
     <script src="{{"js/shortcuts-modal.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
-
-{{/* TOC scroll spy is handled by yaub.js - removed duplicate observer that caused flickering */}}
-    <script type="text/javascript">
-        function scrollTopAnimated() {
-            $("html, body").animate(
-                { scrollTop: "0" }, 500);
-        }
-    </script>
-
     <script>
         function topFunction() {
           document.body.scrollTop = 0; // For Safari
