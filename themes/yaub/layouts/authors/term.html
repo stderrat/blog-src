@@ -10,11 +10,11 @@
   <em>Articles by {{ $authorName }}</em>
 </h2>
 
-<div class="flex flex-wrap">
-  <section class="flex-ns flex-wrap justify-between w-100">
+<div class="article-cards-grid">
+  <section class="article-cards-container">
     {{ $paginator := .Paginate .Pages 10 }}
     {{ range $paginator.Pages }}
-      <div class="summary-gradient relative flex-auto w-100 w-40-l mr3 mb3 ba b--moon-gray nested-copy-line-height weight-5">
+      <div class="article-card summary-gradient relative ba b--moon-gray nested-copy-line-height weight-5">
         <div class="mb2 pa3 pa4-l gray">
           {{ partial "summary-with-image.html" . }}
         </div>

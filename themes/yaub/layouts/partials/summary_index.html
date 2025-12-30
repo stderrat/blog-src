@@ -6,10 +6,10 @@
 		</h2>
 {{end}}
 
-<div class="flex flex-wrap">
+<div class="article-cards-grid">
 
-		{{ range (.Paginator 8).Pages }}{{ end }}
-		<section class="flex-ns flex-wrap justify-between w-100">
+		{{ range (.Paginator 14).Pages }}{{ end }}
+		<section class="article-cards-container">
 		  <!-- 1. Get all posts -->
 		  {{ $posts := .Site.GetPage "posts" }}
 	  
@@ -22,7 +22,7 @@
 		  {{ $paginator := .Paginate $regularPosts }}
 		  <!-- 4. Loop through the posts -->
 		  {{ range $paginator.Pages }}
-		    <div class="summary-gradient relative flex-auto w-100 w-40-l mr3 mb3 ba b--moon-gray nested-copy-line-height weight-5">
+		    <div class="article-card summary-gradient relative ba b--moon-gray nested-copy-line-height weight-5">
 		      <div class="mb2 pa3 pa4-l gray">
 			    {{ partial "summary-with-image.html" . }}
 		      </div>
@@ -51,6 +51,8 @@
 
 <!-- $upper_limit = $paginator.TotalPages - $adjacent_links -->
 {{ $upper_limit := (sub $paginator.TotalPages $adjacent_links) }}
+
+</section>
 
 <!-- If there's more than one page. -->
 {{ if gt $paginator.TotalPages 1 }}
@@ -156,6 +158,6 @@
 {{ end }}
 
 
-</section>
+
    
 </div>

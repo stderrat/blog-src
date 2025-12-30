@@ -158,7 +158,7 @@ parent = "browse"
     class = "left"
 
 [[menu.shortcuts]]
-name = 'History'
+name = 'Archive'
 pre = "fas fa-box"
 url = "/archive"
 weight = 3

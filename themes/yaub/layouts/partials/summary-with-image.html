@@ -1,21 +1,26 @@
 {{ $featured_image := partial "func/GetFeaturedImage.html" . }}
 <article class="bb b--black-10 scroll-reveal">
   <div class="article-box db pv4 ph3 ph0-l no-underline dark-gray" href="{{.RelPermalink}}">
-    <div class="flex flex-column flex-row-ns">
-      {{ if $featured_image }}
-      {{ if .Params.show_featured_image_summary }}
-          {{/* Trimming the slash and adding absURL make sure the image works no matter where our site lives */}}
-        {{ $featured_image := (trim $featured_image "/") | absURL }}
-        <div class="pr3-ns mb4 mb0-ns w-100 w-40-ns">
-          <a href="{{.RelPermalink}}">
-            {{/* Add width/height and aspect-ratio for CLS prevention */}}
-            <img src="{{ $featured_image }}" class="img recentlist" alt="image from {{ .Title }}" loading="lazy" decoding="async" width="640" height="360" style="aspect-ratio:16/9;object-fit:cover;">
-          </a>
-        </div>
-      {{ end }}
-      {{ end }}
-      
-      <div class="w-100{{ if $featured_image }} w-60-ns pl3-ns{{ end }}">
+    <div class="flex flex-column">
+
+
+      {{/* Article info below */}}
+      <div class="w-100">
+
+        {{/* Featured image on top */}}
+        {{ if $featured_image }}
+        {{ if .Params.show_featured_image_summary }}
+            {{/* Trimming the slash and adding absURL make sure the image works no matter where our site lives */}}
+          {{ $featured_image := (trim $featured_image "/") | absURL }}
+          <div class="mb3 w-100 article-card-image">
+            <a href="{{.RelPermalink}}">
+              {{/* Add width/height and aspect-ratio for CLS prevention */}}
+              <img src="{{ $featured_image }}" class="img recentlist" alt="image from {{ .Title }}" loading="lazy" decoding="async" width="640" height="360" style="aspect-ratio:16/9;object-fit:cover;width:100%;">
+            </a>
+          </div>
+        {{ end }}
+        {{ end }}
+
 
         {{ if .Params.categories }}
         <div class="categories">    
@@ -37,7 +42,7 @@
             <strong>{{- .Date.Format "January 2, 2006" -}}</strong>
           </span>
 
-          <span class="divider">-</span>
+          <span class="divider"> </span>
 
           <span class="author-info">
           {{ range .Param "authors" }}
@@ -52,7 +57,7 @@
           {{ end }}
           </span>
 
-          <span class="divider">-</span>
+          <span class="divider"> </span>
 
           {{- $wordCount := countwords .Content -}}
           {{- $readingTime := math.Round (div $wordCount 200.0) -}}

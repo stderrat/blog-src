@@ -28,7 +28,7 @@
 
 {{ if ge $section_count 1 }}
 
-  <div class="flex flex-wrap">
+  <div class="article-cards-grid">
 
 	{{/* Section title */}}
 	<h1 class="flex-none recentlist gradient-header article">
@@ -38,11 +38,11 @@
 	{{ $n_posts := 10000 }}
 
 
-	<section class="flex-ns flex-wrap justify-between w-100">
+	<section class="article-cards-container">
 	  {{/* Range through the first $n_posts items of the section */}}
 	  {{ range (first $n_posts $section) }}
-		<div class="relative flex-auto w-100 w-40-l mr3 mb3 bg-white ba b--moon-gray nested-copy-line-height weight-5">
-			<div class="summary-gradient bg-white mb2 pa3 pa4-l gray">
+		<div class="article-card summary-gradient relative ba b--moon-gray nested-copy-line-height weight-5">
+			<div class="mb2 pa3 pa4-l gray">
 		  {{ partial "summary-with-image.html" . }}
 		</div>
 		</div>

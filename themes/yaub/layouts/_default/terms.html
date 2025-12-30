@@ -65,20 +65,31 @@
       {{ end }}
     {{ end }}
 
-    <!-- range all pages sorted by their title -->
+    <!-- Archive grouped by Year and Month -->
     {{ if (eq .Title "Archive") }}
-    <table>
-    {{ range .Site.RegularPages.ByDate.Reverse }}
-      <tr>
-        <td class="archivetable-date">
-          <span class="date">{{ .Date.Format "2006-01-02" }}</span>
-        </td>
-        <td class="archivetable-content">
-          <archive><a class="archive" href="{{ .Permalink }}">{{ .Title }}</a></archive>
-        </td>
-      </tr>
+    <div class="archive-by-month">
+    {{ range sort (.Site.RegularPages.GroupByDate "2006-01") ".Key" "desc" }}
+      {{ $monthDate := printf "%s-01" .Key | time }}
+      <div class="archive-month-group">
+        <h3 class="archive-month-header">
+          <i class="far fa-calendar-alt"></i> <span class="archive-month-name">{{ $monthDate.Format "January 2006" }}</span>
+          <span class="archive-count">({{ len .Pages }})</span>
+        </h3>
+        <table class="archive-table">
+        {{ range .Pages.ByDate.Reverse }}
+          <tr>
+            <td class="archivetable-date">
+              <span class="date">{{ .Date.Format "Jan 02" }}</span>
+            </td>
+            <td class="archivetable-content">
+              <archive><a class="archive" href="{{ .Permalink }}">{{ .Title }}</a></archive>
+            </td>
+          </tr>
+        {{ end }}
+        </table>
+      </div>
     {{ end }}
-    </table>
+    </div>
     {{ end }}
     </div>
 <footer class=" footline" >
