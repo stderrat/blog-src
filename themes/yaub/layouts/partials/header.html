@@ -297,8 +297,16 @@
         {{define "breadcrumb"}}
           {{$parent := .page.Parent }}
           {{ if $parent }}
-          {{ $value := (printf "<span itemscope='' itemprop='itemListElement' itemtype='http://schema.org/ListItem'><a itemprop='item' href='%s'> <span itemprop='name'>%s</span><meta itemprop='position' content='%d' /></a></span> > %s" $parent.RelPermalink $parent.Title (sub (.origPage.Scratch.Get "depth") .position) .value ) }}
-          {{ template "breadcrumb" dict "origPage" .origPage "page" $parent "value" $value "position" (add .position 1) }}
+            {{/* Check if this parent is the root (has no parent itself) and if root breadcrumb should be hidden */}}
+            {{ $parentOfParent := $parent.Parent }}
+            {{ $hideRoot := .origPage.Site.Params.disableRootBreadcrumb }}
+            {{ if and $hideRoot (not $parentOfParent) }}
+              {{/* Skip the root breadcrumb - just output current value */}}
+              {{.value|safeHTML}}
+            {{ else }}
+              {{ $value := (printf "<span itemscope='' itemprop='itemListElement' itemtype='http://schema.org/ListItem'><a itemprop='item' href='%s'> <span itemprop='name'>%s</span><meta itemprop='position' content='%d' /></a></span> > %s" $parent.RelPermalink $parent.Title (sub (.origPage.Scratch.Get "depth") .position) .value ) }}
+              {{ template "breadcrumb" dict "origPage" .origPage "page" $parent "value" $value "position" (add .position 1) }}
+            {{ end }}
           {{else}}
             {{.value|safeHTML}}
           {{end}}

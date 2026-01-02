@@ -1,0 +1,81 @@
+{{/* Sidebar Widgets - Archive Overview & Recently Updated Articles */}}
+<aside class="sidebar-widgets" aria-label="Sidebar">
+    
+    {{/* Recently Updated Articles Widget */}}
+    <div class="sidebar-widget updated-widget" style="animation-delay: 0.25s;">
+        <h3 class="widget-title">
+            <i class="fas fa-sync-alt"></i> Recently Updated
+        </h3>
+        <div class="widget-content">
+            <ul class="updated-articles-list">
+                {{/* Get pages sorted by last modification date, exclude those where lastmod equals date */}}
+                {{ $recentlyUpdated := slice }}
+                {{ range .Site.RegularPages.ByLastmod.Reverse }}
+                    {{/* Only include if Lastmod is significantly different from Date (more than 1 day) */}}
+                    {{ $daysDiff := div (sub .Lastmod.Unix .Date.Unix) 86400 }}
+                    {{ if and (gt $daysDiff 1) (lt (len $recentlyUpdated) 5) }}
+                        {{ $recentlyUpdated = $recentlyUpdated | append . }}
+                    {{ end }}
+                {{ end }}
+                
+                {{ if $recentlyUpdated }}
+                    {{ range $recentlyUpdated }}
+                    <li class="updated-article-item">
+                        <a href="{{ .Permalink }}" class="updated-article-link">
+                            <span class="updated-article-title">{{ .Title | truncate 50 }}</span>
+                            <span class="updated-article-date" title="Last updated on {{ .Lastmod.Format "January 2, 2006" }}">
+                                <i class="far fa-clock"></i> {{ .Lastmod.Format "Jan 2" }}
+                            </span>
+                        </a>
+                    </li>
+                    {{ end }}
+                {{ else }}
+                    <li class="no-updates">No recent updates</li>
+                {{ end }}
+            </ul>
+        </div>
+    </div>
+
+    {{/* Archive Overview Widget */}}
+    <div class="sidebar-widget archive-widget" style="animation-delay: 0.1s;">
+        <h3 class="widget-title">
+            <i class="fas fa-archive"></i> Archive
+        </h3>
+        <div class="widget-content">
+            <ul class="archive-list">
+                {{ $archiveData := slice }}
+                {{ range .Site.RegularPages.GroupByDate "2006" }}
+                    {{ $year := .Key }}
+                    {{ $count := len .Pages }}
+                    <li class="archive-year-item">
+                        <a href="/archive/#{{ $year }}" class="archive-year-link">
+                            <span class="archive-year">{{ $year }}</span>
+                            <span class="archive-count-badge">{{ $count }}</span>
+                        </a>
+                        {{/* Show months for current and previous year */}}
+                        {{ $currentYear := now.Year }}
+                        {{ if or (eq (int $year) $currentYear) (eq (int $year) (sub $currentYear 1)) }}
+                        <ul class="archive-months">
+                            {{ range .Pages.GroupByDate "2006-01" }}
+                            {{ $monthKey := .Key }}
+                            {{ $monthDate := printf "%s-01" .Key | time }}
+                            <li class="archive-month-item">
+                                <a href="/archive/#{{ $monthKey }}" class="archive-month-link">
+                                    <span class="archive-month-name">{{ $monthDate.Format "January" }}</span>
+                                    <span class="archive-month-count">({{ len .Pages }})</span>
+                                </a>
+                            </li>
+                            {{ end }}
+                        </ul>
+                        {{ end }}
+                    </li>
+                {{ end }}
+            </ul>
+            <a href="/archive/" class="widget-view-all">
+                View Full Archive <i class="fas fa-arrow-right"></i>
+            </a>
+        </div>
+    </div>
+
+</aside>
+

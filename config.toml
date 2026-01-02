@@ -27,6 +27,8 @@ home = [ "HTML", "RSS", "JSON"]
 
 [params]
   themeVariant = "yaub"
+  # Enable/disable the right sidebar on homepage (Archive + Recently Updated)
+  enableRightSidebar = true
   # Google Search Console verification
   googleSiteVerification = "yq2Ib3doJVHVlEW2wtHap5WY54JhS2CCvI40y30F0FI"
   #editURL = "https://github.com/stderrat/stderrat.github.io/"
@@ -37,6 +39,8 @@ home = [ "HTML", "RSS", "JSON"]
   description = "TechBlog about OpenShift/Ansible/Satellite and much more"
   author = "Toni Schmidbauer & Thomas Jungbauer"
   disableBreadcrumb = false
+  # Hide the root/first breadcrumb (typically "YAUB Yet Another Useless Blog")
+  disableRootBreadcrumb = true
   disableNextPrev = false
   disableMermaid = false
   titleSeparator = "::"

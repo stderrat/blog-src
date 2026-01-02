@@ -68,9 +68,20 @@
     <!-- Archive grouped by Year and Month -->
     {{ if (eq .Title "Archive") }}
     <div class="archive-by-month">
+    {{ $.Scratch.Set "prevYear" "" }}
     {{ range sort (.Site.RegularPages.GroupByDate "2006-01") ".Key" "desc" }}
       {{ $monthDate := printf "%s-01" .Key | time }}
-      <div class="archive-month-group">
+      {{ $year := $monthDate.Format "2006" }}
+      {{ $monthKey := $monthDate.Format "2006-01" }}
+      {{/* Add year header if this is a new year */}}
+      {{ if ne $year ($.Scratch.Get "prevYear") }}
+      <div id="{{ $year }}" class="archive-year-header">
+        <i class="fas fa-calendar-check"></i>
+        <span class="archive-year-title">{{ $year }}</span>
+      </div>
+      {{ $.Scratch.Set "prevYear" $year }}
+      {{ end }}
+      <div id="{{ $monthKey }}" class="archive-month-group">
         <h3 class="archive-month-header">
           <i class="far fa-calendar-alt"></i> <span class="archive-month-name">{{ $monthDate.Format "January 2006" }}</span>
           <span class="archive-count">({{ len .Pages }})</span>
