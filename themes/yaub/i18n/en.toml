@@ -16,9 +16,6 @@ other = "Summary: {{.Title }}"
 [Search-placeholder]
 other = "Search..."
 
-[Clear-History]
-other = "Clear History"
-
 [Attachments-label]
 other = "Attachments"
 

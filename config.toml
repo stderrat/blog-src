@@ -33,8 +33,6 @@ home = [ "HTML", "RSS", "JSON"]
   googleSiteVerification = "yq2Ib3doJVHVlEW2wtHap5WY54JhS2CCvI40y30F0FI"
   #editURL = "https://github.com/stderrat/stderrat.github.io/"
   # Author of the site, will be used in meta information
-  # Shows a checkmark for visited pages on the menu
-  showVisitedLinks = false
   disableInlineCopyToClipBoard = false
   description = "TechBlog about OpenShift/Ansible/Satellite and much more"
   author = "Toni Schmidbauer & Thomas Jungbauer"

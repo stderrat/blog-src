@@ -1,6 +1,5 @@
-<nav id="sidebar" class="{{if $.Site.Params.showVisitedLinks }}showVisitedLinks{{end}}">
+<nav id="sidebar">
 {{ $currentNode := . }}
-{{ $showvisitedlinks := .Site.Params.showVisitedLinks }}
   <div id="header-wrapper">
   <!-- Sidebar Toggle Button -->
   <button id="sidebar-toggle-btn" class="sidebar-toggle-btn" title="Toggle Sidebar" aria-label="Toggle Sidebar">
@@ -68,11 +67,11 @@
 
         {{if eq .Site.Params.ordersectionsby "title"}}
           {{range .Site.Home.Sections.ByTitle}}
-          {{ template "section-tree-nav" dict "sect" . "currentnode" $currentNode "showvisitedlinks" $showvisitedlinks}}
+          {{ template "section-tree-nav" dict "sect" . "currentnode" $currentNode }}
           {{end}}
         {{else}}
           {{range .Site.Home.Sections.ByWeight}}
-          {{ template "section-tree-nav" dict "sect" . "currentnode" $currentNode "showvisitedlinks" $showvisitedlinks}}
+          {{ template "section-tree-nav" dict "sect" . "currentnode" $currentNode }}
           {{end}}
         {{end}}
     </ul>
@@ -97,11 +96,11 @@
     <!-- Saved Articles / Bookmarks -->
     {{ partial "bookmarks-list.html" . }}
 
-    {{ if or hugo.IsMultilingual $showvisitedlinks }}
+    {{ if hugo.IsMultilingual }}
     <section id="prefooter">
       <hr/>
       <ul>
-      {{ if and hugo.isMultilingual (not .Site.Params.DisableLanguageSwitchingButton)}}
+      {{ if not .Site.Params.DisableLanguageSwitchingButton }}
         <li>
           <a class="padding">
             <i class="fas fa-language fa-fw"></i>
@@ -135,10 +134,6 @@
         </a>
         </li>
       {{end}}
-
-      {{ if $showvisitedlinks}}
-        <li><a class="padding" href="#" data-clear-history-toggle=""><i class="fas fa-history fa-fw"></i> {{T "Clear-History"}}</a></li>
-      {{ end }}
       </ul>
     </section>
     {{ end }}
@@ -151,7 +146,6 @@
 
 <!-- templates -->
 {{ define "section-tree-nav" }}
-{{ $showvisitedlinks := .showvisitedlinks }}
 {{ $currentNode := .currentnode }}
 {{ $currentFileUniqueID := "" }}
 {{ with $currentNode.File }}{{ $currentFileUniqueID = .UniqueID }}{{ end }}
@@ -167,9 +161,6 @@
       {{ $numberOfPages := (add (len ( where .Pages "Params.hidden" "ne" true )) (len ( where .Sections "Params.hidden" "ne" true ))) }}
       <a href="{{.RelPermalink}}" class="{{ if ne $numberOfPages 0 }}has-children{{ end }}">
           <span class="menu-title">{{safeHTML .Params.Pre}}{{or .Params.menuTitle .LinkTitle .Title}}{{safeHTML .Params.Post}}</span>
-          {{ if $showvisitedlinks}}
-            <i class="fas fa-check read-icon"></i>
-          {{ end }}
           {{ if ne $numberOfPages 0 }}
           <i class="fas fa-chevron-right menu-chevron"></i>
           {{ end }}
@@ -186,7 +177,7 @@
           {{ range $pages.ByTitle }}
             {{ if and .Params.hidden (not $.showhidden) }}
             {{else}}
-            {{ template "section-tree-nav" dict "sect" . "currentnode" $currentNode "showvisitedlinks" $showvisitedlinks }}
+            {{ template "section-tree-nav" dict "sect" . "currentnode" $currentNode }}
             {{end}}
           {{ end }}
         {{else}}
@@ -204,13 +195,13 @@
           {{ range $sortedNonSeriesPages }}
             {{ if and .Params.hidden (not $.showhidden) }}
             {{else}}
-            {{ template "section-tree-nav" dict "sect" . "currentnode" $currentNode "showvisitedlinks" $showvisitedlinks }}
+            {{ template "section-tree-nav" dict "sect" . "currentnode" $currentNode }}
             {{end}}
           {{ end }}
           {{ range $sortedSeriesPages }}
             {{ if and .Params.hidden (not $.showhidden) }}
             {{else}}
-            {{ template "section-tree-nav" dict "sect" . "currentnode" $currentNode "showvisitedlinks" $showvisitedlinks }}
+            {{ template "section-tree-nav" dict "sect" . "currentnode" $currentNode }}
             {{end}}
           {{ end }}
         {{end}}
@@ -222,7 +213,6 @@
       <li data-nav-id="{{.RelPermalink}}" title="{{.Title}}" class="dd-item {{if eq .File.UniqueID $currentFileUniqueID}}active{{end}}">
         <a href="{{ .RelPermalink}}">
         {{safeHTML .Params.Pre}}{{or .Params.menuTitle .LinkTitle .Title}}{{safeHTML .Params.Post}}
-        {{ if $showvisitedlinks}}<i class="fas fa-check read-icon"></i>{{end}}
         </a>
     </li>
      {{ end }}
