@@ -6,25 +6,41 @@
     <h3 id="related-heading"><i class="fas fa-link"></i> Related Articles</h3>
     <div class="related-grid">
         {{ range . }}
+        {{/* Save the related article context before entering with blocks */}}
+        {{ $article := . }}
+        {{/* Get position from the RELATED article's frontmatter (not current page) */}}
+        {{ $position := .Params.featured_image_position | default "center" }}
         <a href="{{ .RelPermalink }}" class="related-card no-highlight{{ if not .Params.featured_image }} no-image{{ end }}">
             {{/* Only show image container if featured_image exists */}}
             {{ with .Params.featured_image }}
+            {{/* 
+                featured_image_position controls which part of the image is shown.
+                Set in the RELATED article's frontmatter:
+                  featured_image_position: "center"      (default)
+                  featured_image_position: "top"         (show top of image)
+                  featured_image_position: "bottom"      (show bottom)
+                  featured_image_position: "center top"  (horizontal center, vertical top)
+                  featured_image_position: "20% 80%"     (custom x% y%)
+            */}}
             <div class="related-card-image">
-                <img src="{{ . }}" alt="Featured image for {{ $.Title }}" loading="lazy" class="inline" width="300" height="120">
+                <img src="{{ . }}" 
+                     alt="Featured image for {{ $article.Title }}" 
+                     loading="lazy" 
+                     style="object-position: {{ $position }};">
             </div>
             {{ end }}
             <div class="related-card-content">
                 <span class="related-card-category">
-                    {{ with .Params.categories }}{{ index . 0 }}{{ end }}
+                    {{ with $article.Params.categories }}{{ index . 0 }}{{ end }}
                 </span>
-                <span class="related-card-title">{{ .Title }}</span>
+                <span class="related-card-title">{{ $article.Title }}</span>
                 <span class="related-card-meta">
-                    <time datetime="{{ .Date.Format "2006-01-02" }}">
-                        {{ .Date.Format "Jan 2, 2006" }}
+                    <time datetime="{{ $article.Date.Format "2006-01-02" }}">
+                        {{ $article.Date.Format "Jan 2, 2006" }}
                     </time>
-                    {{ if .Params.authors }}
+                    {{ if $article.Params.authors }}
                     <span class="related-card-author">
-                        · {{ index .Params.authors 0 }}
+                        · {{ index $article.Params.authors 0 }}
                     </span>
                     {{ end }}
                 </span>
