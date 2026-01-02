@@ -24,7 +24,7 @@ aliases: [
 ]
 ---
 
-:imagesdir: /images/
+:imagesdir: /openshift-platform/other-topics/images/
 :icons: font
 :toc:
 
@@ -107,6 +107,57 @@ spec:
 
 CAUTION: If you're using a custom CA, create the ConfigMap beforehand or alongside the `HostedCluster` resource. The ConfigMap must contain a key named `ca-bundle.crt` with your CA certificate(s).
 
+## But wait there is more...
+
+If you are using such a proxy, which is injecting it's own certificate, then you probably saw the following: The *Release Image* is not available when you try to deploy a new Hosted Control Plane.
+The drop down in the UI is empty and you can't select a release image.
+
+This happens because the Pod that is trying to fetch the image is not able to connect to Github. 
+
+You can test this with the following commands:
+
+[source,bash]
+----
+
+oc rsh cluster-image-set-controller-XXXXX -n multicluster-engine <1>
+
+curl -v https://github.com/stolostron/acm-hive-openshift-releases.git/info/refs?service=git-upload-pack <2>
+----
+<1> Replace *XXXXX* with the name of the Pod cluster-image-set-controller in the *multicluster-engine* namespace
+<2> Try to execute the curl command to see if you can connect to Github
+
+If this command fails with a certificate error, then you need to add the certificate to the Pod/Deployment.
+A Configmap called *trusted-ca-bundle* should already exist in the multicluster-engine namespace. If not, it must be created with the certificate chain of your Proxy (key: ca-bundle.crt) 
+
+The following command will add the ConfigMap to the deployment.
+
+[source,bash]
+----
+oc -n multicluster-engine set volume deployment/cluster-image-set-controller --add --type configmap --configmap-name trusted-ca-bundle --name trusted-ca-bundle --mount-path /etc/pki/tls/certs/ --overwrite
+----
+
+Wait a couple of minutes after the Pods has been restarted. It will try to download the release images from Github again.
+
+You can check the logs of the Pod to see if the download was successful.
+
+[source,bash]
+----
+oc logs cluster-image-set-controller-XXXXX -n multicluster-engine <1>
+----
+<1> Replace *XXXXX* with the name of the Pod cluster-image-set-controller in the *multicluster-engine* namespace
+
+That should do it, you should now be able to select a release image and deploy a new Hosted Control Plane.
+
+.Drow Down with Release Images
+image::HCP-Release-Images.png["Release Images"]
+
 ## Summary 
 
 That's actually everything you need for proxy configuration with Hosted Control Planes. Hopefully, the official OpenShift documentation will be updated soon to include this information.
+red Hat created two tickets to track the progress of this:
+
+* https://issues.redhat.com/browse/ACM-10151[ACM-10151^]
+* https://issues.redhat.com/browse/ACM-23664[ACM-23664^]
+
+
+
