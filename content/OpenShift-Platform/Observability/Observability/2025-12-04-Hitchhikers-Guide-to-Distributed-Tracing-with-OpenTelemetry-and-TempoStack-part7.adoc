@@ -11,6 +11,7 @@ series_part: 7
 featured_image: /openshift-platform/observability/images/observability/Logo_observability_7.png
 show_featured_image_summary: true
 show_featured_image_article: true
+featured_image_position: 50% 35%
 disableBreadcrumb: true
 
 authors: [Thomas Jungbauer]
