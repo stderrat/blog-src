@@ -10,10 +10,3 @@
 {{ partial "summary_index.html" . }}
 
 {{ partial "footer.html" . }}
-
-{{/* Right Navigation Sidebar - positioned fixed, outside main content flow */}}
-{{ if .Site.Params.enableRightSidebar }}
-<nav id="right-sidebar" class="right-nav-sidebar" aria-label="Archive and Updates">
-    {{ partial "sidebar-widgets.html" . }}
-</nav>
-{{ end }}
