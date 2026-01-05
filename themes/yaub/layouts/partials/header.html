@@ -4,6 +4,16 @@
     <script>
       document.documentElement.className = document.documentElement.className.replace('no-js', 'js');
       
+      {{- if not .Site.Params.disableThemeToggle }}
+      // Apply theme immediately to prevent flash of wrong theme
+      (function() {
+        var stored = null;
+        try { stored = localStorage.getItem('yaub-theme'); } catch(e) {}
+        var theme = stored || (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+        document.documentElement.setAttribute('data-theme', theme);
+      })();
+      {{- end }}
+      
       // Detect Mac for keyboard shortcuts (runs before paint to prevent flash)
       if (navigator.platform.toUpperCase().indexOf('MAC') >= 0) {
         document.documentElement.classList.add('is-mac');

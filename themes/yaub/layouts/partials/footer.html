@@ -124,70 +124,16 @@
     
     <!-- WebP image upgrade for better performance (works with AsciiDoc) -->
     <script src="{{"js/webp-upgrade.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
-    <script src="{{"js/highlight.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
-    <script>
-      // Plugin to preserve AsciiDoc callout (conum) elements during highlighting
-      // AsciiDoc generates: <i class="conum" data-value="1"></i><b>(1)</b>
-      // Both elements need to be preserved and restored after highlighting
-      (function() {
-        var conumPlaceholder = 'HLJS_CONUM_';
-        var conumStore = {};
-        var conumCounter = 0;
-        
-        // Register plugin with highlight.js
-        hljs.addPlugin({
-          'before:highlightElement': function(context) {
-            var el = context.el;
-            var conums = el.querySelectorAll('.conum[data-value]');
-            
-            conums.forEach(function(conum) {
-              var id = conumPlaceholder + (conumCounter++);
-              // Store the conum HTML and any following <b> sibling
-              var html = conum.outerHTML;
-              var nextSibling = conum.nextSibling;
-              
-              // Check if next sibling is a <b> element (AsciiDoc fallback text)
-              if (nextSibling && nextSibling.nodeType === 1 && nextSibling.tagName === 'B') {
-                html += nextSibling.outerHTML;
-                nextSibling.parentNode.removeChild(nextSibling);
-              }
-              
-              conumStore[id] = html;
-              // Replace conum with text placeholder
-              var placeholder = document.createTextNode(id);
-              conum.parentNode.replaceChild(placeholder, conum);
-            });
-          },
-          'after:highlightElement': function(context) {
-            var el = context.el;
-            var html = el.innerHTML;
-            
-            // Replace all placeholders with original conum HTML
-            Object.keys(conumStore).forEach(function(id) {
-              // Use split/join for safer replacement (no regex special char issues)
-              html = html.split(id).join(conumStore[id]);
-            });
-            el.innerHTML = html;
-          }
-        });
-        
-        // Configure highlight.js
-        hljs.configure({
-          ignoreUnescapedHTML: true
-        });
-        
-        // Run highlighting
-        hljs.highlightAll();
-        
-        // Clear store
-        conumStore = {};
-        conumCounter = 0;
-      })();
-    </script>
+    <script src="{{"js/highlight.pack.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+
     <!-- Modernizr removed - replaced with inline JS in header.html -->
     <script src="{{"js/learn.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
     <script src="{{"js/yaub.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
     <script src="{{"js/reader-mode.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+    {{- if not .Site.Params.disableThemeToggle }}
+    <script src="{{"js/theme-toggle.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+    {{- end }}
     
     <!-- Search Modal (Cmd/Ctrl+K) -->
     <link href="/pagefind/pagefind-ui.css" rel="stylesheet">

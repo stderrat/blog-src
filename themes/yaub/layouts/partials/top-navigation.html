@@ -38,6 +38,20 @@
                   <!-- Spacer to push buttons to the right -->
                   <li class="topnav-spacer"></li>
 
+                  {{- if not .Site.Params.disableThemeToggle }}
+                  <!-- Theme Toggle Button -->
+                  <li class="list-horizontal theme-toggle-li">
+                      <button id="theme-toggle-btn" class="theme-toggle-btn" type="button" aria-label="Switch to light mode" title="Switch to light mode">
+                          <span class="theme-toggle-icon theme-toggle-sun">
+                              <i class="fas fa-sun"></i>
+                          </span>
+                          <span class="theme-toggle-icon theme-toggle-moon">
+                              <i class="fas fa-moon"></i>
+                          </span>
+                      </button>
+                  </li>
+                  {{- end }}
+
                   <!-- Help Button (keyboard shortcuts) -->
                   <li class="list-horizontal topnav-help-li">
                       <button class="topnav-help-btn" onclick="window.ShortcutsModal && window.ShortcutsModal.open()" title="Keyboard shortcuts" aria-label="Show keyboard shortcuts">
