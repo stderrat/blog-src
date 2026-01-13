@@ -212,8 +212,8 @@
     {{ partial "keyboard-hints.html" . }}
     {{ partial "custom-footer.html" . }}
 
-    {{/* Right Navigation Sidebar - only on homepage */}}
-    {{ if and .IsHome .Site.Params.enableRightSidebar }}
+    {{/* Right Navigation Sidebar - on homepage and section landing pages */}}
+    {{ if and (or .IsHome .IsSection) .Site.Params.enableRightSidebar }}
     <nav id="right-sidebar" class="right-nav-sidebar" aria-label="Archive and Updates">
         {{ partial "sidebar-widgets.html" . }}
     </nav>

@@ -19,7 +19,7 @@
 
     <div class="absolute submenu-div">
       {{ range sort .Children "Weight" }}
-        <a href="{{ .URL }}" class="submenu-style submenu-link display-block"><i class='{{ .Pre }}'></i>{{default .Name}}</a>
+        <a href="{{ .URL }}" class="submenu-style submenu-link display-block">{{ if .Pre }}<i class='{{ .Pre }}'></i>{{ end }}{{ safeHTML .Name }}</a>
       {{ end }}
     </div>
   </div>
