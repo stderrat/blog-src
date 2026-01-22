@@ -8,18 +8,14 @@
 
 <div class="article-cards-grid">
 
-		{{ range (.Paginator 14).Pages }}{{ end }}
 		<section class="article-cards-container">
-		  <!-- 1. Get all posts -->
-		  {{ $posts := .Site.GetPage "posts" }}
+		  <!-- 1. Get all posts with type "post" sorted by date -->
+		  {{ $allPages := where .Site.RegularPages "Type" "post" }}
+		  {{ $allPages = $allPages.ByDate.Reverse }}
 	  
-		  <!-- 2. Sort them from featured to regular, chronologically -->
-		  {{ $featuredPosts := where $posts.Pages ".Params.featured" true }}
-		  {{ $regularPosts := where $posts.Pages ".Params.featured" false }}
-		  {{ $sortedPosts := union $featuredPosts $regularPosts }}
-
-		  <!-- 3. Feed the paginator with these sorted posts -->
-		  {{ $paginator := .Paginate $regularPosts }}
+		  <!-- 2. All posts sorted by date (newest first) -->
+		  <!-- 3. Feed the paginator with these sorted posts (14 per page) -->
+		  {{ $paginator := .Paginate $allPages 14 }}
 		  <!-- 4. Loop through the posts -->
 		  {{ range $paginator.Pages }}
 		    <div class="article-card summary-gradient relative ba b--moon-gray nested-copy-line-height weight-5">

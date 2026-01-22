@@ -1,0 +1,763 @@
+--- 
+title: "[Ep.15] OpenShift GitOps - Argo CD Agent"
+description: "Learn how to install and configure the Argo CD Agent for multi-cluster management with OpenShift GitOps using hub and spoke architecture"
+date: "2026-01-14"
+doctype: book
+weight: 99
+
+series: "GitOps Episodes"
+series_part: 15
+
+featured_image: /gitopscollection/images/agent/Logo-ArgoCDAgent.png
+show_featured_image_summary: true
+show_featured_image_article: true
+featured_image_position: 25% 35%
+disableBreadcrumb: true
+
+authors: [Thomas Jungbauer]
+draft: true
+type: post
+categories:
+   - GitOps
+   - OpenShift
+
+tags: ["Argo CD", "Argo CD Agent", "OpenShift GitOps", "OpenShift", "OCP", "GitOps", "Multi-cluster", "Hub and Spoke", "Kubernetes", "Helm", "mTLS", "Application", "ApplicationSet"]
+
+aliases: []
+---
+
+:imagesdir: /gitopscollection/images/
+:icons: font
+:toc:
+
+OpenShift GitOps based on Argo CD is a powerful tool to manage the infrastructure and applications on an OpenShift cluster. Initially, there were two ways of deployment: centralized and decentralized (or distributed). Both methods had their own advantages and disadvantages. The choice was mainly between scalability and centralization.
+With OpenShift GitOps v1.19, the Argo CD Agent was finally generally available. This agent tries to solve this problem by bringing the best of both worlds together. In this quite long article, I will show you how to install and configure the Argo CD Agent with OpenShift GitOps using hub and spoke architecture.
+
+<!--more--> 
+
+## Classic Deployment Models:
+
+Prior to the Argo CD Agent, there were two classic and often used deployment models: **centralized** and **decentralized**.
+
+### Centralized Model
+
+In a centralized deployment, all changes are applied to a single, central Argo CD instance, often installed on a management cluster. This is the traditional way of deploying Argo CD, at least in my opinion. With this model, you have a single pane of glass to manage all your clusters. You have a single UI and will see all your clusters in one place, which makes this model very convenient when you have multiple clusters. However, the scalability of this model is limited. Organizations with a huge number of clusters or Argo CD applications would hit some boundaries at some point. A sharding configuration would help, but only to a certain extent. The performance would degrade significantly. In addition, this model creates a Single Point of Failure. If this instance is down, the company loses the ability to manage their clusters through Argo CD.
+
+NOTE: I often saw or used this model for the cluster configuration.
+
+### Decentralized Model
+
+In a decentralized deployment, multiple instances of Argo CD, often one for each cluster, are installed. With this approach, the issue with scalability is solved. Moreover, the Single Point of Failure is eliminated as well, since a broken instance will not affect the other instances. However, the disadvantages of this model are that the complexity for the operational teams will increase, since they need to manage multiple instances now. Also, the single pane of glass for management is lost, as there are multiple UIs to manage.
+
+NOTE: I often saw or used this model for the application deployment.
+
+
+## The - not so secret - Argo CD Agent
+
+The **Argo CD Agent**, released as generally available in OpenShift GitOps v1.19, is a new way to use Argo CD. It tries to solve the challenges of the classic deployment models by combining the best of both worlds. The Agent allows you to have a single UI in a central control plane, while the application controller is distributed across the fleet of clusters. Agents on the different clusters will communicate with the central Argo CD instance. 
+
+The Agent model introduces a hub and spoke architecture:
+
+* Control plane cluster (hub) - The control plane cluster is the central cluster that manages the configuration for multiple spokes.
+* Workload cluster (spoke) - The workload cluster is the cluster that runs the application workloads deployed by Argo CD.
+
+
+Each Argo CD Agent on a cluster manages the local Argo CD instance and ensures that applications, AppProjects, and secrets remain synchronized with their source of truth.
+
+
+The official documentation describes a comparison between the classic deployment models and the Argo CD Agent: https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/1.19/html/argo_cd_agent_architecture/argocd-agent-architecture#gitops-architecture-argocd-agent-comparison_argocd-agent-architecture-overview[GitOps Architecture - Argo CD Agent Comparison^]
+
+
+### Argo CD Agent Modes 
+
+The Argo CD Agent supports two modes of operation: Managed and Autonomous.
+The mode determines where the authoritative source of truth for the Application .spec field resides.
+
+* Managed mode — the control plane/hub defines Argo CD applications and their specifications.
+* Autonomous mode — each workload cluster/spoke defines its own Argo CD applications and their specifications.
+
+NOTE: A mixed mode is also possible.
+
+
+
+#### Managed Mode
+
+Using the managed mode means that the control plane is the source of truth and is responsible for the Argo CD application resources and their distribution across the different workload clusters. 
+Any change on the hub cluster will be propagated to the spoke clusters. Any changes made on the spoke/workload cluster will be reverted to match the control plane configuration. 
+
+#### Autonomous Mode
+
+Using this mode, the Argo CD applications are defined on the workload clusters, which serve as their own source of truth. The applications are synchronized back to the control plane for observability.
+Changes made on the workload cluster are not reverted, but will appear on the control plane. On the other hand, you cannot modify applications directly from the control plane.
+
+
+### Security
+
+The Argo CD Agent uses mTLS certificates to communicate between the hub and the spoke clusters. 
+
+CAUTION: The certificate must be created and managed by the user.
+
+'''
+
+
+## Argo CD Agent Installation
+
+The agent consists of two components that are responsible to synchronize the Argo CD applications between the hub and the spoke clusters.
+
+* Principal - Deployed on the control plane cluster together with Argo CD. Here the central UI (and API) can be found. 
+* Agent - Deployed on the workload clusters to synchronize the Argo CD applications.
+
+The installation of both is done differently. But before we dive into the installation, let's have a look at the terminology to understand the different components and their roles.
+
+This is a quote from the official documentation (https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/1.19/html/argo_cd_agent_installation/argocd-agent-installation#gitops-argocd-agent-terminologiest_argocd-agent-installation[Argo CD Agent Terminologies^])
+
+* **Principal namespace** - Specifies the namespace where you install the Principal component. This namespace is not created by default, you must create it before adding the resources in this namespace. In Argo CD Agent CLI commands, this value is provided using the --principal-namespace flag.
+* **Agent namespace** - Specifies the namespace hosting the Agent component. This namespace is not created by default, you must create it before adding the resources in this namespace. In Argo CD Agent CLI commands, this value is provided using the --agent-namespace flag.
+* **Context** - A context refers to a named configuration in the oc CLI that allows you to switch between different clusters. You must be logged in to all clusters and assign distinct context names for the hub and spoke clusters. Examples for cluster names include principal-cluster, hub-cluster, managed-agent-cluster, or autonomous-agent-cluster.
+* **Principal context** - The context name you provide for the hub (control plane) cluster. For example, if you log in to the hub cluster and rename its context to principal-cluster, you specify it in Argo CD Agent CLI commands as --principal-context principal-cluster.
+* **Agent context** - The context name you provide for the spoke (workload) cluster. For example, if you log in to a spoke cluster and rename its context to autonomous-agent-cluster, you specify it in Argo CD Agent CLI commands as --agent-context autonomous-agent-cluster.
+
+### A Word about the Setup
+
+To create some kind of real customer scenario, I have created two clusters:
+
+1. The cluster where we installed the Principal component. This will be the Hub/Management/Principal cluster (We have too many words for this...)
+2. A separate cluster that will be the Agent cluster. This will be the Spoke/Workload cluster.
+
+The first one I have installed on AWS, and the second one is a Bare Metal Single node cluster. Both can reach each other via the Internet.
+
+WARNING: We are using different contexts for the different clusters for the command line. The *argocd-agentctl* tool knows the flags **--principal-context** and **--agent-context** to switch between the different clusters. Be sure to create the resources on the correct cluster. 
+
+### Prerequisites
+
+Before we start with the installation of the Principal or Agent component, we need to ensure that the following prerequisites are met:
+
+* We have two OpenShift test clusters.
+* Both clusters can reach each other
+* OpenShift GitOps Operator is already installed (possible configuration modifications are described in the following sections)
+
+NOTE: Because of my main focus on OpenShift GitOps, we will try to deploy cluster configurations and not just workload. Therefore, the example Argo CD applications will configure cluster settings. (A banner on the top and bottom of the UI) 
+
+### Configure OpenShift GitOps Subscription on the Hub Cluster
+
+The OpenShift GitOps Operator installs by default an Argo CD instance. In this test we will disable this, as we do not need that instance. Moreover and even more important, we need to tell the Operator for which namespaces it should feel responsible for. In this case, we will tell the Operator to be responsible for all namespaces on the cluster.
+
+We need to modify the Subscription **openshift-gitops-operator** and add the following environment variables:
+
+[source,yaml]
+----
+spec:
+  config:
+    env:
+      - name: DISABLE_DEFAULT_ARGOCD_INSTANCE <1>
+        value: 'true'
+      - name: ARGOCD_CLUSTER_CONFIG_NAMESPACES <2>
+        value: '*'
+----
+<1> Optional: Disable the default Argo CD instance.
+<2> Tell the Operator for which namespaces it should feel responsible for. In this case, all Namespaces. This is important for a namespace-scoped Argo CD instance, which we will install in the next step.
+
+
+### Activate the Principal Component
+To activate the Principal components we first need a cluster (the Hub) where OpenShift GitOps is installed. On this cluster, there might be a running instance of Argo CD already.
+However, at this time an existing Argo CD **cannot** be used. Instead, a new Argo CD instance must be created.  (This is because the controller must not be activated)
+
+In my case, I will install the Principal component in the namespace **argocd-principal**.
+
+To create an Argo CD instance we need to create the following configuration: 
+
+CAUTION: At this very stage, the principal component must be installed in a separate Argo CD instance, since the controller must not be activated. Therefore we create a new Argo CD instance in a new namespace.
+
+[source,yaml]
+----
+apiVersion: argoproj.io/v1beta1
+kind: ArgoCD
+metadata:
+  name: hub-argocd
+  namespace: argocd-principal
+spec:
+  controller:
+    enabled: false <1>
+  argoCDAgent:
+    principal:
+      enabled: true <2>
+      auth: "mtls:CN=([^,]+)" <3>
+      logLevel: "info"
+      namespace:
+        allowedNamespaces: <4>
+          - "*"
+      tls:
+        insecureGenerate: false <5>
+      jwt:
+        insecureGenerate: false
+  sourceNamespaces: <6>
+    - "argocd-agent-bm01"
+  server:
+    route:
+      enabled: true <7>
+----
+<1> Disable the controller component.
+<2> Enable the Principal component.
+<3> Authentication method for the Principal component.
+<4> Allowed namespaces for the Principal component.
+<5> Insecure generation of the TLS certificate.
+<6> Specifies the sourceNamespaces configuration. (Such a list might already exist)
+<7> Enable the Route for the Principal component.
+
+This will start a Pod called **hub-gitops-agent-principal** in the namespace **argocd-principal**. However, this pod will **fail** at this moment and that is fine. 
+
+[source,bash]
+----
+Pod hub-gitops-agent-principal is failing with: 
+{"level":"info","msg":"Setting loglevel to info","time":"2026-01-19T13:45:57Z"}
+time="2026-01-19T13:45:57Z" level=info msg="Loading gRPC TLS certificate from secret argocd-principal/argocd-agent-principal-tls"
+time="2026-01-19T13:45:57Z" level=info msg="Loading root CA certificate from secret argocd-principal/argocd-agent-ca"
+time="2026-01-19T13:45:57Z" level=info msg="Loading resource proxy TLS certificate from secrets argocd-principal/argocd-agent-resource-proxy-tls and argocd-principal/argocd-agent-ca"
+[FATAL]: Error reading TLS config for resource proxy: error getting proxy certificate: could not read TLS secret argocd-principal/argocd-agent-resource-proxy-tls: secrets "argocd-agent-resource-proxy-tls" not found <1>
+----
+<1> The secret is not yet available.
+
+CAUTION: The Pod is failing at the moment because the different secrets for authentication, are not yet available. The Secrets are created in a later step, because some settings, such as the principal hostname and resource proxy service names, are available only after the Red Hat OpenShift GitOps Operator enables the principal component.
+
+At this point the Operator created the Route object already:
+
+[source,bash]
+----
+Route: hub-gitops-agent-principal
+Hostname: https://hub-gitops-agent-principal-argocd-principal.apps.ocp.aws.ispworld.at
+Service: hub-gitops-agent-principal
+----
+
+### Configure the AppProject
+
+If you configured the AppProject with sourceNamespaces, you need to add the following to the AppProject (for example to the **default** AppProject). This must match exactly the namespaces you have created for the Agent.
+
+[source,yaml]
+----
+spec:
+  sourceNamespaces:
+    - "argocd-agent-bm01"
+----
+
+You can also use this patch command:
+
+[source,bash]
+----
+oc patch appproject default -n argocd-principal --type='merge' \
+  -p '{"spec": {"sourceNamespaces": ["argocd-agent-bm01"]}}' --context aws
+----
+
+Restart the Argo CD Pods to apply the changes.
+
+### Download argocd-agentctl
+
+To create the required secrets, we need to download the **argocd-agentctl** tool. 
+
+This can be found at: https://developers.redhat.com/content-gateway/rest/browse/pub/cgw/openshift-gitops/ 
+
+Download and install it for your platform.
+
+### Create Required Secrets
+
+The following steps will create the required secrets for the Principal component. In this example, we will create our own CA and certificates. This is suitable for development and testing purposes. For production environments, you should use certificates issued by your organization’s PKI or a trusted certificate authority.
+
+CAUTION: Use your company's CA and certificates for production environments.
+
+#### Initialize the Certificate Authority (CA)
+To create a certificate authority (CA) that signs other certificates, we need to run the following command:
+
+[source,bash]
+----
+argocd-agentctl pki init \
+    --principal-namespace argocd-principal \ <1>
+    --principal-context aws
+----
+<1> The namespace where the Principal component is running.
+
+This will initialize the CA and store it in the secret **argocd-principal/argocd-agent-ca**. The certificate looks like: 
+
+[source,bash]
+----
+"Certificate Information:
+Common Name: argocd-agent-ca
+Subject Alternative Names:
+Organization: DO NOT USE IN PRODUCTION
+Organization Unit:
+Locality:
+State:
+Country:
+Valid From: January 15, 2026
+Valid To: January 15, 2036
+Issuer: argocd-agent-ca, DO NOT USE IN PRODUCTION
+Serial Number: 1 (0x1)"
+----
+
+#### Generate Service Certificate for the Principal
+
+To generate the server certificate for the Principal’s gRPC service, run the following command:
+
+[source,bash]
+----
+argocd-agentctl pki issue principal \
+    --principal-namespace argocd-principal \
+    --principal-context aws \
+    --dns "<YOUR PRINCIPAL HOSTNAME>" <1>
+----
+<1> The hostname of the Principal service. This must match with the hostname of the Principal's route (spec.host) or, in case a LoadBalancer Service is used, with .status.loadBalancer.ingress.hostname.
+
+
+#### Generate the Resource Proxy Certificate
+
+The resource proxy service requires a certificate as well. Since the proxy will run on the same cluster as the Principal, we can use the service name directly.
+This is generated by the following command:
+
+[source,bash]
+----
+argocd-agentctl pki issue resource-proxy \
+    --principal-namespace argocd-principal \
+    --principal-context aws \
+    --dns hub-argocd-agent-principal-resource-proxy <1>
+----
+<1> The service name for the resource-proxy. This must match with the service name of the Resource Proxy service.
+
+
+#### Generate the JWT Signing Key
+
+Generate the RSA private key for the JWT signing key by running the following command:
+
+[source,bash]
+----
+argocd-agentctl jwt create-key \
+    --principal-namespace argocd-principal \
+    --principal-context aws
+----
+
+This will generate the RSA private key and store it in the secret **argocd-principal/argocd-agent-jwt**.
+
+### Verify the Principal Component
+Now the principal pod should be running successfully. 
+
+NOTE: If the Pod still shows an error, wait a few moments or restart the Pod.
+
+In the logs you should see the following:
+[source,bash]
+----
+{"level":"info","msg":"Setting loglevel to info","time":"2026-01-19T14:09:31Z"}
+time="2026-01-19T14:09:31Z" level=info msg="Loading gRPC TLS certificate from secret argocd-principal/argocd-agent-principal-tls"
+time="2026-01-19T14:09:31Z" level=info msg="Loading root CA certificate from secret argocd-principal/argocd-agent-ca"
+time="2026-01-19T14:09:31Z" level=info msg="Loading resource proxy TLS certificate from secrets argocd-principal/argocd-agent-resource-proxy-tls and argocd-principal/argocd-agent-ca"
+time="2026-01-19T14:09:31Z" level=info msg="Loading JWT signing key from secret argocd-principal/argocd-agent-jwt"
+time="2026-01-19T14:09:31Z" level=info msg="Starting argocd-agent (server) v99.9.9-unreleased (ns=argocd-principal, allowed_namespaces=[*])" module=server
+----
+
+This concludes the configuration of the Principal component. There are a lot of steps to create the required secrets, but this is only done once. A GitOps-friendly way to achieve this might be done using a Kubernetes Job (if you consider this as GitOps-friendly... which I do).
+
+'''
+
+## Activate the Agent Component
+
+After the Principal component is configured, you can activate one or more Agents (spoke or workload clusters) and connect them with the Hub.
+
+The prerequisites are:
+
+* The Principal component is configured and running.
+* You have access to both the Principal and Agent clusters.
+* The argocd-agentctl CLI tool is installed and accessible from your environment.
+* The helm CLI is installed and configured. Ensure that the helm CLI version is later than v3.8.0.
+* OpenShift GitOps Operator is installed and configured on the Agent cluster.
+
+NOTE: Yes, a separate Helm Chart will be used to install the Agent component on the target cluster. This time it is not a Chart that I created, but one provided by Red Hat. :)
+
+### Create Agent Secret on Principal Cluster
+
+We first need to create an agent on the Principal cluster. 
+
+[source,bash]
+----
+argocd-agentctl agent create "argocd-agent-bm01" \ <1>
+  --principal-context "aws" \ <2>
+  --principal-namespace "argocd-principal" \ <3>
+  --resource-proxy-server "hub-argocd-agent-principal-resource-proxy:9090" <4>
+----
+<1> A (unique) name for the Agent.
+<2> The context name for the Principal cluster. In my case it is "aws".
+<3> The namespace where the Principal component is running.
+<4> The resource proxy server URL. This is the URL of the Principal's resource proxy service including the port (9090).
+
+This will create the secret **cluster-argocd-agent-bm01** with the label **argocd.argoproj.io/secret-type: cluster** in the Argo CD namespace. 
+
+### Create the Agent Namespace on the Agent Cluster
+
+Be sure that the target namespace on the agent or workload cluster exists. If not, create it first.
+
+[source,bash]
+----
+oc create namespace argocd-agent-bm01 --context bm <1>
+----
+<1> The name of the namespace.
+
+### Propagate the Principal CA to the Agent Cluster
+
+To copy the CA certificate from the principal to the agent cluster the following command is used:
+
+[source,bash]
+----
+argocd-agentctl pki propagate \
+    --agent-context bm \ <1>
+    --principal-context aws \ <2>
+    --principal-namespace argocd-principal \ <3>
+    --agent-namespace argocd-agent-bm01 <4>
+----
+<1> The context name for the Agent cluster.
+<2> The context name for the Principal cluster.
+<3> The namespace where the Principal component is running.
+<4> The namespace where the Agent component is running.
+
+This will copy the CA certificate from the Principal cluster to the Agent cluster into the namespace and secret **argocd-agent-bm01/argocd-agent-ca**.
+
+NOTE: Only the certificate is copied. The private key is not copied.
+
+### Generate a client certificate for the Agent
+
+Now we need to create, based on the imported CA, a client certificate for the Agent. This is done by the following command:
+
+[source,bash]
+----
+argocd-agentctl pki issue agent "argocd-agent-bm01" \
+    --principal-context "aws" \
+    --agent-context "bm" \
+    --agent-namespace "argocd-agent-bm01" \
+    --principal-namespace "argocd-principal"
+----
+
+This will create the secret **argocd-agent-client-tls** on the workload cluster, containing a certificate and a key, signed by the CA certificate imported from the Principal cluster.
+
+### Configure OpenShift GitOps Subscription on the Spoke Cluster
+
+The OpenShift GitOps Operator installs by default an Argo CD instance. In this test we will disable this, as we do not need that instance. Moreover and even more important, we need to tell the Operator for which namespaces it should feel responsible for. In this case, we will tell the Operator to be responsible for all namespaces on the cluster.
+
+We need to modify the Subscription **openshift-gitops-operator** and add the following environment variables:
+
+[source,yaml]
+----
+spec:
+  config:
+    env:
+      - name: DISABLE_DEFAULT_ARGOCD_INSTANCE <1>
+        value: 'true'
+      - name: ARGOCD_CLUSTER_CONFIG_NAMESPACES <2>
+        value: '*'
+----
+<1> Disable the default Argo CD instance.
+<2> Tell the Operator for which namespaces it should feel responsible for. In this case, all Namespaces.
+
+### Create Argo CD Instance on the Agent Cluster
+
+To create a minimalistic Argo CD instance on the Agent cluster, we can use the following Argo CD configuration:
+
+[source,yaml]
+----
+apiVersion: argoproj.io/v1beta1
+kind: ArgoCD
+metadata:
+  name: agent-argocd
+  namespace: argocd-agent-bm01 <1>
+spec:
+  server:
+    enabled: false
+----
+<1> The namespace where the Argo CD instance is running. This is also the name of the Agent we have created earlier on the principal cluster.
+
+This will create a lightweight Argo CD instance in the namespace **argocd-agent-bm01**. 
+
+[source,bash]
+----
+oc get pod -n argocd-agent-bm01 --context bm
+NAME                                            READY   STATUS    RESTARTS   AGE
+agent-argocd-application-controller-0       1/1     Running   0          2m49s
+agent-argocd-redis-5f6759f6fb-2fdnt         1/1     Running   0          2m49s
+agent-argocd-repo-server-7949d97dfd-dsk6b   1/1     Running   0          2m49s
+----
+
+'''
+
+## Installing the Agent
+
+To install the agent we will use a Helm Chart provided by Red Hat. This will install the Agent component on the target cluster.
+
+As a reminder, we have two modes of operation for the Agent:
+
+* **Managed mode** — the control plane/hub defines Argo CD applications and their specifications.
+* **Autonomous mode** — each workload cluster/spoke defines its own Argo CD applications and their specifications.
+
+### Create Required Network Policy
+
+Before we start with the actual installation of the Agent, we need to ensure that the Redis instance on the spoke cluster is accessible for the Agent. We need to create a NetworkPolicy accordingly:
+
+[source,yaml]
+----
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: argocd-agent-bm01-redis-network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: agent-argocd-redis <1>
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 6379
+      from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: argocd-agent-agent
+  policyTypes:
+    - Ingress
+----
+<1> The name of the Redis instance. The label is based on <instance name>-redis.
+
+Apply the NetworkPolicy to the spoke cluster:
+
+[source,bash]
+----
+oc apply -f network-policy.yaml -n argocd-agent-bm01 --context bm
+----
+
+### Add the Helm Chart Repository 
+
+Add the Helm repository:
+
+[source,bash]
+----
+helm repo add openshift-helm-charts https://charts.openshift.io/
+helm repo update
+----
+
+### Install a managed Agent with the Helm Chart
+
+Install the agent in the **managed** mode using the Helm Chart. The following parameters are used:
+
+* **namespaceOverride** - The namespace where the Agent is running.
+* **agentMode** - The mode of the Agent.
+* **server** - The server URL of the Principal component. This is the spec.host setting of the Principal's route.
+* **argoCdRedisSecretName** - The name of the Redis secret.
+* **argoCdRedisPasswordKey** - The key of the Redis password.
+* **redisAddress** - The address of the Redis instance.
+
+[source,bash]
+----
+helm install redhat-argocd-agent openshift-helm-charts/redhat-argocd-agent \
+--set namespaceOverride=argocd-agent-bm01 \
+--set agentMode="managed" \
+--set server="serverURL of principal route" \
+--set argoCdRedisSecretName="agent-argocd-redis-initial-password" \
+--set argoCdRedisPasswordKey="admin.password" \
+--set redisAddress="agent-argocd-redis:6379" \
+--kube-context "bm"
+----
+
+With this chart a pod on the **spoke** cluster will be created and will start to synchronize the Argo CD applications between the hub and the spoke cluster.
+
+### Verify the Managed Agent
+
+To verify the Agent in **managed** mode we need to create an Argo CD Application on the **hub** cluster. We can try the following Application. The Application is taken from the https://github.com/tjungbauer/openshift-clusterconfig-gitops[openshift-clusterconfig-gitops^] repository and simply adds a banner to the top of the OpenShift UI. I typically use this as a quick test if GitOps is working. 
+
+[source,yaml]
+----
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: branding
+  namespace: argocd-agent-bm01 <1>
+spec:
+  destination:
+    namespace: default
+    server: 'https://hub-argocd-agent-principal-resource-proxy:9090?agentName=argocd-agent-bm01' <2>
+  project: default
+  source:
+    path: clusters/management-cluster/branding
+    repoURL: 'https://github.com/tjungbauer/openshift-clusterconfig-gitops'
+    targetRevision: main
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+----
+<1> The namespace of the agent
+<2> The server URL of the Principal component. This is the URL plus the port and the agentName. As an alternative you can also use **name: argocd-agent-bm01** which is the name of the cluster and might be easier to read.
+
+Apply the Application to the **hub** cluster:
+
+[source,bash]
+----
+oc apply -f application.yaml -n argocd-agent-bm01 --context aws
+----
+
+Since the application will try to automatically synchronize the configuration, the status will change to **Synced** after a few seconds:
+
+[source,yaml]
+----
+status:
+  resources:
+    - group: console.openshift.io
+      kind: ConsoleNotification
+      name: topbanner
+      status: Synced
+      version: v1
+----
+
+and the (top) banner will be visible on the UI:
+
+.Banner on the top of the UI
+image::agent/banner-top.png[Banner on the top of the UI]
+
+On the **hub** cluster, the Argo CD Application will be Synced:
+
+[source,bash]
+----
+oc get applications --context aws -A
+NAMESPACE           NAME                     SYNC STATUS   HEALTH STATUS
+argocd-agent-bm01   branding-banner   Synced        Healthy
+----
+
+### Install an autonomous Agent with the Helm Chart
+
+Let's cleanup the first installation of the Chart (managed agent) in order to not have any conflicts.
+[source,bash]
+----
+helm uninstall redhat-argocd-agent --kube-context "bm"
+----
+
+Install the agent in the **autonomous** mode using the Helm Chart. The following parameters are used:
+
+* **namespaceOverride** - The namespace where the Agent is running.
+* **agentMode** - The mode of the Agent.
+* **server** - The server URL of the Principal component. This is the spec.host setting of the Principal's route.
+* **argoCdRedisSecretName** - The name of the Redis secret.
+* **argoCdRedisPasswordKey** - The key of the Redis password.
+* **redisAddress** - The address of the Redis instance.
+
+The only difference to the managed mode is the **agentMode** parameter.
+
+[source,bash]
+----
+helm install redhat-argocd-agent-autonomous openshift-helm-charts/redhat-argocd-agent \
+--set namespaceOverride=argocd-agent-bm01 \
+--set agentMode="autonomous" \
+--set server="serverURL of principal route" \
+--set argoCdRedisSecretName="agent-argocd-redis-initial-password" \
+--set argoCdRedisPasswordKey="admin.password" \
+--set redisAddress="agent-argocd-redis:6379" \
+--kube-context "bm"
+----
+
+With this chart a pod on the **spoke** cluster will be created and will start to synchronize the Argo CD applications between the hub and the spoke cluster.
+
+### Verify the Autonomous Agent
+
+To verify the Agent in **autonomous** mode we need to create an Argo CD Application on the **spoke** cluster. 
+
+We can try the following Application. It is basically the same as we used for the test for the managed mode, except that this time we will add a banner on the bottom of the UI. 
+
+[source,yaml]
+----
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: branding-bottom-banner
+  namespace: argocd-agent-bm01 <1>
+spec:
+  destination:
+    namespace: default
+    server: 'https://kubernetes.default.svc' <2>
+  project: default
+  source:
+    path: clusters/management-cluster/branding-bottom
+    repoURL: 'https://github.com/tjungbauer/openshift-clusterconfig-gitops'
+    targetRevision: main
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+----
+<1> The namespace of the agent
+<2> The server URL of the local cluster, since in autonomous mode the application is managed locally.
+
+Apply the Application to the **spoke** cluster:
+
+[source,bash]
+----
+oc apply -f application.yaml -n argocd-agent-bm01 --context bm
+----
+
+Like the managed mode, the status will change to **Synced** after a few seconds and the (this time) bottom banner will be visible on the UI:
+
+.Banner on the bottom of the UI
+image::agent/banner-bottom.png[Banner on the bottom of the UI]
+
+Moreover, the Argo CD Application will appear on the **hub** cluster:
+
+[source,bash]
+----
+oc get applications --context aws -A
+NAMESPACE           NAME                     SYNC STATUS   HEALTH STATUS
+argocd-agent-bm01   branding-bottom-banner   Synced        Healthy
+argocd-agent-bm01   branding-banner          Synced        Healthy
+----
+
+'''
+
+## Troubleshooting
+
+During the installation and configuration of the Argo CD Agent, you might encounter some issues. Here are some issues I encountered during the tests:
+
+### Principal Pod Fails to Start
+
+If the Principal pod fails to start with errors about missing secrets, verify that all required secrets have been created:
+
+[source,bash]
+----
+oc get secrets -n argocd-principal | grep argocd-agent
+----
+
+You should see the following secrets:
+
+* **argocd-agent-ca** - The CA certificate
+* **argocd-agent-principal-tls** - The Principal's TLS certificate
+* **argocd-agent-resource-proxy-tls** - The Resource Proxy's TLS certificate
+* **argocd-agent-jwt** - The JWT signing key
+
+If any of these are missing, re-run the corresponding `argocd-agentctl` command to create them.
+
+### Redis Errors in the Principal Pod
+
+When you see errors like the following in the logs of the Principal pod, ensure that the Argo CD instance does not have the controller enabled in that namespace (set `spec.controller.enabled: false`). Hopefully, this will change in the future.
+
+[source,bash]
+----
+time="2026-01-20T04:57:10Z" level=error msg="unexpected lack of '_' namespace/name separate: 'app|managed-resources|branding|1.8.3'" connUUID=3c13b30b-9f84-4af6-93d8-e1c03c4c7898 function=redisFxn module=redisProxy
+----
+
+'''
+
+## Limitations
+
+While the Argo CD Agent brings significant improvements, there are some limitations to be aware of:
+
+### Separate Argo CD Instance Required
+
+Currently, the Principal component **cannot** be installed alongside an existing Argo CD instance where the application controller is enabled. You must create a separate Argo CD instance with the controller disabled (`spec.controller.enabled: false`). To me, this is one of the biggest limitations. However, this will be addressed in the future and is tracked in the issue: https://github.com/argoproj-labs/argocd-agent/issues/708
+
+### Manual Certificate Management
+
+The mTLS certificates must be created and managed manually by the user. There is no automatic certificate rotation or renewal. For production environments, you should integrate with your organization's PKI infrastructure and implement a certificate rotation strategy.
+
+
+'''
+
+## Summary
+
+The Argo CD Agent provides a powerful solution for managing multiple clusters with Argo CD. By combining the benefits of centralized management with distributed application controllers, it addresses the scalability and single point of failure challenges of traditional deployment models. 
+
+While the initial setup requires several steps, especially around certificate management, the resulting architecture offers a robust foundation for GitOps at scale.
