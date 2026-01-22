@@ -15,7 +15,7 @@ featured_image_position: 25% 35%
 disableBreadcrumb: true
 
 authors: [Thomas Jungbauer]
-draft: true
+draft: false
 type: post
 categories:
    - GitOps
