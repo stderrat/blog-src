@@ -30,9 +30,18 @@
       }
       
       const genDate = new Date(data.generated);
+      
+      // Helper to safely parse dates (handles ISO strings and timestamps)
+      const parseDate = (dateStr) => {
+        if (!dateStr) return new Date(0);
+        const d = new Date(dateStr);
+        return isNaN(d.getTime()) ? new Date(0) : d;
+      };
+      
       // Sort by lastModified (most recent first) then take top items
       const charts = data.charts
-        .sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified))
+        .filter(c => c.lastModified) // Only include charts with a lastModified date
+        .sort((a, b) => parseDate(b.lastModified).getTime() - parseDate(a.lastModified).getTime())
         .slice(0, maxItems);
       
       let html = `
@@ -54,13 +63,15 @@
         
         let changesHtml = '';
         if (chart.changes && chart.changes.length > 0) {
+          // Reverse changes to show most recent first (in case JSON has oldest-first)
+          const sortedChanges = [...chart.changes].reverse();
           changesHtml = '<ul class="helm-changes-list">';
-          chart.changes.slice(0, 4).forEach(change => {
+          sortedChanges.slice(0, 4).forEach(change => {
             const kind = (change.kind || 'changed').toLowerCase();
             changesHtml += `<li class="${kind}"><span class="helm-change-badge ${kind}">${kind}</span>${change.description}</li>`;
           });
-          if (chart.changes.length > 4) {
-            changesHtml += `<li style="color:#888;border-left-color:#888;">... and ${chart.changes.length - 4} more changes</li>`;
+          if (sortedChanges.length > 4) {
+            changesHtml += `<li style="color:#888;border-left-color:#888;">... and ${sortedChanges.length - 4} more changes</li>`;
           }
           changesHtml += '</ul>';
         }

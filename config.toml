@@ -197,7 +197,7 @@ parent = "gitops-helm"
     class = "left"
 
 [[menu.shortcuts]]
-name = "What's New"
+name = "Helm Charts Repository Updates"
 pre = "fas fa-bell"
 url = "/whats-new/2025-12-12-helm-charts-changelog/"
 weight = 3
