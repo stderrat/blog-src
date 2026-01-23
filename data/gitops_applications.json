@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2025-12-23",
+  "lastUpdated": "2026-01-23",
   "repository": "https://github.com/tjungbauer/openshift-clusterconfig-gitops",
   "categories": {
     "security": { "name": "Security & Compliance", "icon": "shield-alt", "color": "#dc3545" },
@@ -14,6 +14,7 @@
     {"id": "project-onboarding", "name": "proj-onboarding", "path": "clusters/all/project-onboarding", "description": "This Chart shall deploy namespaces and their depending resources, like NetworkPolicies or Quotas etc.", "namespace": "default", "category": "platform", "icon": "folder-plus", "version": "1.0.5", "keywords": []},
     {"id": "applications-gitops", "name": "gitops-deployment", "path": "clusters/management-cluster/applications-gitops", "description": "Deployment of a GitOps for Application Management", "namespace": "application-gitops", "category": "platform", "icon": "code-branch", "version": "1.0.1", "keywords": [], "helmDependencies": ["openshift-gitops"]},
     {"id": "branding", "name": "clusterbranding", "path": "clusters/management-cluster/branding", "description": "Deploys Cluster Branding such as custom Login Page or Logo etc.", "namespace": "default", "category": "platform", "icon": "paint-brush", "version": "1.0.1", "keywords": ["secure-supply-chain"], "helmDependencies": ["generic-cluster-config"]},
+    {"id": "branding-bottom", "name": "clusterbranding", "path": "clusters/management-cluster/branding-bottom", "description": "Deploys Cluster Branding such as custom Login Page or Logo etc.", "namespace": "default", "category": "platform", "icon": "paint-brush", "version": "1.0.1", "keywords": ["secure-supply-chain"], "helmDependencies": ["generic-cluster-config"]},
     {"id": "cert-manager", "name": "cert-manager", "path": "clusters/management-cluster/cert-manager", "description": "Setup and configure the cert Manager operator", "namespace": "cert-manager", "category": "security", "icon": "certificate", "version": "2.0.1", "keywords": ["compliance"], "helmDependencies": ["cert-manager"]},
     {"id": "clusterconfig-apiserver", "name": "clusterconfig-apiserver", "path": "clusters/management-cluster/clusterconfig-apiserver", "description": "Enables ETCD encryption, customer certificate and audit-profile for APIServer", "namespace": "default", "category": "security", "icon": "server", "version": "1.0.3", "keywords": ["security"], "helmDependencies": ["generic-cluster-config","cert-manager"]},
     {"id": "etcd-backup", "name": "enable-etcd-backup", "path": "clusters/management-cluster/etcd-backup", "description": "Create a CronJob that performs ETCD Backup and stores the backup to a PV.", "namespace": "etcd-backup", "category": "platform", "icon": "server", "version": "1.0.0", "keywords": [], "helmDependencies": ["etcd-backup"]},
