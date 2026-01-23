@@ -76,6 +76,19 @@
     {{ end }}
     </main>
 
+    {{/* Right Navigation Sidebar - moved here for faster loading (before JS files) */}}
+    {{ if and (or .IsHome .IsSection) .Site.Params.enableRightSidebar }}
+    <nav id="right-sidebar" class="right-nav-sidebar" aria-label="Archive and Updates">
+        <!-- Right Sidebar Toggle Button (mirrors left sidebar) -->
+        <button id="right-sidebar-toggle-btn" class="right-sidebar-toggle-btn" title="Toggle Right Sidebar" aria-label="Toggle Right Sidebar">
+            <svg class="right-sidebar-toggle-icon" viewBox="0 0 32 32">
+                <path d="M10 1a.997.997 0 0 1 .707.293l13.646 13.646a1.501 1.501 0 0 1 0 2.122L10.707 30.707a1 1 0 1 1-1.414-1.414L22.586 16 9.293 2.707A1 1 0 0 1 10 1Z"></path>
+            </svg>
+        </button>
+        {{ partial "sidebar-widgets.html" . }}
+    </nav>
+    {{ end }}
+
 <!-- READING PROGRESS BAR -->
 <script>
 (function(){
@@ -211,18 +224,5 @@
 
     {{ partial "keyboard-hints.html" . }}
     {{ partial "custom-footer.html" . }}
-
-    {{/* Right Navigation Sidebar - on homepage and section landing pages */}}
-    {{ if and (or .IsHome .IsSection) .Site.Params.enableRightSidebar }}
-    <nav id="right-sidebar" class="right-nav-sidebar" aria-label="Archive and Updates">
-        <!-- Right Sidebar Toggle Button (mirrors left sidebar) -->
-        <button id="right-sidebar-toggle-btn" class="right-sidebar-toggle-btn" title="Toggle Right Sidebar" aria-label="Toggle Right Sidebar">
-            <svg class="right-sidebar-toggle-icon" viewBox="0 0 32 32">
-                <path d="M10 1a.997.997 0 0 1 .707.293l13.646 13.646a1.501 1.501 0 0 1 0 2.122L10.707 30.707a1 1 0 1 1-1.414-1.414L22.586 16 9.293 2.707A1 1 0 0 1 10 1Z"></path>
-            </svg>
-        </button>
-        {{ partial "sidebar-widgets.html" . }}
-    </nav>
-    {{ end }}
   </body>
 </html>
