@@ -17,10 +17,14 @@
 {{- with .Params.images -}}
 <meta property="og:image" content="{{ index . 0 | absURL }}">
 {{- else -}}
+{{- with .Params.featured_image -}}
+<meta property="og:image" content="{{ . | absURL }}">
+{{- else -}}
 {{- with .Params.featuredImage -}}
 <meta property="og:image" content="{{ . | absURL }}">
 {{- else -}}
 <meta property="og:image" content="{{ "images/default-share.png" | absURL }}">
+{{- end -}}
 {{- end -}}
 {{- end -}}
 {{ if .IsPage }}
@@ -37,10 +41,14 @@
 {{- with .Params.images -}}
 <meta name="twitter:image" content="{{ index . 0 | absURL }}">
 {{- else -}}
+{{- with .Params.featured_image -}}
+<meta name="twitter:image" content="{{ . | absURL }}">
+{{- else -}}
 {{- with .Params.featuredImage -}}
 <meta name="twitter:image" content="{{ . | absURL }}">
 {{- else -}}
 <meta name="twitter:image" content="{{ "images/default-share.png" | absURL }}">
+{{- end -}}
 {{- end -}}
 {{- end -}}
 
