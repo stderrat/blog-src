@@ -1,0 +1,91 @@
+---
+description: AsciiDoc blog post conventions for Hugo
+globs: content/**/*.adoc
+alwaysApply: false
+---
+
+# Blog Post Conventions
+
+## Frontmatter Structure
+
+Every post must have YAML frontmatter with these fields:
+
+```yaml
+---
+title: "[Series Prefix] Title Here"
+description: "SEO-friendly description"
+date: "YYYY-MM-DD"
+doctype: book
+
+series: "Series Name"       # Optional
+series_part: N              # Optional
+
+featured_image: /category/images/Logo-Name.png        # Optional
+show_featured_image_summary: true                     # Show in list/summary view
+show_featured_image_article: true                     # Show in article view
+featured_image_position: 50% 35%                      # Optional, CSS position
+
+authors: [Thomas Jungbauer]
+type: post
+draft: false
+categories:
+   - Category1
+   - Category2
+tags: ["tag1", "tag2"]
+
+aliases: [
+   "/posts-output/YYYY-MM-DD-slug/",
+]
+---
+```
+
+## Required AsciiDoc Attributes
+
+After frontmatter, include:
+
+```asciidoc
+:imagesdir: /category/images/
+:icons: font
+:toc:
+```
+
+## Content Structure
+
+- Use `<!--more-->` to mark the excerpt break
+- Headings: `==` for H2, `===` for H3, `====` for H4
+- Never use `=` (H1) in content - title comes from frontmatter
+
+## Code Blocks
+
+```asciidoc
+[source,yaml]
+----
+code: here
+----
+```
+
+Use callouts for explanations:
+
+```asciidoc
+[source,yaml]
+----
+key: value <1>
+other: setting <2>
+----
+<1> Explanation of first callout
+<2> Explanation of second callout
+```
+
+## Admonitions
+
+Use: `NOTE:`, `TIP:`, `WARNING:`, `IMPORTANT:`, `CAUTION:`
+
+## Links and Images
+
+- Internal links: `link:/category/post-slug/[Link Text]`
+- External links: `https://example.com[Link Text^]` (^ opens new tab)
+- Images: `image::filename.png?width=720px[Alt text]`
+
+## File Naming
+
+Pattern: `YYYY-MM-DD-Title-With-Dashes.adoc`
