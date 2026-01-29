@@ -12,3 +12,5 @@ pom.xml.asc
 /public/
 .DS_Store
 /node_modules/
+/.idea/
+/blog-src.iml
