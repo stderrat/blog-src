@@ -4,7 +4,7 @@ description: "A second look into the Kubernetes Gateway API on OpenShift"
 date: "2025-08-31"
 doctype: book
 
-featured_image: /openshift-platform/day-2/networking/images/gateway-api/gateway-api.png
+featured_image: /openshift-platform/networking/images/gateway-api/gateway-api.png
 show_featured_image_summary: false
 show_featured_image_article: true
 
@@ -22,10 +22,11 @@ aliases: [
 	 "/posts-output/2025-08-31-gateway-api-II/",
    "/openshift/2025/08/gateway-api-II",
    "/openshift/2025/08/a-second-look-into-the-kubernetes-gateway-api-on-openshift/",
+   "/openshift-platform/day-2/networking/2025-08-31-openshift-gateway-api-ii/",
 ]
 ---
 
-:imagesdir: /openshift-platform/day-2/networking/images/gateway-api/
+:imagesdir: /openshift-platform/networking/images/gateway-api/
 :icons: font
 :toc:
 
