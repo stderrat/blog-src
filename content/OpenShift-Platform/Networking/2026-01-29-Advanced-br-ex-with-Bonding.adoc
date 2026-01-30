@@ -6,7 +6,7 @@ doctype: book
 
 authors: [Thomas Jungbauer]
 type: post
-draft: false
+draft: true
 
 featured_image: /openshift-platform/networking/images/logos/Migrating_br-ex_Logo.png
 show_featured_image_summary: true
