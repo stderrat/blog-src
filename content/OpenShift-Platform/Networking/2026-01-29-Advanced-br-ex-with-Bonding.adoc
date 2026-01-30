@@ -8,7 +8,7 @@ authors: [Thomas Jungbauer]
 type: post
 draft: true
 
-featured_image: /openshift-platform/networking/images/logos/Migrating_br-ex_Logo.png
+featured_image: /openshift-platform/networking/images/logos/Migrating_br-ex_Logo_optimized.png
 show_featured_image_summary: true
 show_featured_image_article: true
 disableBreadcrumb: false
@@ -63,7 +63,7 @@ Before configuring bonding with br-ex, ensure you have:
 
 * OpenShift 4.x cluster with OVN-Kubernetes CNI
 * NMState Operator installed ... not discussed in this article, but you can simply install and configure the NMState Operator
-* Multiple network interfaces available on your nodes
+* Multiple network interfaces (interface1 and interface2) available on your nodes
 * Understanding of your network topology and switch configuration
 
 == Understanding Bonding Modes
@@ -90,8 +90,16 @@ Linux supports several bonding modes. The most common ones for OpenShift deploym
 
 NOTE: Mode LACP is recommended for production environments **when switch support is available**, as it provides both redundancy and load balancing.
 
+== The Technical Setup
+We will implement the following network topology:
 
+* Physical Interfaces: interface1 and interace2 (configured as secondary).
 
+* Bond Interface: bond-public in active-backup mode.
+
+* OVS Bridge: br-ex (the standard OVN external bridge) using bond-public as a port.
+
+* Host Networking: The node's IP address will be assigned to the br-ex OVS interface (internal port), effectively moving the management IP from the physical NIC to the bridge.
 
 
 

@@ -8,25 +8,14 @@
       <div class="w-100">
 
         {{/* Featured image on top */}}
-        {{ if $featured_image.src }}
+        {{ if $featured_image }}
         {{ if .Params.show_featured_image_summary }}
             {{/* Trimming the slash and adding absURL make sure the image works no matter where our site lives */}}
-          {{ $imgSrc := (trim $featured_image.src "/") | absURL }}
-          {{ $webpSrc := "" }}
-          {{ if $featured_image.webp }}
-            {{ $webpSrc = (trim $featured_image.webp "/") | absURL }}
-          {{ end }}
+          {{ $featured_image := (trim $featured_image "/") | absURL }}
           <div class="mb3 w-100 article-card-image">
             <a href="{{.RelPermalink}}">
               {{/* Add width/height and aspect-ratio for CLS prevention */}}
-              {{ if $webpSrc }}
-              <picture>
-                <source srcset="{{ $webpSrc }}" type="image/webp">
-                <img src="{{ $imgSrc }}" class="img recentlist" alt="image from {{ .Title }}" loading="lazy" decoding="async" width="640" height="360" style="aspect-ratio:16/9;object-fit:cover;width:100%;">
-              </picture>
-              {{ else }}
-              <img src="{{ $imgSrc }}" class="img recentlist" alt="image from {{ .Title }}" loading="lazy" decoding="async" width="640" height="360" style="aspect-ratio:16/9;object-fit:cover;width:100%;">
-              {{ end }}
+              <img src="{{ $featured_image }}" class="img recentlist" alt="image from {{ .Title }}" loading="lazy" decoding="async" width="640" height="360" style="aspect-ratio:16/9;object-fit:cover;width:100%;">
             </a>
           </div>
         {{ end }}

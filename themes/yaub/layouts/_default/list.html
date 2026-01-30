@@ -4,23 +4,11 @@
 
 {{ if eq .Kind "section" }}
 	{{/* Display featured image for section pages */}}
-	{{ if $featured_image.src }}
+	{{ if $featured_image }}
 	{{ if .Params.show_featured_image_article }}
-	  {{ $imgSrc := (trim $featured_image.src "/") | absURL }}
-	  {{ $webpSrc := "" }}
-	  {{ if $featured_image.webp }}
-	    {{ $webpSrc = (trim $featured_image.webp "/") | absURL }}
-	  {{ end }}
 	  <div class="pr3-ns mb4 mb0-ns w-100 featured-img-container">
 	    <a href="{{.RelPermalink}}">
-	      {{ if $webpSrc }}
-	      <picture>
-	        <source srcset="{{ $webpSrc }}" type="image/webp">
-	        <img src="{{ $imgSrc }}" class="img featured-img" alt="image from {{ .Title }}" loading="eager" decoding="async" style="max-width:100%;height:auto;box-shadow:none;">
-	      </picture>
-	      {{ else }}
-	      <img src="{{ $imgSrc }}" class="img featured-img" alt="image from {{ .Title }}" loading="eager" decoding="async" style="max-width:100%;height:auto;box-shadow:none;">
-	      {{ end }}
+	      <img src="{{ $featured_image }}" class="img featured-img" alt="image from {{ .Title }}" loading="eager" decoding="async" style="max-width:100%;height:auto;box-shadow:none;">
 	    </a>
 	  </div>
 	{{ end }}

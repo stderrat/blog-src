@@ -11,55 +11,25 @@
     If no featured_image was set, and there's no "cover" image in page resources, then
     this partial returns an empty string (which evaluates to false).
 
-    @return Dict with 'src' (original image) and 'webp' (WebP version if exists, else empty)
-            For backwards compatibility, if called in string context returns just the src
+    @return RelPermalink to featured image, or an empty string if not found.
 
 */}}
 
-{{/* Declare variables */}}
+{{/* Declare a new string variable, $linkToCover */}}
 {{ $linkToCover := "" }}
-{{ $webpPath := "" }}
-{{ $hasWebp := false }}
 
 {{/* Use the value from front matter if present */}}
 {{ if .Params.featured_image }}
     {{ $linkToCover = .Params.featured_image }}
-    
-    {{/* Generate WebP path and check if it exists */}}
-    {{ $webpPath = replace $linkToCover ".png" ".webp" | replace ".jpg" ".webp" | replace ".jpeg" ".webp" | replace ".PNG" ".webp" | replace ".JPG" ".webp" | replace ".JPEG" ".webp" }}
-    
-    {{/* Check if WebP file exists in static or as resource */}}
-    {{ $webpStaticPath := printf "static%s" $webpPath }}
-    {{ if fileExists $webpStaticPath }}
-        {{ $hasWebp = true }}
-    {{ else }}
-        {{/* Also check in content directory (page resources) */}}
-        {{ $webpResource := $.Page.Resources.GetMatch (printf "*%s*" (path.Base $webpPath)) }}
-        {{ if $webpResource }}
-            {{ $hasWebp = true }}
-            {{ $webpPath = $webpResource.RelPermalink }}
-        {{ end }}
-    {{ end }}
 
 {{/* Find the first image with 'cover' in the name in this page bundle. */}}
 {{ else }}
     {{ $img := (.Resources.ByType "image").GetMatch "*cover*" }}
     {{ with $img }}
         {{ $linkToCover = .RelPermalink }}
-        {{/* Look for WebP version of the cover image */}}
-        {{ $baseName := path.BaseName .RelPermalink }}
-        {{ $webpResource := $.Resources.GetMatch (printf "*%s*.webp" $baseName) }}
-        {{ with $webpResource }}
-            {{ $hasWebp = true }}
-            {{ $webpPath = .RelPermalink }}
-        {{ end }}
     {{ end }}
 {{ end }}
 
-{{/* Return a dict with src and webp (webp is empty if not found) */}}
-{{ $result := dict "src" $linkToCover "webp" "" }}
-{{ if $hasWebp }}
-    {{ $result = dict "src" $linkToCover "webp" $webpPath }}
-{{ end }}
-
-{{ return $result }}
+{{/* return either a permalink, or an empty string. Note that partials can only have a single
+return statement, so this needs to be at the end of the partial (and not in the if block) */}}
+{{ return $linkToCover }}
