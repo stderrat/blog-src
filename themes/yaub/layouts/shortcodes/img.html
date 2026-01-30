@@ -29,10 +29,20 @@
   </picture>
 {{- else }}
   {{- /* Fallback for external or static images */ -}}
-  {{- $webpSrc := replace $src ".png" ".webp" | replace ".jpg" ".webp" | replace ".jpeg" ".webp" }}
+  {{- $webpSrc := replace $src ".png" ".webp" | replace ".jpg" ".webp" | replace ".jpeg" ".webp" | replace ".PNG" ".webp" | replace ".JPG" ".webp" | replace ".JPEG" ".webp" }}
+  {{- /* Check if WebP exists */ -}}
+  {{- $hasWebp := false }}
+  {{- $webpStaticPath := printf "static%s" $webpSrc }}
+  {{- if fileExists $webpStaticPath }}
+    {{- $hasWebp = true }}
+  {{- end }}
+  {{- if $hasWebp }}
   <picture{{ with $class }} class="{{ . }}"{{ end }}>
     <source srcset="{{ $webpSrc | relURL }}" type="image/webp">
     <img src="{{ $src | relURL }}" alt="{{ $alt }}" loading="lazy" decoding="async"{{ with $width }} width="{{ . }}"{{ end }}{{ with $height }} height="{{ . }}"{{ end }}>
   </picture>
+  {{- else }}
+  <img{{ with $class }} class="{{ . }}"{{ end }} src="{{ $src | relURL }}" alt="{{ $alt }}" loading="lazy" decoding="async"{{ with $width }} width="{{ . }}"{{ end }}{{ with $height }} height="{{ . }}"{{ end }}>
+  {{- end }}
 {{- end }}
 

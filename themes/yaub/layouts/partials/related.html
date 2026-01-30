@@ -22,11 +22,26 @@
                   featured_image_position: "center top"  (horizontal center, vertical top)
                   featured_image_position: "20% 80%"     (custom x% y%)
             */}}
+            {{ $imgSrc := . }}
+            {{ $webpSrc := replace . ".png" ".webp" | replace ".jpg" ".webp" | replace ".jpeg" ".webp" | replace ".PNG" ".webp" | replace ".JPG" ".webp" | replace ".JPEG" ".webp" }}
+            {{/* Check if WebP exists */}}
+            {{ $webpStaticPath := printf "static%s" $webpSrc }}
+            {{ $hasWebp := fileExists $webpStaticPath }}
             <div class="related-card-image">
-                <img src="{{ . }}" 
+                {{ if $hasWebp }}
+                <picture>
+                    <source srcset="{{ $webpSrc }}" type="image/webp">
+                    <img src="{{ $imgSrc }}" 
+                         alt="Featured image for {{ $article.Title }}" 
+                         loading="lazy" 
+                         style="object-position: {{ $position }};">
+                </picture>
+                {{ else }}
+                <img src="{{ $imgSrc }}" 
                      alt="Featured image for {{ $article.Title }}" 
                      loading="lazy" 
                      style="object-position: {{ $position }};">
+                {{ end }}
             </div>
             {{ end }}
             <div class="related-card-content">
