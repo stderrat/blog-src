@@ -5,7 +5,7 @@ date: "2026-02-09"
 doctype: book
 weight: 10
 
-draft: true
+draft: false
 
 featured_image: /openshift-platform/infrastructure/images/okd-sno-disconnected/okd_diconnected_cat.webp
 show_featured_image_summary: true
