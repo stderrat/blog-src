@@ -15,10 +15,10 @@ disableBreadcrumb: false
 authors: [Toni Schmidbauer]
 type: post
 categories:
-   - OpenShift
+   - OKD
    - Single Node
-   - Agent Based Installation
-   - PXE
+   - Disconnected
+   - Installation
 
 tags: ["OKD", "OpenShift", "Single Node", "Installation", "Disconnected"]
 
