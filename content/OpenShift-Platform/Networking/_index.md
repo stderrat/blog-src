@@ -8,3 +8,5 @@ pre: "<i class='fas fa-plug'></i> "
 tags: ["OpenShift", "Kubernetes", "Networking", "Gateway API", "Routes", "Ingress", "OVN-Kubernetes", "br-ex", "Bonding", "LACP", "NMState", "Load Balancing", "Service Mesh", "Istio", "Network Policy", "SDN", "CNI"]
 aliases:
   - /networking/
+
+---
