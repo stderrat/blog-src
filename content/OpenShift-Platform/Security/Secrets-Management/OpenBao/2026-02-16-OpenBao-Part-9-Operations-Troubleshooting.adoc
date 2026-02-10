@@ -1,0 +1,718 @@
+--- 
+title: "The Complete Guide to OpenBao - Operations and Troubleshooting - Part 9"
+description: "Day-2 operations, common issues and solutions, log analysis, migration from Vault, and CLI command reference for OpenBao"
+date: "2026-02-16"
+doctype: book
+weight: 92
+
+series: "The Complete Guide to OpenBao"
+series_part: 9
+
+featured_image: /openshift-platform/security/secrets-management/openbao/images/Logo_OpenBao.png
+show_featured_image_summary: true
+show_featured_image_article: true
+disableBreadcrumb: true
+
+authors: [Thomas Jungbauer]
+type: post
+draft: true
+categories:
+   - OpenShift
+   - Security
+   - Secret Management
+
+tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "Operations", "Troubleshooting"] 
+
+aliases: [ 
+	 "/openshift/security/openbao/2026-02-16-openbao-operations-troubleshooting/",
+]
+---
+
+:imagesdir: /openshift-platform/security/secrets-management/openbao/images/
+:icons: font
+:toc:
+
+This article covers day-to-day operations, common troubleshooting scenarios, log analysis, migration from HashiCorp Vault, and a handy CLI reference for OpenBao administrators.
+
+<!--more--> 
+
+== Introduction
+
+Operating OpenBao in production requires understanding:
+
+* Routine maintenance tasks
+* How to diagnose and resolve issues
+* Log analysis techniques
+* Migration procedures
+* Essential CLI commands
+
+== Day-2 Operations Checklist
+
+=== Daily Tasks
+
+[source,bash]
+----
+# Check cluster health
+bao status
+
+# Verify Raft peers
+bao operator raft list-peers
+
+# Check for failed leases
+bao lease list sys/leases/lookup
+
+# Review audit logs for anomalies
+tail -100 /var/log/openbao/audit.log | jq '.type'
+----
+
+=== Weekly Tasks
+
+[source,bash]
+----
+# Create backup snapshot
+bao operator raft snapshot save /backup/weekly-$(date +%Y%m%d).snap
+
+# Review token usage
+bao token lookup
+
+# Check for expiring certificates (if using PKI)
+bao list pki_int/certs
+
+# Review policies for unused entries
+bao policy list
+----
+
+=== Monthly Tasks
+
+[source,bash]
+----
+# Rotate encryption keys
+bao operator rotate
+
+# Review and prune old secret versions
+bao kv metadata get -format=json secret/myapp/config | jq '.data.versions'
+
+# Audit user access and clean up unused roles
+bao list auth/kubernetes/role
+bao list auth/oidc/role
+
+# Test disaster recovery procedure
+bao operator raft snapshot restore --force /backup/test-restore.snap
+----
+
+== Common Issues and Solutions
+
+=== Issue 1: OpenBao is Sealed
+
+**Symptoms:**
+[source,bash]
+----
+bao status
+# Sealed: true
+----
+
+**Causes:**
+* Pod restart without auto-unseal
+* Manual seal operation
+* Storage corruption
+
+**Solutions:**
+
+[source,bash]
+----
+# If using Shamir keys
+bao operator unseal  # Repeat with 3 different keys
+
+# If auto-unseal is configured but failing
+# Check KMS/seal service connectivity
+oc logs openbao-0 -n openbao | grep -i seal
+
+# Force unseal with recovery keys (auto-unseal mode)
+bao operator unseal -reset  # Reset seal state
+bao operator unseal  # Use recovery key
+----
+
+=== Issue 2: Authentication Failures
+
+**Symptoms:**
+[source]
+----
+Error: permission denied
+Error: missing client token
+----
+
+**Diagnosis:**
+[source,bash]
+----
+# Check if auth method is enabled
+bao auth list
+
+# Verify role configuration
+bao read auth/kubernetes/role/myapp
+
+# Test token capabilities
+bao token capabilities <token> secret/data/myapp/config
+
+# Check policy
+bao policy read myapp-policy
+----
+
+**Common Fixes:**
+
+[source,bash]
+----
+# Service account not bound correctly
+bao write auth/kubernetes/role/myapp \
+  bound_service_account_names=myapp \
+  bound_service_account_namespaces=myapp \
+  policies=myapp-policy
+
+# Policy path mismatch (KV v2 requires /data/)
+# Wrong:
+path "secret/myapp/*" { ... }
+# Correct:
+path "secret/data/myapp/*" { ... }
+
+# Token expired
+bao token lookup  # Check TTL
+bao token renew   # Renew if renewable
+----
+
+=== Issue 3: Agent Injector Not Working
+
+**Symptoms:**
+* Pods missing sidecar container
+* Secrets not appearing in `/vault/secrets/`
+
+**Diagnosis:**
+[source,bash]
+----
+# Check webhook is running
+oc get mutatingwebhookconfigurations | grep openbao
+
+# Check injector logs
+oc logs -l app.kubernetes.io/name=openbao-agent-injector -n openbao
+
+# Check pod annotations
+oc get pod <pod-name> -o yaml | grep vault.hashicorp.com
+
+# Check init container logs in the application pod
+oc logs <pod-name> -c vault-agent-init
+----
+
+**Common Fixes:**
+
+[source,bash]
+----
+# Missing annotation
+# Add: vault.hashicorp.com/agent-inject: "true"
+
+# Wrong role name
+# Verify role exists:
+bao read auth/kubernetes/role/<role-name>
+
+# Namespace not in bound list
+bao write auth/kubernetes/role/myapp \
+  bound_service_account_namespaces="myapp,myapp-staging"
+
+# TLS verification failing
+# Add annotation: vault.hashicorp.com/tls-skip-verify: "true" (testing only!)
+----
+
+=== Issue 4: Raft Cluster Issues
+
+**Symptoms:**
+[source,bash]
+----
+bao operator raft list-peers
+# Missing peers or incorrect leader
+----
+
+**Diagnosis:**
+[source,bash]
+----
+# Check cluster state
+bao operator raft list-peers
+
+# Check logs for Raft errors
+oc logs openbao-0 -n openbao | grep -i raft
+
+# Check network connectivity between pods
+oc exec openbao-0 -n openbao -- nc -zv openbao-1.openbao-internal 8201
+----
+
+**Solutions:**
+
+[source,bash]
+----
+# Remove failed peer
+bao operator raft remove-peer <node-id>
+
+# Force a node to rejoin
+oc delete pod openbao-1 -n openbao
+# Pod will rejoin automatically on restart
+
+# Recover from lost quorum (DANGEROUS - data loss possible)
+# Only if majority of cluster is lost
+bao operator raft join -retry http://openbao-0.openbao-internal:8200
+----
+
+=== Issue 5: High Memory Usage
+
+**Symptoms:**
+* OOMKilled pods
+* Slow responses
+
+**Diagnosis:**
+[source,bash]
+----
+# Check memory metrics
+curl -s http://localhost:8200/v1/sys/metrics?format=prometheus | grep vault_runtime
+
+# Check lease count
+bao lease list sys/leases/lookup | wc -l
+
+# Check active tokens
+curl -s -H "X-Vault-Token: $BAO_TOKEN" \
+  http://localhost:8200/v1/sys/internal/counters/tokens
+----
+
+**Solutions:**
+
+[source,bash]
+----
+# Revoke unused leases
+bao lease revoke -prefix database/creds/
+
+# Tidy up expired tokens
+bao token revoke -mode=orphan <token>
+
+# Increase memory limits
+# In Helm values:
+server:
+  resources:
+    limits:
+      memory: 4Gi
+----
+
+=== Issue 6: Slow Performance
+
+**Symptoms:**
+* High latency on API calls
+* Timeouts
+
+**Diagnosis:**
+[source,bash]
+----
+# Check request latency metrics
+curl -s http://localhost:8200/v1/sys/metrics?format=prometheus | grep vault_core_handle_request
+
+# Check storage latency
+curl -s http://localhost:8200/v1/sys/metrics?format=prometheus | grep vault_raft
+
+# Check CPU usage
+oc top pod -n openbao
+----
+
+**Solutions:**
+
+[source,bash]
+----
+# Scale up resources
+server:
+  resources:
+    limits:
+      cpu: 2000m
+
+# Use faster storage class
+dataStorage:
+  storageClass: "premium-ssd"
+
+# Enable client-side caching (agent configuration)
+cache {
+  use_auto_auth_token = true
+}
+----
+
+== Log Analysis
+
+=== Accessing Logs
+
+[source,bash]
+----
+# Pod logs
+oc logs openbao-0 -n openbao
+
+# Tail logs
+oc logs -f openbao-0 -n openbao
+
+# Previous container logs (after crash)
+oc logs openbao-0 -n openbao --previous
+
+# All pods
+oc logs -l app.kubernetes.io/name=openbao -n openbao
+----
+
+=== Audit Log Analysis
+
+[source,bash]
+----
+# Read audit log (if using file audit)
+oc exec openbao-0 -n openbao -- cat /vault/audit/audit.log | jq '.'
+
+# Filter by type
+jq 'select(.type == "response")' audit.log
+
+# Filter by path
+jq 'select(.request.path | startswith("secret/"))' audit.log
+
+# Find authentication failures
+jq 'select(.error != null)' audit.log
+
+# Find specific user activity
+jq 'select(.auth.display_name == "token-myuser")' audit.log
+----
+
+=== Common Log Messages
+
+[cols="2,3"]
+|===
+|Message |Meaning
+
+|`core: security barrier not initialized`
+|OpenBao needs initialization
+
+|`core: seal configuration missing`
+|Seal stanza not configured
+
+|`core: post-unseal setup complete`
+|Successfully unsealed
+
+|`raft: entering leader state`
+|This node became leader
+
+|`raft: lost leadership`
+|Leadership transferred
+
+|`auth.kubernetes: login unauthorized`
+|Kubernetes auth failed
+
+|`expiration: revoked lease`
+|Lease was revoked (normal)
+|===
+
+== Migration from HashiCorp Vault
+
+OpenBao supports in-place migration from Vault Community Edition.
+
+=== Prerequisites
+
+* Source: Vault CE 1.14.x or earlier
+* Storage: Raft with Shamir unseal (auto-unseal not supported for migration)
+* Backup current Vault data
+
+=== Migration Steps
+
+==== Step 1: Create Backup
+
+[source,bash]
+----
+# On existing Vault cluster
+vault operator raft snapshot save vault-backup.snap
+----
+
+==== Step 2: Stop Vault
+
+[source,bash]
+----
+# Stop all Vault servers
+systemctl stop vault
+# Or scale down in Kubernetes
+kubectl scale statefulset vault --replicas=0
+----
+
+==== Step 3: Replace Vault with OpenBao
+
+[source,bash]
+----
+# Install OpenBao (same configuration, different binary)
+# Keep the same data directory
+
+# Update systemd service to use bao instead of vault
+# Or deploy OpenBao Helm chart pointing to existing PVCs
+----
+
+==== Step 4: Start and Unseal
+
+[source,bash]
+----
+# Start OpenBao
+systemctl start openbao
+
+# Unseal with existing keys
+bao operator unseal
+# Use existing Vault unseal keys
+----
+
+==== Step 5: Verify Migration
+
+[source,bash]
+----
+# Check status
+bao status
+
+# Verify secrets
+bao secrets list
+bao kv get secret/test
+
+# Verify auth
+bao auth list
+
+# Verify policies
+bao policy list
+----
+
+=== Known Migration Issues
+
+* **Vault 1.15.0+**: Not supported for migration
+* **Enterprise features**: Not available in OpenBao
+* **Proprietary plugins**: May need replacement
+* **Snapshot restore**: Some versions have known bugs; test first
+
+=== Post-Migration Tasks
+
+[source,bash]
+----
+# Update client configurations to use bao CLI
+alias vault=bao
+
+# Update application configurations
+# BAO_ADDR instead of VAULT_ADDR
+
+# Update tokens (format differs)
+# Old Vault: hvs.xxx
+# OpenBao: sbr.xxx
+
+# Review and update policies if needed
+----
+
+== CLI Command Reference
+
+=== Status and Health
+
+[source,bash]
+----
+# Server status
+bao status
+
+# Health check (returns HTTP code)
+curl -s -o /dev/null -w "%{http_code}" http://localhost:8200/v1/sys/health
+
+# Leader status
+bao operator raft list-peers
+
+# Configuration (requires root)
+bao read sys/config/state/sanitized
+----
+
+=== Authentication
+
+[source,bash]
+----
+# Login with token
+bao login <token>
+
+# Login with method
+bao login -method=oidc
+bao login -method=ldap username=admin
+bao login -method=userpass username=admin
+
+# Token operations
+bao token create -policy=admin
+bao token lookup
+bao token lookup <token>
+bao token renew
+bao token revoke <token>
+bao token capabilities <token> secret/data/myapp
+----
+
+=== Secrets Management
+
+[source,bash]
+----
+# KV v2 operations
+bao kv put secret/myapp key=value
+bao kv get secret/myapp
+bao kv get -version=2 secret/myapp
+bao kv delete secret/myapp
+bao kv undelete -versions=1 secret/myapp
+bao kv destroy -versions=1 secret/myapp
+bao kv metadata get secret/myapp
+bao kv metadata delete secret/myapp
+
+# List secrets
+bao kv list secret/
+
+# Enable secrets engine
+bao secrets enable -path=apps kv-v2
+bao secrets enable -path=pki pki
+bao secrets enable -path=database database
+
+# Disable secrets engine
+bao secrets disable apps/
+----
+
+=== Policy Management
+
+[source,bash]
+----
+# List policies
+bao policy list
+
+# Read policy
+bao policy read admin
+
+# Write policy
+bao policy write myapp - <<EOF
+path "secret/data/myapp/*" {
+  capabilities = ["read"]
+}
+EOF
+
+# Delete policy
+bao policy delete myapp
+----
+
+=== Auth Method Management
+
+[source,bash]
+----
+# List auth methods
+bao auth list
+
+# Enable auth method
+bao auth enable kubernetes
+bao auth enable -path=oidc-corp oidc
+
+# Configure auth method
+bao write auth/kubernetes/config \
+  kubernetes_host="https://kubernetes.default.svc"
+
+# Disable auth method
+bao auth disable kubernetes/
+----
+
+=== Lease Management
+
+[source,bash]
+----
+# List leases
+bao lease list sys/leases/lookup/database/creds/
+
+# Lookup lease
+bao lease lookup database/creds/myapp/xxx
+
+# Renew lease
+bao lease renew database/creds/myapp/xxx
+bao lease renew -increment=3600 database/creds/myapp/xxx
+
+# Revoke lease
+bao lease revoke database/creds/myapp/xxx
+bao lease revoke -prefix database/creds/myapp/
+----
+
+=== Operator Commands
+
+[source,bash]
+----
+# Seal/unseal
+bao operator seal
+bao operator unseal
+
+# Key rotation
+bao operator rotate
+
+# Raft operations
+bao operator raft list-peers
+bao operator raft remove-peer <node-id>
+bao operator raft snapshot save backup.snap
+bao operator raft snapshot restore backup.snap
+
+# Generate root token
+bao operator generate-root -init
+bao operator generate-root
+bao operator generate-root -decode=<token> -otp=<otp>
+----
+
+=== Audit Management
+
+[source,bash]
+----
+# List audit devices
+bao audit list
+
+# Enable audit device
+bao audit enable file file_path=/var/log/openbao/audit.log
+bao audit enable syslog tag="openbao"
+
+# Disable audit device
+bao audit disable file/
+----
+
+== Useful One-Liners
+
+[source,bash]
+----
+# Find all secrets in a path
+bao kv list -format=json secret/ | jq -r '.[]'
+
+# Export all KV secrets (for backup/migration)
+for key in $(bao kv list -format=json secret/ | jq -r '.[]'); do
+  echo "=== $key ==="
+  bao kv get -format=json secret/$key
+done
+
+# Check token TTL and policies
+bao token lookup -format=json | jq '{policies, ttl, expire_time}'
+
+# Monitor audit log in real-time
+tail -f /var/log/openbao/audit.log | jq -c 'select(.type=="request") | {time, path: .request.path, operation: .request.operation}'
+
+# Count active leases by path
+bao lease list -format=json sys/leases/lookup | jq -r '.[]' | sort | uniq -c | sort -rn
+
+# Revoke all tokens for a user
+bao token revoke -accessor <accessor>
+----
+
+== What is Coming Next?
+
+In Part 10, the final article, we will bring everything together with an end-to-end example:
+
+* Complete application deployment
+* Database dynamic credentials
+* TLS certificates from PKI
+* GitOps configuration
+* Full security review
+
+== Conclusion
+
+Effective OpenBao operations require:
+
+* Regular maintenance routines
+* Understanding common failure modes
+* Proficiency with the CLI
+* Log analysis skills
+
+Key takeaways:
+
+* Create and test backups regularly
+* Monitor key metrics and set alerts
+* Document your specific procedures
+* Practice disaster recovery
+
+== Resources
+
+* https://openbao.org/docs/commands[CLI Command Reference^]
+* https://openbao.org/docs/guides/migration[Migration Guide^]
+* https://openbao.org/api-docs[API Documentation^]

@@ -1,0 +1,936 @@
+--- 
+title: "The Complete Guide to OpenBao - End-to-End Example - Part 10"
+description: "Complete end-to-end example deploying a secure application with OpenBao including dynamic database credentials, TLS certificates, and GitOps configuration"
+date: "2026-02-17"
+doctype: book
+weight: 91
+
+series: "The Complete Guide to OpenBao"
+series_part: 10
+
+featured_image: /openshift-platform/security/secrets-management/openbao/images/Logo_OpenBao.png
+show_featured_image_summary: true
+show_featured_image_article: true
+disableBreadcrumb: true
+
+authors: [Thomas Jungbauer]
+type: post
+draft: true
+categories:
+   - OpenShift
+   - Security
+   - Secret Management
+   - GitOps
+
+tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "GitOps", "PKI", "Database"] 
+
+aliases: [ 
+	 "/openshift/security/openbao/2026-02-17-openbao-end-to-end-example/",
+]
+---
+
+:imagesdir: /openshift-platform/security/secrets-management/openbao/images/
+:icons: font
+:toc:
+
+In this final article of the series, we bring everything together with a complete end-to-end example. We will deploy a web application that uses OpenBao for dynamic database credentials, TLS certificates from PKI, and application secrets - all managed through GitOps.
+
+<!--more--> 
+
+== Introduction
+
+This example demonstrates a production-ready setup:
+
+[source]
+----
+                                    ┌─────────────────┐
+                                    │    Argo CD      │
+                                    │   (GitOps)      │
+                                    └────────┬────────┘
+                                             │
+         ┌───────────────────────────────────┼───────────────────────────────────┐
+         │                                   │                                   │
+         ▼                                   ▼                                   ▼
+┌─────────────────┐              ┌─────────────────┐              ┌─────────────────┐
+│   OpenBao       │              │   Web App       │              │   PostgreSQL    │
+│   Namespace     │◄────────────►│   Namespace     │◄────────────►│   Namespace     │
+└─────────────────┘              └─────────────────┘              └─────────────────┘
+         │                                │
+         │                                │
+         ▼                                ▼
+  ┌─────────────┐                ┌─────────────┐
+  │ Secrets:    │                │ Consumes:   │
+  │ - KV        │                │ - DB creds  │
+  │ - PKI       │                │ - TLS cert  │
+  │ - Database  │                │ - API keys  │
+  └─────────────┘                └─────────────┘
+----
+
+=== What We Will Build
+
+* **PostgreSQL database** with OpenBao-managed root credentials
+* **Web application** that consumes:
+** Dynamic database credentials (auto-rotated)
+** TLS certificate from PKI engine
+** Static secrets from KV store
+* **External Secrets Operator** to sync secrets
+* **GitOps deployment** via Argo CD
+
+== Prerequisites
+
+Ensure you have:
+
+* OpenBao deployed and unsealed (Parts 2-4)
+* Argo CD installed and configured
+* External Secrets Operator installed (Part 7)
+* A Git repository for your configuration
+
+== Step 1: Configure OpenBao
+
+=== Enable Required Secrets Engines
+
+[source,bash]
+----
+# KV v2 for static secrets
+bao secrets enable -path=apps kv-v2
+
+# PKI for certificates
+bao secrets enable -path=pki pki
+bao secrets tune -max-lease-ttl=8760h pki
+
+# Database for dynamic credentials
+bao secrets enable database
+----
+
+=== Configure PKI Engine
+
+[source,bash]
+----
+# Generate root CA
+bao write pki/root/generate/internal \
+  common_name="Example Root CA" \
+  ttl=8760h
+
+# Configure CA URLs
+bao write pki/config/urls \
+  issuing_certificates="http://openbao.openbao:8200/v1/pki/ca" \
+  crl_distribution_points="http://openbao.openbao:8200/v1/pki/crl"
+
+# Create certificate role for our app
+bao write pki/roles/webapp \
+  allowed_domains="webapp.example.com,webapp.apps.cluster.local" \
+  allow_subdomains=true \
+  max_ttl=168h \
+  key_bits=2048
+----
+
+=== Configure Database Engine
+
+[source,bash]
+----
+# Configure PostgreSQL connection
+# Note: We'll set this up after PostgreSQL is deployed
+bao write database/config/webapp-db \
+  plugin_name=postgresql-database-plugin \
+  allowed_roles="webapp-readonly,webapp-readwrite" \
+  connection_url="postgresql://{{username}}:{{password}}@postgresql.database:5432/webapp?sslmode=disable" \
+  username="openbao_admin" \
+  password="initial_password"
+
+# Create read-only role
+bao write database/roles/webapp-readonly \
+  db_name=webapp-db \
+  creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"{{name}}\";" \
+  revocation_statements="DROP ROLE IF EXISTS \"{{name}}\";" \
+  default_ttl=1h \
+  max_ttl=8h
+
+# Create read-write role
+bao write database/roles/webapp-readwrite \
+  db_name=webapp-db \
+  creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO \"{{name}}\"; GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO \"{{name}}\";" \
+  revocation_statements="DROP ROLE IF EXISTS \"{{name}}\";" \
+  default_ttl=1h \
+  max_ttl=4h
+----
+
+=== Store Static Secrets
+
+[source,bash]
+----
+# Application configuration
+bao kv put apps/webapp/config \
+  app_name="My Awesome App" \
+  log_level="info" \
+  feature_flags='{"new_ui": true, "beta_features": false}'
+
+# External API credentials
+bao kv put apps/webapp/api-keys \
+  stripe_api_key="sk_test_xxx" \
+  sendgrid_api_key="SG.xxx" \
+  github_token="ghp_xxx"
+----
+
+=== Create Policies
+
+[source,bash]
+----
+# Policy for the web application
+bao policy write webapp - <<EOF
+# Read static configuration
+path "apps/data/webapp/config" {
+  capabilities = ["read"]
+}
+
+# Read API keys
+path "apps/data/webapp/api-keys" {
+  capabilities = ["read"]
+}
+
+# Generate database credentials
+path "database/creds/webapp-readwrite" {
+  capabilities = ["read"]
+}
+
+# Issue TLS certificates
+path "pki/issue/webapp" {
+  capabilities = ["create", "update"]
+}
+
+# Renew tokens
+path "auth/token/renew-self" {
+  capabilities = ["update"]
+}
+EOF
+
+# Policy for External Secrets Operator
+bao policy write external-secrets - <<EOF
+# Read all app secrets
+path "apps/data/*" {
+  capabilities = ["read", "list"]
+}
+
+# Read all app metadata
+path "apps/metadata/*" {
+  capabilities = ["read", "list"]
+}
+
+# Generate database credentials
+path "database/creds/*" {
+  capabilities = ["read"]
+}
+
+# Issue certificates
+path "pki/issue/*" {
+  capabilities = ["create", "update"]
+}
+EOF
+----
+
+=== Configure Authentication
+
+[source,bash]
+----
+# Kubernetes auth for the webapp
+bao write auth/kubernetes/role/webapp \
+  bound_service_account_names=webapp \
+  bound_service_account_namespaces=webapp \
+  policies=webapp \
+  ttl=1h
+
+# Kubernetes auth for External Secrets Operator
+bao write auth/kubernetes/role/external-secrets \
+  bound_service_account_names=external-secrets \
+  bound_service_account_namespaces=external-secrets \
+  policies=external-secrets \
+  ttl=1h
+----
+
+== Step 2: Git Repository Structure
+
+Create the following structure in your Git repository:
+
+[source]
+----
+gitops-repo/
+├── apps/
+│   └── webapp/
+│       ├── Chart.yaml
+│       ├── values.yaml
+│       └── templates/
+│           ├── namespace.yaml
+│           ├── serviceaccount.yaml
+│           ├── secretstore.yaml
+│           ├── externalsecrets.yaml
+│           ├── deployment.yaml
+│           ├── service.yaml
+│           └── route.yaml
+├── database/
+│   └── postgresql/
+│       ├── Chart.yaml
+│       ├── values.yaml
+│       └── templates/
+│           ├── namespace.yaml
+│           ├── statefulset.yaml
+│           ├── service.yaml
+│           └── pvc.yaml
+└── argocd/
+    └── applications/
+        ├── webapp.yaml
+        └── postgresql.yaml
+----
+
+== Step 3: PostgreSQL Deployment
+
+=== templates/namespace.yaml
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: database
+  labels:
+    app.kubernetes.io/name: database
+----
+
+=== templates/statefulset.yaml
+
+[source,yaml]
+----
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgresql
+  namespace: database
+spec:
+  serviceName: postgresql
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgresql
+  template:
+    metadata:
+      labels:
+        app: postgresql
+    spec:
+      containers:
+        - name: postgresql
+          image: registry.redhat.io/rhel9/postgresql-15:latest
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRESQL_USER
+              value: "openbao_admin"
+            - name: POSTGRESQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgresql-admin
+                  key: password
+            - name: POSTGRESQL_DATABASE
+              value: "webapp"
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/pgsql/data
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - pg_isready -U openbao_admin -d webapp
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - pg_isready -U openbao_admin -d webapp
+            initialDelaySeconds: 5
+            periodSeconds: 5
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi
+----
+
+=== templates/service.yaml
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql
+  namespace: database
+spec:
+  selector:
+    app: postgresql
+  ports:
+    - port: 5432
+      targetPort: 5432
+  clusterIP: None
+----
+
+=== Initial Admin Secret (Sealed Secret)
+
+[source,yaml]
+----
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  name: postgresql-admin
+  namespace: database
+spec:
+  encryptedData:
+    password: AgBy8hT...encrypted...
+  template:
+    metadata:
+      name: postgresql-admin
+      namespace: database
+    type: Opaque
+----
+
+== Step 4: Web Application Deployment
+
+=== templates/namespace.yaml
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: webapp
+  labels:
+    app.kubernetes.io/name: webapp
+    openbao-access: "true"
+----
+
+=== templates/serviceaccount.yaml
+
+[source,yaml]
+----
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: webapp
+  namespace: webapp
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: external-secrets
+  namespace: webapp
+----
+
+=== templates/secretstore.yaml
+
+[source,yaml]
+----
+apiVersion: external-secrets.io/v1beta1
+kind: SecretStore
+metadata:
+  name: openbao
+  namespace: webapp
+spec:
+  provider:
+    vault:
+      server: "http://openbao.openbao:8200"
+      path: "apps"
+      version: "v2"
+      auth:
+        kubernetes:
+          mountPath: "kubernetes"
+          role: "external-secrets"
+          serviceAccountRef:
+            name: external-secrets
+----
+
+=== templates/externalsecrets.yaml
+
+[source,yaml]
+----
+# Static configuration secrets
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: webapp-config
+  namespace: webapp
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao
+    kind: SecretStore
+  target:
+    name: webapp-config
+    creationPolicy: Owner
+  dataFrom:
+    - extract:
+        key: webapp/config
+---
+# API keys
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: webapp-api-keys
+  namespace: webapp
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao
+    kind: SecretStore
+  target:
+    name: webapp-api-keys
+    creationPolicy: Owner
+  dataFrom:
+    - extract:
+        key: webapp/api-keys
+----
+
+=== templates/deployment.yaml
+
+[source,yaml]
+----
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp
+  namespace: webapp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: webapp
+  template:
+    metadata:
+      labels:
+        app: webapp
+      annotations:
+        # Enable OpenBao Agent Injector
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "webapp"
+        
+        # Inject database credentials (auto-renewed)
+        vault.hashicorp.com/agent-inject-secret-database: "database/creds/webapp-readwrite"
+        vault.hashicorp.com/agent-inject-template-database: |
+          {{- with secret "database/creds/webapp-readwrite" -}}
+          export DATABASE_URL="postgresql://{{ .Data.username }}:{{ .Data.password }}@postgresql.database:5432/webapp?sslmode=disable"
+          export DB_USER="{{ .Data.username }}"
+          export DB_PASS="{{ .Data.password }}"
+          {{- end }}
+        
+        # Inject TLS certificate
+        vault.hashicorp.com/agent-inject-secret-tls.crt: "pki/issue/webapp"
+        vault.hashicorp.com/agent-inject-template-tls.crt: |
+          {{- with secret "pki/issue/webapp" "common_name=webapp.apps.cluster.local" "ttl=24h" -}}
+          {{ .Data.certificate }}
+          {{ .Data.issuing_ca }}
+          {{- end }}
+        
+        vault.hashicorp.com/agent-inject-secret-tls.key: "pki/issue/webapp"
+        vault.hashicorp.com/agent-inject-template-tls.key: |
+          {{- with secret "pki/issue/webapp" "common_name=webapp.apps.cluster.local" "ttl=24h" -}}
+          {{ .Data.private_key }}
+          {{- end }}
+    spec:
+      serviceAccountName: webapp
+      containers:
+        - name: webapp
+          image: quay.io/example/webapp:latest
+          ports:
+            - containerPort: 8443
+              name: https
+          command:
+            - /bin/sh
+            - -c
+            - |
+              # Source database credentials
+              source /vault/secrets/database
+              
+              # Start application with TLS
+              /app/webapp \
+                --tls-cert=/vault/secrets/tls.crt \
+                --tls-key=/vault/secrets/tls.key
+          env:
+            # Static config from External Secrets
+            - name: APP_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: webapp-config
+                  key: app_name
+            - name: LOG_LEVEL
+              valueFrom:
+                secretKeyRef:
+                  name: webapp-config
+                  key: log_level
+            # API keys from External Secrets
+            - name: STRIPE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: webapp-api-keys
+                  key: stripe_api_key
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8443
+              scheme: HTTPS
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8443
+              scheme: HTTPS
+            initialDelaySeconds: 30
+            periodSeconds: 10
+----
+
+=== templates/service.yaml
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapp
+  namespace: webapp
+spec:
+  selector:
+    app: webapp
+  ports:
+    - port: 443
+      targetPort: 8443
+      name: https
+----
+
+=== templates/route.yaml
+
+[source,yaml]
+----
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: webapp
+  namespace: webapp
+spec:
+  host: webapp.apps.cluster.example.com
+  port:
+    targetPort: https
+  tls:
+    termination: passthrough
+  to:
+    kind: Service
+    name: webapp
+----
+
+== Step 5: Argo CD Applications
+
+=== applications/postgresql.yaml
+
+[source,yaml]
+----
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: postgresql
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/your-org/gitops-repo.git
+    targetRevision: main
+    path: database/postgresql
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: database
+  syncPolicy:
+    automated:
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+----
+
+=== applications/webapp.yaml
+
+[source,yaml]
+----
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: webapp
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/your-org/gitops-repo.git
+    targetRevision: main
+    path: apps/webapp
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: webapp
+  syncPolicy:
+    automated:
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      jsonPointers:
+        - /data
+----
+
+== Step 6: Verification
+
+=== Check Argo CD Sync Status
+
+[source,bash]
+----
+# Check applications
+argocd app list
+
+# Sync if needed
+argocd app sync postgresql
+argocd app sync webapp
+----
+
+=== Verify External Secrets
+
+[source,bash]
+----
+# Check ExternalSecret status
+oc get externalsecret -n webapp
+
+# NAME              STORE     REFRESH INTERVAL   STATUS
+# webapp-config     openbao   1h                 SecretSynced
+# webapp-api-keys   openbao   1h                 SecretSynced
+
+# Check created secrets
+oc get secrets -n webapp | grep webapp
+----
+
+=== Verify Agent Injection
+
+[source,bash]
+----
+# Check pod has sidecar
+oc get pods -n webapp
+
+# NAME                      READY   STATUS    RESTARTS   AGE
+# webapp-xxx                2/2     Running   0          5m
+
+# Verify secrets are injected
+oc exec -it deploy/webapp -n webapp -c webapp -- ls -la /vault/secrets/
+
+# Check database credentials
+oc exec -it deploy/webapp -n webapp -c webapp -- cat /vault/secrets/database
+
+# Check TLS certificate
+oc exec -it deploy/webapp -n webapp -c webapp -- cat /vault/secrets/tls.crt
+----
+
+=== Verify Database Connectivity
+
+[source,bash]
+----
+# Check application can connect to database
+oc logs deploy/webapp -n webapp -c webapp | grep -i database
+
+# Verify dynamic credentials in OpenBao
+bao lease list database/creds/webapp-readwrite
+----
+
+=== Test the Application
+
+[source,bash]
+----
+# Get the route
+ROUTE=$(oc get route webapp -n webapp -o jsonpath='{.spec.host}')
+
+# Test the endpoint
+curl -k https://$ROUTE/health
+
+# Check TLS certificate
+openssl s_client -connect $ROUTE:443 -servername $ROUTE 2>/dev/null | openssl x509 -noout -text | head -20
+----
+
+== Security Review Checklist
+
+Before going to production, verify:
+
+=== OpenBao Configuration
+
+[cols="1,2"]
+|===
+|Item |Status
+
+|[ ] Root token revoked
+|After creating admin users
+
+|[ ] Audit logging enabled
+|For compliance and debugging
+
+|[ ] Auto-unseal configured
+|For operational ease
+
+|[ ] Backup schedule active
+|Regular Raft snapshots
+
+|[ ] TLS enabled
+|For API communication
+|===
+
+=== Policies
+
+[cols="1,2"]
+|===
+|Item |Status
+
+|[ ] Least privilege
+|Only required paths
+
+|[ ] Namespace bound
+|Service accounts limited
+
+|[ ] TTLs appropriate
+|Short for dynamic, longer for static
+|===
+
+=== Application
+
+[cols="1,2"]
+|===
+|Item |Status
+
+|[ ] No secrets in code
+|All from OpenBao
+
+|[ ] No secrets in env vars
+|Use files or volumes
+
+|[ ] Certificate rotation
+|Auto-renewed by agent
+
+|[ ] Credential rotation
+|Dynamic credentials with TTL
+|===
+
+== Architecture Diagram
+
+[source]
+----
+┌────────────────────────────────────────────────────────────────────────────┐
+│                              Git Repository                                │
+│   ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                       │
+│   │ PostgreSQL  │  │   WebApp    │  │  Argo CD    │                       │
+│   │   Config    │  │   Config    │  │   Apps      │                       │
+│   └─────────────┘  └─────────────┘  └─────────────┘                       │
+└───────────────────────────────┬────────────────────────────────────────────┘
+                                │
+                                ▼
+                    ┌───────────────────────┐
+                    │       Argo CD         │
+                    │    (OpenShift GitOps) │
+                    └───────────┬───────────┘
+                                │
+        ┌───────────────────────┼───────────────────────┐
+        │                       │                       │
+        ▼                       ▼                       ▼
+┌───────────────┐     ┌───────────────┐     ┌───────────────┐
+│   database    │     │    webapp     │     │    openbao    │
+│   namespace   │     │   namespace   │     │   namespace   │
+├───────────────┤     ├───────────────┤     ├───────────────┤
+│ - PostgreSQL  │     │ - Deployment  │     │ - OpenBao HA  │
+│ - Service     │     │   (+ agent)   │     │ - Injector    │
+│ - PVC         │     │ - Service     │     │ - Route       │
+│               │     │ - Route       │     │               │
+│               │     │ - SecretStore │     │               │
+│               │     │ - ExtSecret   │     │               │
+└───────┬───────┘     └───────┬───────┘     └───────┬───────┘
+        │                     │                     │
+        │         ┌───────────┴───────────┐         │
+        │         │                       │         │
+        │         ▼                       ▼         │
+        │   ┌───────────┐           ┌───────────┐   │
+        │   │ K8s Auth  │           │   Agent   │   │
+        │   │   Role    │           │ Injector  │   │
+        │   └─────┬─────┘           └─────┬─────┘   │
+        │         │                       │         │
+        │         └───────────┬───────────┘         │
+        │                     │                     │
+        │                     ▼                     │
+        │         ┌───────────────────────┐         │
+        │         │     OpenBao API       │         │
+        │         │   ┌───────────────┐   │         │
+        │         │   │  KV Engine    │   │         │
+        │         │   │  (config,     │   │         │
+        │         │   │   api-keys)   │   │         │
+        │         │   └───────────────┘   │         │
+        │         │   ┌───────────────┐   │         │
+        │         │   │  PKI Engine   │   │         │
+        │         │   │  (TLS certs)  │   │         │
+        │         │   └───────────────┘   │         │
+        │         │   ┌───────────────┐   │         │
+        └────────►│   │Database Engine│   │◄────────┘
+                  │   │(dynamic creds)│   │
+                  │   └───────────────┘   │
+                  └───────────────────────┘
+----
+
+== Summary
+
+In this series, we covered:
+
+* **Part 1**: Introduction to OpenBao and its concepts
+* **Part 2**: Standalone installation for testing and edge cases
+* **Part 3**: OpenShift deployment with Helm
+* **Part 4**: GitOps deployment with Argo CD
+* **Part 5**: Authentication methods (Kubernetes, OIDC, LDAP, AppRole)
+* **Part 6**: Secrets engines (KV, PKI, Database, Transit)
+* **Part 7**: Kubernetes integration patterns
+* **Part 8**: High availability and production best practices
+* **Part 9**: Operations and troubleshooting
+* **Part 10**: Complete end-to-end example
+
+== Key Takeaways
+
+. **Centralize secrets**: Use OpenBao as the single source of truth
+. **Prefer dynamic secrets**: Reduce blast radius with short-lived credentials
+. **Use GitOps**: Manage OpenBao configuration declaratively
+. **Layer your approach**: Combine Agent Injector with External Secrets Operator
+. **Automate operations**: Auto-unseal, backups, and monitoring
+. **Least privilege**: Specific policies bound to specific namespaces
+
+== What's Next?
+
+Consider exploring:
+
+* **Multi-cluster**: Using OpenBao across multiple clusters
+* **Disaster recovery**: Active-passive setup across regions
+* **Advanced PKI**: Certificate chains and cross-signing
+* **Transit encryption**: Application-level encryption patterns
+* **Compliance**: Meeting regulatory requirements with audit logging
+
+Thank you for following this series. I hope it helps you implement secure secret management in your OpenShift environments!
+
+== Resources
+
+* https://openbao.org/docs[OpenBao Documentation^]
+* https://external-secrets.io[External Secrets Operator^]
+* https://argo-cd.readthedocs.io[Argo CD Documentation^]
+* https://github.com/openbao/openbao[OpenBao GitHub^]

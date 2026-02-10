@@ -1,0 +1,688 @@
+--- 
+title: "The Complete Guide to OpenBao - Standalone Installation - Part 2"
+description: "Installing OpenBao as a standalone service outside of Kubernetes for testing and edge deployments"
+date: "2026-02-09"
+doctype: book
+weight: 99
+
+series: "The Complete Guide to OpenBao"
+series_part: 2
+
+featured_image: /openshift-platform/security/secrets-management/openbao/images/Logo_OpenBao.png
+show_featured_image_summary: true
+show_featured_image_article: true
+disableBreadcrumb: true
+
+authors: [Thomas Jungbauer]
+type: post
+draft: true
+categories:
+   - OpenShift
+   - Security
+   - Secret Management
+
+tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "Installation"] 
+
+aliases: [ 
+	 "/openshift/security/openbao/2026-02-09-openbao-standalone-installation/",
+]
+---
+
+:imagesdir: /openshift-platform/security/secrets-management/openbao/images/
+:icons: font
+:toc:
+
+In the previous article, we introduced OpenBao and its core concepts. Now it is time to get our hands dirty with a standalone installation. This approach is useful for testing, development environments, edge deployments, or scenarios where Kubernetes is not available.
+
+<!--more--> 
+
+== Introduction
+
+While OpenBao shines in Kubernetes environments, understanding the standalone installation helps you grasp the fundamentals. This knowledge is valuable whether you are:
+
+* Learning OpenBao before deploying to production
+* Running OpenBao outside of Kubernetes (edge, legacy systems)
+* Debugging issues in containerized deployments
+* Setting up a development environment
+
+== Installation Methods Overview
+
+OpenBao can be installed through multiple methods:
+
+[cols="1,2,2"]
+|===
+|Method |Best For |Complexity
+
+|Package managers (apt, dnf, brew)
+|Production Linux/macOS systems
+|Low
+
+|Container images (Podman/Docker)
+|Quick testing, isolated environments
+|Low
+
+|Binary download
+|Air-gapped environments
+|Low
+
+|Source compilation
+|Custom builds, development
+|Medium
+|===
+
+NOTE: For this article, we will focus on MacOS for local testings with binary and container image (using Podman) and Red Hat Enterprise Linux to setup and example production ready server.
+The deployment on the Kubernetes environment will be discussed in the next article.
+
+== Method 1: Package Manager Installation
+
+=== RHEL/Fedora/CentOS
+
+On RHEL or CentOS, before you can install OpenBao you need to install Epel repository. To do so, you first need to enable Code Ready Repository. The following commands will do the trick. Be sure that your system is registered, in case of RHEL.
+
+WARNING: If you get the error "Repositories disabled by configuration." you need to tell the subscription manager that you want to manage the repositories. This can be done permanently or temporarily. You can use the command: **sudo subscription-manager config --rhsm.manage_repos=1** to do so.
+
+==== RHEL
+
+. Enable Code Ready Repository
+[source,bash]
+----
+sudo subscription-manager repos --enable codeready-builder-for-rhel-9-$(arch)-rpms
+----
+
+. Install EPEL Repository
+[source,bash]
+----
+sudo dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+----
+
+. Install OpenBai
+[source,bash]
+----
+sudo dnf install -y openbao
+----
+
+==== CentOS
+
+. Enable Code Ready Repository on CentOS
+[source,bash]
+----
+sudo dnf config-manager --set-enabled crb
+----
+
+. Install EPEL Repository
+[source,bash]
+----
+sudo dnf install epel-release epel-next-release
+----
+
+. Install OpenBai
+[source,bash]
+----
+sudo dnf install -y openbao
+----
+
+=== macOS (Homebrew)
+
+[source,bash]
+----
+# Install OpenBao
+brew install openbao
+----
+
+=== Verify Installation
+
+After installation, verify OpenBao is available:
+
+[source,bash]
+----
+bao version
+# Output:
+OpenBao v2.5.0 (bcbb6036ec2b747bceb98c7706ce9b974faa1b23), built 2026-02-04T15:57:17Z (cgo)
+----
+
+CAUTION: The OpenBao CLI command is `bao`, not `vault`. This distinguishes it from HashiCorp Vault.
+
+=== Start Development Server
+
+To start a development environment, you can use the following command. 
+
+CAUTION: This is NOT suitable for production, it is just a test to evaluate the basic concepts of OpenBao.
+
+[source,bash]
+----
+bao server -dev -dev-root-token-id="dev-only-token"
+----
+
+This will start the server. The UI is accessible at http://localhost:8200 where you can login using the root token `dev-only-token`.
+
+== Method 2: Container Image
+
+For quick testing or isolated environments, container images are ideal. Luckily, OpenBao, offers several types of contaiers, suitable for 
+any environment. We will use the image hosted on **quay.io** and is based on **RHEL UBI** and can be found at: https://quay.io/openbao/openbao-ubi[quay.io/openbao/openbao-ubi^]
+
+=== Using Podman
+
+The following command will fetch the image and start the container.
+
+CAUTION: This is NOT suitable for production, it is just a test to evaluate the basic concepts of OpenBao.
+
+[source,bash]
+----
+# Run in dev mode (for testing only!)
+podman run --rm -d \
+  --name openbao-dev \
+  -p 8200:8200 \
+  -e 'BAO_DEV_ROOT_TOKEN_ID=dev-only-token' \
+  -e 'BAO_DEV_LISTEN_ADDRESS=0.0.0.0:8200' \
+  quay.io/openbao/openbao-ubi:latest server -dev
+----
+
+[source,bash]
+----
+# Verify it is running
+podman logs -f openbao-dev
+----
+
+This will start the server. The UI is accessible at http://localhost:8200 where you can login using the root token `dev-only-token`.
+
+NOTE: If you prefer to use Docker, simply replace `podman` with `docker` in the commands.
+
+
+== Dev Mode: Quick Start for Testing
+
+Dev mode is the fastest way to start using OpenBao for learning and testing.
+
+The characteristics in this mode are:
+
+* In-memory storage (data lost on restart)
+* Automatically initialized and unsealed
+* Root token printed to stdout
+* TLS disabled
+* Single server (no HA)
+
+Let's create an example secret and try to retrieve it again.
+
+. Authenticate against OpenBao
++
+[source,bash]
+----
+export VAULT_TOKEN="dev-only-token"
+export BAO_ADDR='http://127.0.0.1:8200'
+----
+
+. Create Secret
++
+[source,bash]
+----
+curl \
+  --header "X-Vault-Token: $VAULT_TOKEN" \
+  --header "Content-Type: application/json" \
+  --request POST \
+  --data '{"data": {"password": "OpenBao123"}}' \
+  $BAO_ADDR/v1/secret/data/my-secret-password &&
+  echo "Secret written successfully."
+----
+
+. Retrieve Secret
++
+[source,bash]
+----
+curl --header "X-Vault-Token: $VAULT_TOKEN" \
+  $BAO_ADDR/v1/secret/data/my-secret-password | jq '.data.data'
+----
+
+You should see the password that was created before: 
+
+[source,json]
+----
+{
+  "password": "OpenBao123"
+}
+----
+
+=== Check Status of OpenBao Server
+
+[source,bash]
+----
+bao status
+----
+
+This will give you the status of your running OpenBao instance. 
+
+[source,bash]
+----
+Key             Value
+---             -----
+Seal Type       shamir
+Initialized     true
+Sealed          false
+Total Shares    1
+Threshold       1
+Version         2.5.0
+Build Date      2026-02-04T15:57:17Z
+Storage Type    inmem
+Cluster Name    vault-cluster-421b2431
+Cluster ID      6d42dcd2-e399-211e-999a-49b1874cc8ce
+HA Enabled      false
+----
+
+== Hardening your System
+
+OpenBao does a good job to secure your secrets, however, memory paging (or swap) can undermine the protection. Your OS should either have swap disabled completely or encrypt the swap space. 
+
+As I am testing on a macOS the swap space is encrypted out of the box. 
+
+However, OpenBao documented what must be done for various operating systems at https://openbao.org/docs/install/#post-installation-hardening[Post-installation hardening^]
+
+== Production Standalone Setup
+
+For a proper standalone installation, follow these steps:
+
+=== Step 1: Create System User
+
+[source,bash]
+----
+# Create a dedicated user
+sudo useradd --system --home /etc/openbao --shell /bin/false openbao
+----
+
+=== Step 2: Create Directory Structure
+
+[source,bash]
+----
+# Create directories
+sudo mkdir -p /etc/openbao
+sudo mkdir -p /var/lib/openbao/data
+sudo mkdir -p /var/log/openbao
+
+# Set ownership
+sudo chown -R openbao:openbao /etc/openbao
+sudo chown -R openbao:openbao /var/lib/openbao
+sudo chown -R openbao:openbao /var/log/openbao
+
+# Set permissions
+sudo chmod 750 /etc/openbao
+sudo chmod 750 /var/lib/openbao
+----
+
+=== Step 3: Create Configuration File
+
+Create `/etc/openbao/config.hcl`:
+
+[source,hcl]
+----
+# Full configuration for standalone OpenBao server
+
+# Cluster name for identification
+cluster_name = "openbao-standalone"
+
+# Storage backend using integrated Raft
+storage "raft" {
+  path    = "/var/lib/openbao/data"
+  node_id = "node1"
+}
+
+# HTTP listener (for internal communication)
+listener "tcp" {
+  address         = "0.0.0.0:8200"
+  cluster_address = "0.0.0.0:8201"
+  tls_disable     = false
+  tls_cert_file   = "/etc/openbao/tls/server.crt"
+  tls_key_file    = "/etc/openbao/tls/server.key"
+}
+
+# API address for clients
+api_addr = "https://openbao.example.com:8200"
+
+# Cluster address for raft communication
+cluster_addr = "https://openbao.example.com:8201"
+
+# UI enabled
+ui = true
+
+# Logging
+log_level = "info"
+log_file  = "/var/log/openbao/openbao.log"
+
+# Disable memory locking (enable in production if possible)
+disable_mlock = true
+
+# Telemetry (optional)
+telemetry {
+  prometheus_retention_time = "30s"
+  disable_hostname          = true
+}
+----
+
+=== Step 4: Generate TLS Certificates
+
+For production, you should use proper certificates. For testing, create self-signed ones:
+
+[source,bash]
+----
+# Create TLS directory
+sudo mkdir -p /etc/openbao/tls
+
+# Generate private key
+sudo openssl genrsa -out /etc/openbao/tls/server.key 4096
+
+# Generate certificate signing request
+sudo openssl req -new -key /etc/openbao/tls/server.key \
+  -out /etc/openbao/tls/server.csr \
+  -subj "/CN=openbao.example.com"
+
+# Generate self-signed certificate
+sudo openssl x509 -req -days 365 \
+  -in /etc/openbao/tls/server.csr \
+  -signkey /etc/openbao/tls/server.key \
+  -out /etc/openbao/tls/server.crt
+
+# Set permissions
+sudo chown -R openbao:openbao /etc/openbao/tls
+sudo chmod 600 /etc/openbao/tls/server.key
+----
+
+=== Step 5: Create Systemd Service
+
+Create `/etc/systemd/system/openbao.service`:
+
+[source,ini]
+----
+[Unit]
+Description=OpenBao Secret Management
+Documentation=https://openbao.org/docs
+Requires=network-online.target
+After=network-online.target
+ConditionFileNotEmpty=/etc/openbao/config.hcl
+
+[Service]
+User=openbao
+Group=openbao
+ProtectSystem=full
+ProtectHome=read-only
+PrivateTmp=yes
+PrivateDevices=yes
+SecureBits=keep-caps
+AmbientCapabilities=CAP_IPC_LOCK
+CapabilityBoundingSet=CAP_SYSLOG CAP_IPC_LOCK
+NoNewPrivileges=yes
+ExecStart=/usr/local/bin/bao server -config=/etc/openbao/config.hcl
+ExecReload=/bin/kill --signal HUP $MAINPID
+KillMode=process
+KillSignal=SIGINT
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+LimitNOFILE=65536
+LimitMEMLOCK=infinity
+
+[Install]
+WantedBy=multi-user.target
+----
+
+=== Step 6: Start the Service
+
+[source,bash]
+----
+# Reload systemd
+sudo systemctl daemon-reload
+
+# Enable and start OpenBao
+sudo systemctl enable openbao
+sudo systemctl start openbao
+
+# Check status
+sudo systemctl status openbao
+
+# View logs
+sudo journalctl -u openbao -f
+----
+
+== Initialize and Unseal OpenBao
+
+After starting OpenBao for the first time, it needs to be initialized and unsealed.
+
+=== Set Environment Variables
+
+[source,bash]
+----
+# Set the OpenBao address
+export BAO_ADDR='https://openbao.example.com:8200'
+
+# If using self-signed certificates
+export BAO_CACERT='/etc/openbao/tls/server.crt'
+# Or skip verification (testing only!)
+export BAO_SKIP_VERIFY=true
+----
+
+=== Check Status
+
+[source,bash]
+----
+bao status
+
+# Expected output (before initialization):
+# Key                Value
+# ---                -----
+# Seal Type          shamir
+# Initialized        false <1>
+# Sealed             true
+# ...
+----
+<1> Not yet initialized
+
+=== Initialize OpenBao
+
+[source,bash]
+----
+# Initialize with default settings (5 key shares, 3 threshold)
+bao operator init
+
+# Or with custom settings
+bao operator init -key-shares=5 -key-threshold=3 -format=json > /root/openbao-init.json
+----
+
+CAUTION: Store the unseal keys and root token securely! Anyone with these can access all secrets.
+
+The output looks like:
+
+[source,json]
+----
+{
+  "unseal_keys_b64": [
+    "key1...",
+    "key2...",
+    "key3...",
+    "key4...",
+    "key5..."
+  ],
+  "unseal_keys_hex": [...],
+  "unseal_shares": 5,
+  "unseal_threshold": 3,
+  "recovery_keys_b64": [],
+  "recovery_keys_hex": [],
+  "root_token": "sbr.xxxxxxxxxxxx"
+}
+----
+
+=== Unseal OpenBao
+
+You need to provide 3 (threshold) different unseal keys:
+
+[source,bash]
+----
+# First key
+bao operator unseal
+# Enter first unseal key
+
+# Second key
+bao operator unseal
+# Enter second unseal key
+
+# Third key
+bao operator unseal
+# Enter third unseal key
+----
+
+After providing enough keys:
+
+[source,bash]
+----
+bao status
+
+# Expected output:
+# Key                     Value
+# ---                     -----
+# Seal Type               shamir
+# Initialized             true
+# Sealed                  false <1>
+# Total Shares            5
+# Threshold               3
+# Version                 2.x.x
+# Storage Type            raft
+# HA Enabled              true
+----
+<1> Now unsealed and ready
+
+=== Login with Root Token
+
+[source,bash]
+----
+bao login
+
+# Enter the root token from initialization
+----
+
+== Basic Verification
+
+Let us verify the installation works:
+
+[source,bash]
+----
+# Check server status
+bao status
+
+# List enabled secrets engines
+bao secrets list
+
+# List enabled auth methods
+bao auth list
+
+# Write a test secret
+bao secrets enable -path=secret kv-v2
+bao kv put secret/test message="Hello from OpenBao"
+
+# Read the secret
+bao kv get secret/test
+----
+
+== Security Hardening Checklist
+
+Before using OpenBao in production:
+
+[cols="1,3"]
+|===
+|Item |Recommendation
+
+|TLS
+|Always enable TLS with valid certificates
+
+|Root Token
+|Revoke root token after initial setup, create admin users
+
+|Unseal Keys
+|Distribute to different people/locations, consider auto-unseal
+
+|Network
+|Restrict access with firewall rules
+
+|Audit
+|Enable audit logging
+
+|Backups
+|Regular Raft snapshots
+
+|Updates
+|Keep OpenBao updated
+|===
+
+=== Enable Audit Logging
+
+[source,bash]
+----
+# Enable file audit device
+bao audit enable file file_path=/var/log/openbao/audit.log
+----
+
+=== Revoke Root Token (After Creating Admin Users)
+
+[source,bash]
+----
+# First, create admin policies and users (covered in Part 5)
+# Then revoke the root token
+bao token revoke <root-token>
+----
+
+== Troubleshooting Common Issues
+
+=== OpenBao Won't Start
+
+Check logs:
+[source,bash]
+----
+sudo journalctl -u openbao -n 50
+----
+
+Common causes:
+* Configuration syntax errors
+* Permission issues on directories
+* Port already in use
+* TLS certificate problems
+
+=== Cannot Connect
+
+[source,bash]
+----
+# Check if OpenBao is listening
+ss -tlnp | grep 8200
+
+# Test connectivity
+curl -k https://localhost:8200/v1/sys/health
+----
+
+=== Seal Issues After Restart
+
+If OpenBao seals after restart (normal behavior):
+[source,bash]
+----
+# Unseal again with threshold keys
+bao operator unseal
+----
+
+Consider implementing auto-unseal (covered in Part 8).
+
+== What is Coming Next?
+
+In Part 3, we will deploy OpenBao on OpenShift/Kubernetes using the official Helm chart. This provides:
+
+* High availability out of the box
+* Kubernetes-native management
+* Integration with OpenShift security features
+* Persistent storage via PVCs
+
+== Conclusion
+
+You now have a working standalone OpenBao installation. This forms the foundation for understanding how OpenBao operates. While standalone mode is useful for testing and edge cases, most production deployments will use Kubernetes, which we will cover next.
+
+Key takeaways:
+
+* OpenBao can run standalone or in containers
+* Dev mode is for testing only
+* Production requires proper TLS, initialization, and security hardening
+* Unseal keys must be stored securely
+
+== Resources
+
+* https://openbao.org/docs/install[OpenBao Installation Documentation^]
+* https://openbao.org/docs/configuration[OpenBao Configuration Reference^]
+* https://openbao.org/docs/commands[OpenBao CLI Reference^]

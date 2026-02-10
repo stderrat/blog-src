@@ -1,0 +1,740 @@
+--- 
+title: "The Complete Guide to OpenBao - High Availability and Production Best Practices - Part 8"
+description: "Production hardening for OpenBao including auto-unseal, disaster recovery, backup strategies, monitoring, and performance tuning"
+date: "2026-02-15"
+doctype: book
+weight: 93
+
+series: "The Complete Guide to OpenBao"
+series_part: 8
+
+featured_image: /openshift-platform/security/secrets-management/openbao/images/Logo_OpenBao.png
+show_featured_image_summary: true
+show_featured_image_article: true
+disableBreadcrumb: true
+
+authors: [Thomas Jungbauer]
+type: post
+draft: true
+categories:
+   - OpenShift
+   - Security
+   - Secret Management
+
+tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "High Availability", "Production", "Backup"] 
+
+aliases: [ 
+	 "/openshift/security/openbao/2026-02-15-openbao-ha-production/",
+]
+---
+
+:imagesdir: /openshift-platform/security/secrets-management/openbao/images/
+:icons: font
+:toc:
+
+Running OpenBao in production requires careful consideration of high availability, disaster recovery, and operational best practices. This article covers auto-unseal configuration, backup strategies, monitoring, and performance tuning.
+
+<!--more--> 
+
+== Introduction
+
+Production OpenBao deployments must address:
+
+* **High Availability**: No single point of failure
+* **Auto-Unseal**: Automatic recovery from restarts
+* **Disaster Recovery**: Ability to recover from failures
+* **Monitoring**: Visibility into health and performance
+* **Security Hardening**: Defense in depth
+
+== High Availability Architecture
+
+=== Raft Consensus
+
+OpenBao uses Raft for distributed consensus:
+
+[source]
+----
+                    ┌─────────────────────────────────────┐
+                    │         Load Balancer/Route         │
+                    └─────────────────┬───────────────────┘
+                                      │
+           ┌──────────────────────────┼──────────────────────────┐
+           │                          │                          │
+           ▼                          ▼                          ▼
+    ┌─────────────┐           ┌─────────────┐           ┌─────────────┐
+    │  OpenBao-0  │◄─────────►│  OpenBao-1  │◄─────────►│  OpenBao-2  │
+    │   (Leader)  │   Raft    │ (Standby)   │   Raft    │ (Standby)   │
+    └──────┬──────┘           └──────┬──────┘           └──────┬──────┘
+           │                          │                          │
+           ▼                          ▼                          ▼
+    ┌─────────────┐           ┌─────────────┐           ┌─────────────┐
+    │    PVC-0    │           │    PVC-1    │           │    PVC-2    │
+    └─────────────┘           └─────────────┘           └─────────────┘
+----
+
+=== Minimum Cluster Size
+
+* **3 nodes**: Tolerates 1 failure (recommended minimum)
+* **5 nodes**: Tolerates 2 failures (for critical environments)
+* Always use odd numbers for proper quorum
+
+=== Pod Anti-Affinity
+
+Ensure pods run on different nodes:
+
+[source,yaml]
+----
+server:
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: openbao
+              component: server
+          topologyKey: kubernetes.io/hostname
+      # Also spread across zones if available
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: openbao
+            topologyKey: topology.kubernetes.io/zone
+----
+
+== Auto-Unseal Configuration
+
+Manual unsealing is operationally burdensome. Auto-unseal delegates unsealing to a trusted service.
+
+=== Option 1: AWS KMS Auto-Unseal
+
+[source,hcl]
+----
+# In server configuration
+seal "awskms" {
+  region     = "us-east-1"
+  kms_key_id = "alias/openbao-unseal"
+  # Or use key ID
+  # kms_key_id = "arn:aws:kms:us-east-1:123456789:key/xxx"
+}
+----
+
+Configure AWS credentials via:
+* IAM Role for Service Account (IRSA) - recommended
+* Environment variables
+* AWS credentials file
+
+[source,yaml]
+----
+# Helm values for IRSA
+server:
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: "arn:aws:iam::123456789:role/openbao-unseal"
+  
+  ha:
+    raft:
+      config: |
+        seal "awskms" {
+          region     = "us-east-1"
+          kms_key_id = "alias/openbao-unseal"
+        }
+        # ... rest of config
+----
+
+=== Option 2: Azure Key Vault Auto-Unseal
+
+[source,hcl]
+----
+seal "azurekeyvault" {
+  tenant_id      = "your-tenant-id"
+  vault_name     = "openbao-keyvault"
+  key_name       = "openbao-unseal-key"
+}
+----
+
+=== Option 3: GCP Cloud KMS Auto-Unseal
+
+[source,hcl]
+----
+seal "gcpckms" {
+  project     = "my-project"
+  region      = "global"
+  key_ring    = "openbao"
+  crypto_key  = "unseal"
+}
+----
+
+=== Option 4: Static Key Auto-Unseal (On-Premise)
+
+For environments without cloud KMS, use static keys from Kubernetes secrets:
+
+[source,hcl]
+----
+seal "transit" {
+  address         = "https://external-vault.example.com:8200"
+  token           = "s.xxx"
+  disable_renewal = "false"
+  key_name        = "openbao-unseal"
+  mount_path      = "transit/"
+}
+----
+
+Or use the environment-based static seal:
+
+[source,yaml]
+----
+# Store the key in a Kubernetes secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: openbao-unseal-key
+  namespace: openbao
+type: Opaque
+data:
+  # 32-byte AES-256 key, base64 encoded
+  key: <base64-encoded-32-byte-key>
+---
+# Mount in the OpenBao pods
+server:
+  extraSecretEnvironmentVars:
+    - envName: BAO_SEAL_KEY
+      secretName: openbao-unseal-key
+      secretKey: key
+  
+  ha:
+    raft:
+      config: |
+        seal "aes256gcm" {
+          key = "${BAO_SEAL_KEY}"
+        }
+        # ... rest of config
+----
+
+=== Migration from Shamir to Auto-Unseal
+
+[source,bash]
+----
+# 1. Stop all standby nodes
+# 2. Update leader configuration with seal stanza
+# 3. Restart leader - it will require unseal keys once more
+# 4. After leader is up, migrate the seal
+bao operator unseal -migrate
+
+# 5. Update standby configurations and restart them
+----
+
+== Recovery Keys
+
+With auto-unseal, recovery keys replace unseal keys:
+
+[source,bash]
+----
+# Generate recovery keys during init (auto-unseal mode)
+bao operator init -recovery-shares=5 -recovery-threshold=3
+
+# Use recovery keys for administrative operations
+bao operator generate-root -init
+bao operator generate-root -decode=<otp> -otp=<recovery-key>
+----
+
+== Backup and Disaster Recovery
+
+=== Raft Snapshots
+
+The primary backup method for Raft storage:
+
+[source,bash]
+----
+# Create a snapshot
+bao operator raft snapshot save /tmp/raft-snapshot.snap
+
+# Verify the snapshot
+ls -la /tmp/raft-snapshot.snap
+
+# Restore from snapshot (on new cluster or after disaster)
+bao operator raft snapshot restore /tmp/raft-snapshot.snap
+----
+
+=== Automated Backup CronJob
+
+[source,yaml]
+----
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: openbao-backup
+  namespace: openbao
+spec:
+  schedule: "0 */6 * * *"  # Every 6 hours
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: openbao-backup
+          containers:
+            - name: backup
+              image: ghcr.io/openbao/openbao:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  
+                  # Login with AppRole
+                  export BAO_ADDR=http://openbao:8200
+                  export BAO_TOKEN=$(bao write -field=token auth/approle/login \
+                    role_id="$ROLE_ID" \
+                    secret_id="$SECRET_ID")
+                  
+                  # Create snapshot
+                  TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+                  bao operator raft snapshot save /backup/snapshot-${TIMESTAMP}.snap
+                  
+                  # Cleanup old backups (keep last 7 days)
+                  find /backup -name "*.snap" -mtime +7 -delete
+                  
+                  echo "Backup completed: snapshot-${TIMESTAMP}.snap"
+              env:
+                - name: ROLE_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: openbao-backup-creds
+                      key: role_id
+                - name: SECRET_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: openbao-backup-creds
+                      key: secret_id
+              volumeMounts:
+                - name: backup
+                  mountPath: /backup
+          volumes:
+            - name: backup
+              persistentVolumeClaim:
+                claimName: openbao-backup
+          restartPolicy: OnFailure
+----
+
+=== Backup Policy
+
+Create a policy for the backup job:
+
+[source,hcl]
+----
+# backup-policy.hcl
+# Allow reading and creating snapshots
+path "sys/storage/raft/snapshot" {
+  capabilities = ["read"]
+}
+----
+
+=== Off-Site Backup
+
+Copy snapshots to external storage:
+
+[source,yaml]
+----
+# Add to backup CronJob
+- name: upload
+  image: amazon/aws-cli:latest
+  command:
+    - /bin/sh
+    - -c
+    - |
+      aws s3 sync /backup s3://openbao-backups/$(date +%Y/%m)/ \
+        --exclude "*" \
+        --include "*.snap"
+  volumeMounts:
+    - name: backup
+      mountPath: /backup
+      readOnly: true
+----
+
+=== Disaster Recovery Procedure
+
+[source,bash]
+----
+# 1. Deploy fresh OpenBao cluster (same version)
+
+# 2. Initialize with same configuration
+bao operator init -key-shares=5 -key-threshold=3
+
+# 3. Unseal the new leader
+
+# 4. Restore from snapshot
+bao operator raft snapshot restore /path/to/snapshot.snap
+
+# 5. Unseal remaining nodes and join to cluster
+
+# 6. Verify restoration
+bao secrets list
+bao auth list
+bao kv get secret/test
+----
+
+== Monitoring and Alerting
+
+=== Prometheus Metrics
+
+Enable Prometheus metrics:
+
+[source,hcl]
+----
+telemetry {
+  prometheus_retention_time = "30s"
+  disable_hostname = true
+  unauthenticated_metrics_access = true
+}
+----
+
+=== ServiceMonitor for Prometheus Operator
+
+[source,yaml]
+----
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: openbao
+  namespace: openbao
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: openbao
+  endpoints:
+    - port: http
+      path: /v1/sys/metrics
+      params:
+        format: ["prometheus"]
+      interval: 30s
+----
+
+=== Key Metrics to Monitor
+
+[cols="2,3"]
+|===
+|Metric |Description
+
+|`vault_core_unsealed`
+|1 if unsealed, 0 if sealed
+
+|`vault_core_active`
+|1 if leader, 0 if standby
+
+|`vault_raft_leader`
+|Current Raft leader status
+
+|`vault_raft_peers`
+|Number of Raft peers
+
+|`vault_runtime_alloc_bytes`
+|Memory allocation
+
+|`vault_token_count`
+|Number of active tokens
+
+|`vault_expire_num_leases`
+|Number of active leases
+
+|`vault_audit_log_request_count`
+|Audit log requests
+|===
+
+=== PrometheusRule for Alerts
+
+[source,yaml]
+----
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: openbao-alerts
+  namespace: openbao
+spec:
+  groups:
+    - name: openbao
+      rules:
+        - alert: OpenBaoSealed
+          expr: vault_core_unsealed == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "OpenBao is sealed"
+            description: "OpenBao instance {{ $labels.instance }} has been sealed for more than 5 minutes."
+        
+        - alert: OpenBaoNoLeader
+          expr: sum(vault_core_active) == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "No OpenBao leader"
+            description: "No OpenBao instance is currently the leader."
+        
+        - alert: OpenBaoHighMemory
+          expr: vault_runtime_alloc_bytes > 1073741824  # 1GB
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High memory usage"
+            description: "OpenBao instance {{ $labels.instance }} is using more than 1GB of memory."
+        
+        - alert: OpenBaoTooManyLeases
+          expr: vault_expire_num_leases > 100000
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Too many active leases"
+            description: "OpenBao has more than 100,000 active leases."
+----
+
+== Security Hardening
+
+=== Revoke Root Token
+
+After initial setup, revoke the root token:
+
+[source,bash]
+----
+# Create admin users/policies first
+bao policy write admin - <<EOF
+path "*" {
+  capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+}
+EOF
+
+# Create admin auth (OIDC recommended)
+# Then revoke root token
+bao token revoke <root-token>
+----
+
+=== Generate New Root Token (Emergency Only)
+
+[source,bash]
+----
+# Requires recovery/unseal key holders
+bao operator generate-root -init
+
+# Each key holder provides their key
+bao operator generate-root
+
+# Decode the final token
+bao operator generate-root -decode=<encoded-token> -otp=<otp>
+----
+
+=== Enable Audit Logging
+
+[source,bash]
+----
+# Enable file audit device
+bao audit enable file file_path=/var/log/openbao/audit.log
+
+# Enable syslog audit device (for SIEM integration)
+bao audit enable syslog tag="openbao" facility="AUTH"
+
+# List audit devices
+bao audit list
+----
+
+=== Network Policies
+
+[source,yaml]
+----
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: openbao-server
+  namespace: openbao
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: openbao
+      component: server
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from other OpenBao pods (Raft)
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: openbao
+      ports:
+        - port: 8200
+        - port: 8201
+    # Allow from injector
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: openbao-agent-injector
+      ports:
+        - port: 8200
+    # Allow from application namespaces
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              openbao-access: "true"
+      ports:
+        - port: 8200
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+    # Allow Kubernetes API
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - port: 443
+    # Allow Raft communication
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: openbao
+      ports:
+        - port: 8200
+        - port: 8201
+----
+
+=== TLS Configuration
+
+[source,yaml]
+----
+server:
+  ha:
+    raft:
+      config: |
+        listener "tcp" {
+          address = "[::]:8200"
+          cluster_address = "[::]:8201"
+          
+          tls_cert_file = "/vault/tls/server.crt"
+          tls_key_file  = "/vault/tls/server.key"
+          tls_client_ca_file = "/vault/tls/ca.crt"
+          
+          tls_min_version = "tls12"
+          tls_prefer_server_cipher_suites = true
+        }
+  
+  extraVolumes:
+    - type: secret
+      name: openbao-tls
+      path: /vault/tls
+----
+
+== Performance Tuning
+
+=== Resource Allocation
+
+[source,yaml]
+----
+server:
+  resources:
+    requests:
+      memory: 1Gi
+      cpu: 500m
+    limits:
+      memory: 2Gi
+      cpu: 2000m
+----
+
+=== Storage Performance
+
+Use high-performance storage:
+
+[source,yaml]
+----
+server:
+  dataStorage:
+    enabled: true
+    size: 50Gi
+    storageClass: "gp3"  # Use SSD-backed storage
+    accessMode: ReadWriteOnce
+----
+
+=== Cache Settings
+
+[source,hcl]
+----
+cache {
+  use_auto_auth_token = true
+}
+----
+
+=== Connection Limits
+
+[source,hcl]
+----
+listener "tcp" {
+  max_request_size = 33554432  # 32MB
+  max_request_duration = "90s"
+}
+----
+
+== Upgrade Strategy
+
+=== Rolling Upgrade
+
+[source,bash]
+----
+# 1. Update Helm values with new version
+# 2. Apply with Helm
+helm upgrade openbao openbao/openbao \
+  --namespace openbao \
+  --values openbao-values.yaml
+
+# 3. Monitor rollout
+oc rollout status statefulset/openbao -n openbao
+
+# 4. Verify cluster health
+bao operator raft list-peers
+bao status
+----
+
+=== Version Compatibility
+
+* Check release notes for breaking changes
+* Test upgrades in non-production first
+* Back up before upgrading
+
+== What is Coming Next?
+
+In Part 9, we will cover day-to-day operations and troubleshooting:
+
+* Common issues and solutions
+* Log analysis
+* Migration from HashiCorp Vault
+* CLI command reference
+
+== Conclusion
+
+Production OpenBao deployments require:
+
+* **High Availability**: 3+ node Raft cluster with anti-affinity
+* **Auto-Unseal**: Remove manual intervention on restarts
+* **Backups**: Regular Raft snapshots with off-site storage
+* **Monitoring**: Prometheus metrics with alerts
+* **Security**: TLS, network policies, audit logging
+
+Key takeaways:
+
+* Auto-unseal is essential for production
+* Test disaster recovery procedures regularly
+* Monitor key metrics and set up alerts
+* Keep root token revoked after initial setup
+
+== Resources
+
+* https://openbao.org/docs/configuration/seal[Seal Configuration^]
+* https://openbao.org/docs/internals/high-availability[High Availability^]
+* https://openbao.org/docs/commands/operator/raft[Raft Operations^]
+* https://openbao.org/docs/configuration/telemetry[Telemetry Configuration^]

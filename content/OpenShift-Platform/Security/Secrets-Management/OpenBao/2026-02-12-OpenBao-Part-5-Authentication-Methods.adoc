@@ -1,0 +1,648 @@
+--- 
+title: "The Complete Guide to OpenBao - Authentication Methods - Part 5"
+description: "Configuring authentication methods in OpenBao including Kubernetes auth, OIDC, LDAP, and AppRole for secure access control"
+date: "2026-02-12"
+doctype: book
+weight: 96
+
+series: "The Complete Guide to OpenBao"
+series_part: 5
+
+featured_image: /openshift-platform/security/secrets-management/openbao/images/Logo_OpenBao.png
+show_featured_image_summary: true
+show_featured_image_article: true
+disableBreadcrumb: true
+
+authors: [Thomas Jungbauer]
+type: post
+draft: true
+categories:
+   - OpenShift
+   - Security
+   - Secret Management
+
+tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "Authentication", "OIDC", "LDAP"] 
+
+aliases: [ 
+	 "/openshift/security/openbao/2026-02-12-openbao-authentication/",
+]
+---
+
+:imagesdir: /openshift-platform/security/secrets-management/openbao/images/
+:icons: font
+:toc:
+
+With OpenBao deployed and running, the next critical step is configuring authentication. This article covers the most common authentication methods: Kubernetes for pods, OIDC for users, LDAP for enterprise directories, and AppRole for automation.
+
+<!--more--> 
+
+== Introduction
+
+Authentication in OpenBao verifies the identity of clients before granting access to secrets. OpenBao supports multiple authentication methods, each suited for different use cases:
+
+[cols="1,2,2"]
+|===
+|Method |Best For |Key Features
+
+|Kubernetes
+|Pods running in K8s/OpenShift
+|Service account tokens, automatic
+
+|OIDC
+|Human users, SSO
+|OpenShift OAuth, Keycloak, Azure AD
+
+|LDAP
+|Enterprise directories
+|Active Directory, OpenLDAP
+
+|AppRole
+|CI/CD, automation
+|Role ID + Secret ID
+
+|Token
+|Direct access, bootstrap
+|Simple but less secure
+|===
+
+== Prerequisites
+
+Before configuring authentication:
+
+* OpenBao is deployed and unsealed (Parts 2-4)
+* You have admin access to OpenBao (root token)
+* For Kubernetes auth: Access to the OpenShift cluster
+* For OIDC: Access to your identity provider
+
+Set up your environment:
+
+[source,bash]
+----
+# Port forward (if needed)
+oc port-forward svc/openbao 8200:8200 -n openbao &
+
+# Set environment
+export BAO_ADDR='http://127.0.0.1:8200'
+
+# Login with root token
+bao login
+----
+
+== Understanding Policies
+
+Before configuring authentication, understand that policies define what authenticated users can do. Create policies first, then associate them with authentication roles.
+
+=== Basic Policy Structure
+
+[source,hcl]
+----
+# Example policy: myapp-read-policy.hcl
+# Allow reading secrets from specific path
+path "secret/data/myapp/*" {
+  capabilities = ["read", "list"]
+}
+
+# Allow renewing own token
+path "auth/token/renew-self" {
+  capabilities = ["update"]
+}
+----
+
+=== Policy Capabilities
+
+* `create` - Create new data
+* `read` - Read data
+* `update` - Update existing data
+* `delete` - Delete data
+* `list` - List keys at a path
+* `deny` - Explicitly deny (overrides other grants)
+
+=== Creating Policies
+
+[source,bash]
+----
+# Create a policy from file
+bao policy write myapp-read myapp-read-policy.hcl
+
+# Or inline
+bao policy write myapp-read - <<EOF
+path "secret/data/myapp/*" {
+  capabilities = ["read", "list"]
+}
+EOF
+
+# List policies
+bao policy list
+
+# Read a policy
+bao policy read myapp-read
+----
+
+== Kubernetes Authentication Method
+
+The Kubernetes auth method is essential for pods to access secrets. It uses Kubernetes Service Account tokens for authentication.
+
+=== Step 1: Enable Kubernetes Auth
+
+[source,bash]
+----
+# Enable the auth method
+bao auth enable kubernetes
+
+# Verify it is enabled
+bao auth list
+----
+
+=== Step 2: Configure Kubernetes Auth
+
+[source,bash]
+----
+# Get the Kubernetes API server address
+KUBERNETES_HOST=$(oc whoami --show-server)
+
+# Configure the auth method
+bao write auth/kubernetes/config \
+  kubernetes_host="$KUBERNETES_HOST"
+----
+
+NOTE: When running inside Kubernetes, OpenBao automatically uses the pod's service account to communicate with the Kubernetes API.
+
+=== Step 3: Create a Policy for the Application
+
+[source,bash]
+----
+# Create policy for an example application
+bao policy write expense-app - <<EOF
+# Read database credentials
+path "secret/data/expense/database" {
+  capabilities = ["read"]
+}
+
+# Read application config
+path "secret/data/expense/config" {
+  capabilities = ["read", "list"]
+}
+
+# Allow token renewal
+path "auth/token/renew-self" {
+  capabilities = ["update"]
+}
+EOF
+----
+
+=== Step 4: Create a Kubernetes Auth Role
+
+[source,bash]
+----
+# Create a role that maps Kubernetes service accounts to OpenBao policies
+bao write auth/kubernetes/role/expense-app \
+  bound_service_account_names=expense-app \
+  bound_service_account_namespaces=expense \
+  policies=expense-app \
+  ttl=1h \
+  max_ttl=24h
+----
+
+Parameters explained:
+
+* `bound_service_account_names`: K8s service account name(s)
+* `bound_service_account_namespaces`: K8s namespace(s)
+* `policies`: OpenBao policies to attach
+* `ttl`: Token time-to-live
+* `max_ttl`: Maximum token lifetime
+
+=== Step 5: Create Kubernetes Resources
+
+In your application namespace:
+
+[source,yaml]
+----
+# service-account.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: expense-app
+  namespace: expense
+---
+# If using Kubernetes 1.24+, create a long-lived token
+apiVersion: v1
+kind: Secret
+metadata:
+  name: expense-app-token
+  namespace: expense
+  annotations:
+    kubernetes.io/service-account.name: expense-app
+type: kubernetes.io/service-account-token
+----
+
+=== Step 6: Test Kubernetes Authentication
+
+[source,bash]
+----
+# From within a pod using the service account
+JWT=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+
+# Authenticate to OpenBao
+curl --request POST \
+  --data "{\"jwt\": \"$JWT\", \"role\": \"expense-app\"}" \
+  http://openbao.openbao:8200/v1/auth/kubernetes/login
+
+# Using the bao CLI
+bao write auth/kubernetes/login \
+  role=expense-app \
+  jwt=$JWT
+----
+
+== OIDC Authentication Method
+
+OIDC enables SSO integration with identity providers like OpenShift OAuth, Keycloak, or Azure AD.
+
+=== Step 1: Enable OIDC Auth
+
+[source,bash]
+----
+bao auth enable oidc
+----
+
+=== Step 2: Configure OIDC (OpenShift OAuth Example)
+
+First, create an OAuth client in OpenShift:
+
+[source,yaml]
+----
+apiVersion: oauth.openshift.io/v1
+kind: OAuthClient
+metadata:
+  name: openbao
+redirectURIs:
+  - https://openbao.apps.cluster.example.com/ui/vault/auth/oidc/oidc/callback
+  - http://localhost:8250/oidc/callback
+grantMethod: auto
+secret: your-client-secret-here
+----
+
+Then configure OpenBao:
+
+[source,bash]
+----
+# Get OpenShift OAuth endpoints
+OAUTH_SERVER=$(oc whoami --show-server | sed 's/api/oauth-openshift.apps/' | sed 's/:6443//')
+
+bao write auth/oidc/config \
+  oidc_discovery_url="$OAUTH_SERVER" \
+  oidc_client_id="openbao" \
+  oidc_client_secret="your-client-secret-here" \
+  default_role="openshift-user"
+----
+
+=== Step 3: Create OIDC Role
+
+[source,bash]
+----
+# Create a role that maps OIDC users to policies
+bao write auth/oidc/role/openshift-user \
+  bound_audiences="openbao" \
+  allowed_redirect_uris="https://openbao.apps.cluster.example.com/ui/vault/auth/oidc/oidc/callback" \
+  allowed_redirect_uris="http://localhost:8250/oidc/callback" \
+  user_claim="preferred_username" \
+  groups_claim="groups" \
+  policies="default" \
+  ttl=8h \
+  max_ttl=24h
+----
+
+=== Step 4: Map Groups to Policies
+
+Create an external group that maps OIDC groups to policies:
+
+[source,bash]
+----
+# Enable identity secrets engine (usually enabled by default)
+bao secrets list
+
+# Create a group for admins
+bao write identity/group \
+  name="openbao-admins" \
+  type="external" \
+  policies="admin-policy"
+
+# Get the group ID
+GROUP_ID=$(bao read -field=id identity/group/name/openbao-admins)
+
+# Get the OIDC auth accessor
+ACCESSOR=$(bao auth list -format=json | jq -r '.["oidc/"].accessor')
+
+# Create an alias mapping the OIDC group to the OpenBao group
+bao write identity/group-alias \
+  name="cluster-admins" \
+  mount_accessor="$ACCESSOR" \
+  canonical_id="$GROUP_ID"
+----
+
+=== Configuring OIDC with Keycloak
+
+For Keycloak integration:
+
+[source,bash]
+----
+bao write auth/oidc/config \
+  oidc_discovery_url="https://keycloak.example.com/realms/master" \
+  oidc_client_id="openbao" \
+  oidc_client_secret="your-keycloak-secret" \
+  default_role="keycloak-user"
+
+bao write auth/oidc/role/keycloak-user \
+  bound_audiences="openbao" \
+  allowed_redirect_uris="https://openbao.apps.cluster.example.com/ui/vault/auth/oidc/oidc/callback" \
+  user_claim="preferred_username" \
+  groups_claim="groups" \
+  policies="default" \
+  ttl=8h
+----
+
+== LDAP Authentication Method
+
+LDAP auth integrates with enterprise directories like Active Directory.
+
+=== Step 1: Enable LDAP Auth
+
+[source,bash]
+----
+bao auth enable ldap
+----
+
+=== Step 2: Configure LDAP (Active Directory Example)
+
+[source,bash]
+----
+bao write auth/ldap/config \
+  url="ldaps://ad.example.com:636" \
+  userattr="sAMAccountName" \
+  userdn="OU=Users,DC=example,DC=com" \
+  groupdn="OU=Groups,DC=example,DC=com" \
+  groupattr="cn" \
+  groupfilter="(&(objectClass=group)(member:1.2.840.113556.1.4.1941:={{.UserDN}}))" \
+  binddn="CN=openbao-svc,OU=ServiceAccounts,DC=example,DC=com" \
+  bindpass="service-account-password" \
+  certificate=@/path/to/ldap-ca.pem \
+  insecure_tls=false \
+  starttls=false
+----
+
+=== Step 3: Map LDAP Groups to Policies
+
+[source,bash]
+----
+# Map an LDAP group to a policy
+bao write auth/ldap/groups/openbao-admins \
+  policies="admin-policy,default"
+
+bao write auth/ldap/groups/openbao-users \
+  policies="user-policy,default"
+----
+
+=== Step 4: Test LDAP Authentication
+
+[source,bash]
+----
+# Login with LDAP credentials
+bao login -method=ldap username=jdoe
+
+# Or via API
+curl --request POST \
+  --data '{"password": "user-password"}' \
+  $BAO_ADDR/v1/auth/ldap/login/jdoe
+----
+
+== AppRole Authentication Method
+
+AppRole is designed for machine authentication, particularly CI/CD systems.
+
+=== Step 1: Enable AppRole Auth
+
+[source,bash]
+----
+bao auth enable approle
+----
+
+=== Step 2: Create an AppRole
+
+[source,bash]
+----
+# Create a policy for the CI/CD system
+bao policy write cicd-policy - <<EOF
+# Read secrets needed for deployment
+path "secret/data/deploy/*" {
+  capabilities = ["read"]
+}
+
+# Allow listing
+path "secret/metadata/deploy/*" {
+  capabilities = ["list"]
+}
+EOF
+
+# Create the AppRole
+bao write auth/approle/role/cicd-role \
+  token_policies="cicd-policy" \
+  token_ttl=1h \
+  token_max_ttl=4h \
+  secret_id_ttl=24h \
+  secret_id_num_uses=100
+----
+
+=== Step 3: Get Role ID and Secret ID
+
+[source,bash]
+----
+# Get the Role ID (static, can be embedded in code)
+bao read auth/approle/role/cicd-role/role-id
+
+# Generate a Secret ID (should be injected securely)
+bao write -f auth/approle/role/cicd-role/secret-id
+----
+
+=== Step 4: Using AppRole in CI/CD
+
+[source,bash]
+----
+# In your CI/CD pipeline
+ROLE_ID="your-role-id"
+SECRET_ID="your-secret-id"
+
+# Authenticate
+TOKEN=$(curl -s --request POST \
+  --data "{\"role_id\": \"$ROLE_ID\", \"secret_id\": \"$SECRET_ID\"}" \
+  $BAO_ADDR/v1/auth/approle/login | jq -r '.auth.client_token')
+
+# Use the token to read secrets
+curl --header "X-Vault-Token: $TOKEN" \
+  $BAO_ADDR/v1/secret/data/deploy/myapp
+----
+
+=== Secure Secret ID Delivery
+
+For secure Secret ID delivery, consider:
+
+* **Response Wrapping**: Secret ID is wrapped and can only be unwrapped once
+* **Pull Model**: CI/CD system requests its own Secret ID with limited permissions
+
+[source,bash]
+----
+# Generate a wrapped Secret ID
+bao write -wrap-ttl=120s -f auth/approle/role/cicd-role/secret-id
+
+# The response contains a wrapping token
+# The CI/CD system uses this to unwrap the actual Secret ID
+bao unwrap <wrapping-token>
+----
+
+== Best Practices for Authentication
+
+=== Use Principle of Least Privilege
+
+[source,hcl]
+----
+# Bad: Too broad
+path "secret/*" {
+  capabilities = ["read", "list"]
+}
+
+# Good: Specific paths
+path "secret/data/myapp/database" {
+  capabilities = ["read"]
+}
+----
+
+=== Set Appropriate Token TTLs
+
+[source,bash]
+----
+# Short-lived for automated systems
+bao write auth/kubernetes/role/batch-job \
+  ttl=5m \
+  max_ttl=15m
+
+# Longer for interactive users
+bao write auth/oidc/role/human-user \
+  ttl=8h \
+  max_ttl=24h
+----
+
+=== Enable Audit Logging
+
+[source,bash]
+----
+# Enable file audit
+bao audit enable file file_path=/var/log/openbao/audit.log
+
+# All authentication attempts are logged
+----
+
+=== Regularly Rotate Credentials
+
+[source,bash]
+----
+# Rotate AppRole Secret IDs periodically
+bao write -f auth/approle/role/cicd-role/secret-id
+
+# Revoke old tokens
+bao token revoke <old-token>
+----
+
+== Common Authentication Patterns
+
+=== Pattern 1: Application Pods
+
+[source]
+----
+Pod → Service Account Token → Kubernetes Auth → Policy → Secret
+----
+
+=== Pattern 2: Human Users
+
+[source]
+----
+User → OIDC Login → Group Mapping → Policy → Secret
+----
+
+=== Pattern 3: CI/CD Pipeline
+
+[source]
+----
+Pipeline → AppRole (Role ID + Secret ID) → Policy → Secret
+----
+
+== Troubleshooting Authentication
+
+=== Kubernetes Auth Issues
+
+[source,bash]
+----
+# Check if the service account exists
+oc get sa expense-app -n expense
+
+# Verify the role configuration
+bao read auth/kubernetes/role/expense-app
+
+# Test with verbose output
+bao write -format=json auth/kubernetes/login \
+  role=expense-app \
+  jwt=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+----
+
+=== OIDC Issues
+
+[source,bash]
+----
+# Verify OIDC configuration
+bao read auth/oidc/config
+
+# Check redirect URIs match exactly
+bao read auth/oidc/role/openshift-user
+
+# Test discovery URL
+curl $OAUTH_SERVER/.well-known/openid-configuration
+----
+
+=== Permission Denied Errors
+
+[source,bash]
+----
+# Check what policies a token has
+bao token lookup
+
+# Test policy with specific path
+bao token capabilities <token> secret/data/myapp/database
+
+# Verify policy content
+bao policy read myapp-policy
+----
+
+== What is Coming Next?
+
+In Part 6, we will explore secrets engines:
+
+* KV (Key-Value) for static secrets
+* PKI for certificate management
+* Database for dynamic credentials
+* Transit for encryption as a service
+
+== Conclusion
+
+Proper authentication configuration is crucial for OpenBao security. Key takeaways:
+
+* Use **Kubernetes auth** for pods
+* Use **OIDC** for human users (SSO)
+* Use **AppRole** for automation
+* Create **specific policies** with least privilege
+* Set **appropriate TTLs** for different use cases
+* **Enable audit logging** for compliance
+
+== Resources
+
+* https://openbao.org/docs/auth/kubernetes[Kubernetes Auth Method^]
+* https://openbao.org/docs/auth/jwt[JWT/OIDC Auth Method^]
+* https://openbao.org/docs/auth/ldap[LDAP Auth Method^]
+* https://openbao.org/docs/auth/approle[AppRole Auth Method^]
+* https://openbao.org/docs/concepts/policies[Policies Documentation^]

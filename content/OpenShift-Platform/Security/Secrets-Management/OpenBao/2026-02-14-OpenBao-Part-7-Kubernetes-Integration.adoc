@@ -1,0 +1,793 @@
+--- 
+title: "The Complete Guide to OpenBao - Kubernetes Integration - Part 7"
+description: "Integrating OpenBao with Kubernetes workloads using Agent Injector, CSI Provider, and External Secrets Operator"
+date: "2026-02-14"
+doctype: book
+weight: 94
+
+series: "The Complete Guide to OpenBao"
+series_part: 7
+
+featured_image: /openshift-platform/security/secrets-management/openbao/images/Logo_OpenBao.png
+show_featured_image_summary: true
+show_featured_image_article: true
+disableBreadcrumb: true
+
+authors: [Thomas Jungbauer]
+type: post
+draft: true
+categories:
+   - OpenShift
+   - Security
+   - Secret Management
+
+tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "Kubernetes", "CSI", "External Secrets Operator"] 
+
+aliases: [ 
+	 "/openshift/security/openbao/2026-02-14-openbao-kubernetes-integration/",
+]
+---
+
+:imagesdir: /openshift-platform/security/secrets-management/openbao/images/
+:icons: font
+:toc:
+
+With OpenBao configured with authentication and secrets engines, the next step is enabling applications to consume secrets. This article covers three integration patterns: Agent Injector for sidecar injection, CSI Provider for volume mounts, and External Secrets Operator for syncing to native Kubernetes Secrets.
+
+<!--more--> 
+
+== Introduction
+
+There are three main patterns for Kubernetes workloads to consume OpenBao secrets:
+
+[cols="1,2,2,2"]
+|===
+|Method |How It Works |Pros |Cons
+
+|Agent Injector
+|Sidecar injects secrets as files
+|Automatic renewal, templates
+|Extra container per pod
+
+|CSI Provider
+|Mounts secrets as volumes
+|No sidecar needed
+|No auto-renewal
+
+|External Secrets Operator
+|Syncs to K8s Secrets
+|GitOps-friendly, standard secrets
+|Additional component
+|===
+
+== Pattern 1: Agent Injector
+
+The Agent Injector uses a mutating webhook to automatically inject a sidecar container that retrieves and renews secrets.
+
+=== How It Works
+
+[source]
+----
+1. Pod created with annotations
+2. Mutating webhook intercepts
+3. Vault Agent sidecar injected
+4. Agent authenticates to OpenBao
+5. Agent retrieves secrets
+6. Secrets written to shared volume
+7. Application reads from /vault/secrets/
+8. Agent renews tokens and re-fetches as needed
+----
+
+=== Prerequisites
+
+The Agent Injector is included when deploying OpenBao with Helm:
+
+[source,yaml]
+----
+# Verify injector is running
+injector:
+  enabled: true
+  replicas: 2
+----
+
+Verify it is running:
+
+[source,bash]
+----
+oc get pods -n openbao -l app.kubernetes.io/name=openbao-agent-injector
+
+# Check webhook
+oc get mutatingwebhookconfigurations | grep openbao
+----
+
+=== Basic Injection Example
+
+==== Step 1: Create OpenBao Resources
+
+[source,bash]
+----
+# Enable KV engine
+bao secrets enable -path=secret kv-v2
+
+# Store a secret
+bao kv put secret/myapp/config \
+  username="appuser" \
+  password="secretpassword" \
+  api_key="abc123"
+
+# Create policy
+bao policy write myapp-policy - <<EOF
+path "secret/data/myapp/config" {
+  capabilities = ["read"]
+}
+EOF
+
+# Create Kubernetes auth role
+bao write auth/kubernetes/role/myapp \
+  bound_service_account_names=myapp \
+  bound_service_account_namespaces=myapp \
+  policies=myapp-policy \
+  ttl=1h
+----
+
+==== Step 2: Create Kubernetes Resources
+
+[source,yaml]
+----
+# namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: myapp
+---
+# serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: myapp
+  namespace: myapp
+----
+
+==== Step 3: Deploy Application with Annotations
+
+[source,yaml]
+----
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp
+  namespace: myapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: myapp
+  template:
+    metadata:
+      labels:
+        app: myapp
+      annotations:
+        # Enable injection
+        vault.hashicorp.com/agent-inject: "true"
+        
+        # OpenBao role to use
+        vault.hashicorp.com/role: "myapp"
+        
+        # Secret to inject (filename will be 'config')
+        vault.hashicorp.com/agent-inject-secret-config: "secret/data/myapp/config"
+        
+        # Template for the secret file
+        vault.hashicorp.com/agent-inject-template-config: |
+          {{- with secret "secret/data/myapp/config" -}}
+          export DB_USERNAME="{{ .Data.data.username }}"
+          export DB_PASSWORD="{{ .Data.data.password }}"
+          export API_KEY="{{ .Data.data.api_key }}"
+          {{- end }}
+    spec:
+      serviceAccountName: myapp
+      containers:
+        - name: myapp
+          image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              source /vault/secrets/config
+              echo "Username: $DB_USERNAME"
+              echo "API Key: $API_KEY"
+              sleep infinity
+----
+
+==== Step 4: Verify Injection
+
+[source,bash]
+----
+# Apply the deployment
+oc apply -f deployment.yaml
+
+# Check pods (should see 2 containers)
+oc get pods -n myapp
+
+# NAME                    READY   STATUS    RESTARTS   AGE
+# myapp-xxx               2/2     Running   0          30s
+
+# Check injected secrets
+oc exec -it deploy/myapp -n myapp -c myapp -- cat /vault/secrets/config
+----
+
+=== Common Annotations
+
+[cols="2,3"]
+|===
+|Annotation |Description
+
+|`vault.hashicorp.com/agent-inject`
+|Enable/disable injection ("true"/"false")
+
+|`vault.hashicorp.com/role`
+|OpenBao auth role to use
+
+|`vault.hashicorp.com/agent-inject-secret-<name>`
+|Secret path, creates file `/vault/secrets/<name>`
+
+|`vault.hashicorp.com/agent-inject-template-<name>`
+|Template for rendering the secret
+
+|`vault.hashicorp.com/agent-inject-status`
+|Set to "update" to force re-injection
+
+|`vault.hashicorp.com/agent-pre-populate-only`
+|"true" = init container only, no sidecar
+
+|`vault.hashicorp.com/agent-revoke-on-shutdown`
+|"true" = revoke token when pod terminates
+
+|`vault.hashicorp.com/tls-skip-verify`
+|Skip TLS verification (testing only)
+|===
+
+=== Advanced Templates
+
+==== JSON Configuration File
+
+[source,yaml]
+----
+vault.hashicorp.com/agent-inject-template-config.json: |
+  {{- with secret "secret/data/myapp/config" -}}
+  {
+    "database": {
+      "username": "{{ .Data.data.username }}",
+      "password": "{{ .Data.data.password }}"
+    },
+    "api": {
+      "key": "{{ .Data.data.api_key }}"
+    }
+  }
+  {{- end }}
+----
+
+==== Multiple Secrets
+
+[source,yaml]
+----
+# First secret
+vault.hashicorp.com/agent-inject-secret-database: "secret/data/myapp/database"
+vault.hashicorp.com/agent-inject-template-database: |
+  {{- with secret "secret/data/myapp/database" -}}
+  DATABASE_URL=postgres://{{ .Data.data.username }}:{{ .Data.data.password }}@db:5432/myapp
+  {{- end }}
+
+# Second secret
+vault.hashicorp.com/agent-inject-secret-api: "secret/data/myapp/api"
+vault.hashicorp.com/agent-inject-template-api: |
+  {{- with secret "secret/data/myapp/api" -}}
+  API_KEY={{ .Data.data.key }}
+  API_SECRET={{ .Data.data.secret }}
+  {{- end }}
+----
+
+==== PKI Certificate
+
+[source,yaml]
+----
+vault.hashicorp.com/agent-inject-secret-cert: "pki_int/issue/server-cert"
+vault.hashicorp.com/agent-inject-template-cert: |
+  {{- with secret "pki_int/issue/server-cert" "common_name=myapp.example.com" -}}
+  {{ .Data.certificate }}
+  {{ .Data.issuing_ca }}
+  {{- end }}
+
+vault.hashicorp.com/agent-inject-secret-key: "pki_int/issue/server-cert"
+vault.hashicorp.com/agent-inject-template-key: |
+  {{- with secret "pki_int/issue/server-cert" "common_name=myapp.example.com" -}}
+  {{ .Data.private_key }}
+  {{- end }}
+----
+
+=== Init Container Only Mode
+
+For applications that only need secrets at startup:
+
+[source,yaml]
+----
+annotations:
+  vault.hashicorp.com/agent-inject: "true"
+  vault.hashicorp.com/agent-pre-populate-only: "true"  # No sidecar
+  vault.hashicorp.com/role: "myapp"
+  vault.hashicorp.com/agent-inject-secret-config: "secret/data/myapp/config"
+----
+
+== Pattern 2: CSI Provider
+
+The OpenBao CSI Provider mounts secrets as volumes without a sidecar container.
+
+=== Installing CSI Provider
+
+Add CSI provider to your Helm values:
+
+[source,yaml]
+----
+csi:
+  enabled: true
+  
+  resources:
+    requests:
+      memory: 64Mi
+      cpu: 50m
+    limits:
+      memory: 128Mi
+      cpu: 100m
+----
+
+Verify installation:
+
+[source,bash]
+----
+# Check CSI driver
+oc get csidrivers | grep vault
+
+# Check provider pods
+oc get pods -n openbao -l app.kubernetes.io/name=openbao-csi-provider
+----
+
+=== Creating a SecretProviderClass
+
+[source,yaml]
+----
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: openbao-myapp
+  namespace: myapp
+spec:
+  provider: vault
+  parameters:
+    vaultAddress: "http://openbao.openbao:8200"
+    roleName: "myapp"
+    
+    objects: |
+      - objectName: "username"
+        secretPath: "secret/data/myapp/config"
+        secretKey: "username"
+      - objectName: "password"
+        secretPath: "secret/data/myapp/config"
+        secretKey: "password"
+      - objectName: "api_key"
+        secretPath: "secret/data/myapp/config"
+        secretKey: "api_key"
+  
+  # Optionally sync to Kubernetes Secret
+  secretObjects:
+    - secretName: myapp-creds
+      type: Opaque
+      data:
+        - objectName: username
+          key: username
+        - objectName: password
+          key: password
+----
+
+=== Using CSI in a Pod
+
+[source,yaml]
+----
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp-csi
+  namespace: myapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: myapp-csi
+  template:
+    metadata:
+      labels:
+        app: myapp-csi
+    spec:
+      serviceAccountName: myapp
+      containers:
+        - name: myapp
+          image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              echo "Username: $(cat /mnt/secrets/username)"
+              echo "Password file exists: $(ls -la /mnt/secrets/)"
+              sleep infinity
+          volumeMounts:
+            - name: secrets
+              mountPath: "/mnt/secrets"
+              readOnly: true
+      volumes:
+        - name: secrets
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "openbao-myapp"
+----
+
+=== CSI vs Agent Injector
+
+[cols="1,2,2"]
+|===
+|Aspect |CSI Provider |Agent Injector
+
+|Container overhead
+|None (DaemonSet only)
+|Sidecar per pod
+
+|Auto-renewal
+|No (on pod restart only)
+|Yes (continuous)
+
+|Secret format
+|Files in volume
+|Templated files
+
+|Dynamic secrets
+|Limited support
+|Full support
+
+|Best for
+|Simple, static secrets
+|Complex, dynamic secrets
+|===
+
+== Pattern 3: External Secrets Operator (ESO)
+
+ESO syncs secrets from OpenBao to native Kubernetes Secrets, making them consumable by any application.
+
+=== Installing External Secrets Operator
+
+[source,bash]
+----
+# Via Helm
+helm repo add external-secrets https://charts.external-secrets.io
+helm repo update
+
+helm install external-secrets external-secrets/external-secrets \
+  --namespace external-secrets \
+  --create-namespace
+----
+
+Or via OperatorHub on OpenShift:
+
+[source,yaml]
+----
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: external-secrets-operator
+  namespace: openshift-operators
+spec:
+  channel: stable
+  installPlanApproval: Automatic
+  name: external-secrets-operator
+  source: community-operators
+  sourceNamespace: openshift-marketplace
+----
+
+=== Creating a SecretStore
+
+[source,yaml]
+----
+apiVersion: external-secrets.io/v1beta1
+kind: SecretStore
+metadata:
+  name: openbao
+  namespace: myapp
+spec:
+  provider:
+    vault:
+      server: "http://openbao.openbao:8200"
+      path: "secret"
+      version: "v2"
+      auth:
+        kubernetes:
+          mountPath: "kubernetes"
+          role: "myapp"
+          serviceAccountRef:
+            name: myapp
+----
+
+For cluster-wide access:
+
+[source,yaml]
+----
+apiVersion: external-secrets.io/v1beta1
+kind: ClusterSecretStore
+metadata:
+  name: openbao-cluster
+spec:
+  provider:
+    vault:
+      server: "http://openbao.openbao:8200"
+      path: "secret"
+      version: "v2"
+      auth:
+        kubernetes:
+          mountPath: "kubernetes"
+          role: "external-secrets"
+          serviceAccountRef:
+            name: external-secrets
+            namespace: external-secrets
+----
+
+=== Creating an ExternalSecret
+
+[source,yaml]
+----
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: myapp-config
+  namespace: myapp
+spec:
+  refreshInterval: 1h  # How often to sync
+  
+  secretStoreRef:
+    name: openbao
+    kind: SecretStore
+  
+  target:
+    name: myapp-config  # K8s Secret name to create
+    creationPolicy: Owner
+  
+  data:
+    # Individual keys
+    - secretKey: username
+      remoteRef:
+        key: myapp/config
+        property: username
+    
+    - secretKey: password
+      remoteRef:
+        key: myapp/config
+        property: password
+    
+    - secretKey: api_key
+      remoteRef:
+        key: myapp/config
+        property: api_key
+----
+
+=== Fetching All Keys from a Path
+
+[source,yaml]
+----
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: myapp-all-config
+  namespace: myapp
+spec:
+  refreshInterval: 1h
+  
+  secretStoreRef:
+    name: openbao
+    kind: SecretStore
+  
+  target:
+    name: myapp-all-config
+  
+  dataFrom:
+    - extract:
+        key: myapp/config
+----
+
+=== Using Generated Secrets
+
+The ExternalSecret creates a standard Kubernetes Secret:
+
+[source,yaml]
+----
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp-eso
+  namespace: myapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: myapp-eso
+  template:
+    metadata:
+      labels:
+        app: myapp-eso
+    spec:
+      containers:
+        - name: myapp
+          image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+          env:
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: myapp-config
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: myapp-config
+                  key: password
+          # Or mount as volume
+          volumeMounts:
+            - name: config
+              mountPath: /etc/config
+              readOnly: true
+      volumes:
+        - name: config
+          secret:
+            secretName: myapp-config
+----
+
+=== ESO with PKI Certificates
+
+[source,yaml]
+----
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: myapp-tls
+  namespace: myapp
+spec:
+  refreshInterval: 24h
+  
+  secretStoreRef:
+    name: openbao
+    kind: SecretStore
+  
+  target:
+    name: myapp-tls
+    template:
+      type: kubernetes.io/tls
+      data:
+        tls.crt: "{{ .certificate }}{{ .issuing_ca }}"
+        tls.key: "{{ .private_key }}"
+  
+  dataFrom:
+    - extract:
+        key: pki_int/issue/server-cert
+        # Include parameters for the PKI request
+        conversionStrategy: Default
+----
+
+=== Verifying ExternalSecret Status
+
+[source,bash]
+----
+# Check ExternalSecret status
+oc get externalsecret -n myapp
+
+# NAME           STORE     REFRESH INTERVAL   STATUS
+# myapp-config   openbao   1h                 SecretSynced
+
+# Check created Secret
+oc get secret myapp-config -n myapp -o yaml
+----
+
+== Comparing Integration Methods
+
+[cols="1,1,1,1"]
+|===
+|Feature |Agent Injector |CSI Provider |ESO
+
+|Auto-renewal
+|Yes
+|No
+|Yes (on interval)
+
+|Sidecar needed
+|Yes
+|No
+|No
+
+|GitOps-friendly
+|Partially
+|Partially
+|Yes
+
+|Standard K8s Secret
+|No (files)
+|Optional
+|Yes
+
+|Dynamic secrets
+|Yes
+|Limited
+|Limited
+
+|Template support
+|Yes
+|No
+|Yes
+
+|Init vs runtime
+|Both
+|Init only
+|Pre-created
+|===
+
+== Best Practices
+
+=== Choose the Right Pattern
+
+* **Agent Injector**: When you need auto-renewal, dynamic secrets, or complex templates
+* **CSI Provider**: For simple secrets with no renewal needs
+* **ESO**: When you need GitOps-friendly, standard Kubernetes Secrets
+
+=== Security Considerations
+
+[source,yaml]
+----
+# Limit namespace access
+bao write auth/kubernetes/role/myapp \
+  bound_service_account_namespaces=myapp  # Single namespace only
+
+# Use short TTLs for dynamic secrets
+bao write database/roles/myapp \
+  default_ttl=1h \
+  max_ttl=4h
+
+# Enable audit logging
+bao audit enable file file_path=/var/log/openbao/audit.log
+----
+
+=== Resource Management
+
+[source,yaml]
+----
+# Set resource limits for agent sidecar
+annotations:
+  vault.hashicorp.com/agent-limits-cpu: "100m"
+  vault.hashicorp.com/agent-limits-mem: "64Mi"
+  vault.hashicorp.com/agent-requests-cpu: "50m"
+  vault.hashicorp.com/agent-requests-mem: "32Mi"
+----
+
+== What is Coming Next?
+
+In Part 8, we will cover high availability and production best practices:
+
+* Auto-unseal configuration
+* Disaster recovery
+* Backup strategies
+* Performance tuning
+
+== Conclusion
+
+This article covered three patterns for integrating OpenBao with Kubernetes:
+
+* **Agent Injector**: Best for dynamic secrets with auto-renewal
+* **CSI Provider**: Lightweight option for static secrets
+* **External Secrets Operator**: GitOps-friendly native K8s secrets
+
+Choose the pattern that best fits your use case, or combine them for different applications.
+
+== Resources
+
+* https://openbao.org/docs/platform/k8s/injector[Agent Injector Documentation^]
+* https://openbao.org/docs/platform/k8s/csi[CSI Provider Documentation^]
+* https://external-secrets.io/latest/provider/hashicorp-vault/[External Secrets Operator - Vault Provider^]

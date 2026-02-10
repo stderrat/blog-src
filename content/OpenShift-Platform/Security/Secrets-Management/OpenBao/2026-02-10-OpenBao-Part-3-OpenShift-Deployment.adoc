@@ -1,0 +1,605 @@
+--- 
+title: "The Complete Guide to OpenBao - OpenShift Deployment with Helm - Part 3"
+description: "Deploying OpenBao on OpenShift and Kubernetes using the official Helm chart for production-ready secret management"
+date: "2026-02-10"
+doctype: book
+weight: 98
+
+series: "The Complete Guide to OpenBao"
+series_part: 3
+
+featured_image: /openshift-platform/security/secrets-management/openbao/images/Logo_OpenBao.png
+show_featured_image_summary: true
+show_featured_image_article: true
+disableBreadcrumb: true
+
+authors: [Thomas Jungbauer]
+type: post
+draft: true
+categories:
+   - OpenShift
+   - Security
+   - Secret Management
+
+tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "Helm", "Kubernetes"] 
+
+aliases: [ 
+	 "/openshift/security/openbao/2026-02-10-openbao-openshift-deployment/",
+]
+---
+
+:imagesdir: /openshift-platform/security/secrets-management/openbao/images/
+:icons: font
+:toc:
+
+After understanding standalone installation in Part 2, it is time to deploy OpenBao on OpenShift using the official Helm chart. This approach provides high availability, Kubernetes-native management, and seamless integration with the OpenShift ecosystem.
+
+<!--more--> 
+
+== Introduction
+
+Deploying OpenBao on Kubernetes/OpenShift offers several advantages:
+
+* **High Availability**: Multiple replicas with automatic failover
+* **Kubernetes-native**: Managed by standard Kubernetes primitives
+* **Persistent Storage**: Data survives pod restarts via PVCs
+* **Integration**: Works with Kubernetes service accounts for authentication
+* **Scalability**: Easy to scale and manage
+
+The official OpenBao Helm chart supports multiple deployment modes:
+
+* **Dev**: Single server, in-memory storage (testing only)
+* **Standalone**: Single server, persistent storage
+* **HA**: Multiple servers with Raft consensus (recommended)
+* **External**: Connect to external OpenBao cluster
+
+== Prerequisites
+
+Before deploying, ensure you have:
+
+* OpenShift 4.12+ or Kubernetes 1.30+
+* Helm 3.6+
+* `oc` or `kubectl` CLI configured
+* Cluster-admin privileges (for initial setup)
+* A storage class that supports ReadWriteOnce PVCs
+
+[source,bash]
+----
+# Verify prerequisites
+oc version
+helm version
+
+# Check available storage classes
+oc get storageclass
+----
+
+== Adding the Helm Repository
+
+First, add the OpenBao Helm repository:
+
+[source,bash]
+----
+# Add the OpenBao Helm repository
+helm repo add openbao https://openbao.github.io/openbao-helm
+
+# Update repository cache
+helm repo update
+
+# Search for available charts
+helm search repo openbao
+
+# Expected output:
+# NAME            CHART VERSION   APP VERSION     DESCRIPTION
+# openbao/openbao 0.x.x           2.x.x           Official OpenBao Helm chart
+----
+
+== Creating the Namespace
+
+Create a dedicated namespace for OpenBao:
+
+[source,bash]
+----
+# Create the namespace
+oc new-project openbao
+
+# Or using kubectl
+kubectl create namespace openbao
+----
+
+== Deployment Mode 1: Dev Mode (Testing Only)
+
+For quick testing, deploy in dev mode:
+
+[source,bash]
+----
+# Deploy in dev mode
+helm install openbao openbao/openbao \
+  --namespace openbao \
+  --set "server.dev.enabled=true" \
+  --set "server.dev.devRootToken=myroot"
+
+# Check pods
+oc get pods -n openbao
+
+# Expected output:
+# NAME                                    READY   STATUS    RESTARTS   AGE
+# openbao-0                               1/1     Running   0          30s
+# openbao-agent-injector-xxx              1/1     Running   0          30s
+----
+
+CAUTION: Dev mode stores data in memory. All secrets are lost when the pod restarts!
+
+== Deployment Mode 2: Standalone Mode
+
+For a single-server deployment with persistent storage:
+
+=== Create Values File
+
+Create `openbao-standalone-values.yaml`:
+
+[source,yaml]
+----
+global:
+  # Enable OpenShift-specific settings
+  openshift: true
+
+server:
+  # Use standalone mode
+  standalone:
+    enabled: true
+    config: |
+      ui = true
+      
+      listener "tcp" {
+        tls_disable = 1
+        address = "[::]:8200"
+        cluster_address = "[::]:8201"
+      }
+      
+      storage "file" {
+        path = "/openbao/data"
+      }
+
+  # Resource requests and limits
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 250m
+    limits:
+      memory: 512Mi
+      cpu: 500m
+
+  # Persistent volume for data
+  dataStorage:
+    enabled: true
+    size: 10Gi
+    # storageClass: "gp3-csi"  # Uncomment and set your storage class
+
+  # Service configuration
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 8200
+
+# Injector for sidecar injection
+injector:
+  enabled: true
+  resources:
+    requests:
+      memory: 64Mi
+      cpu: 50m
+    limits:
+      memory: 128Mi
+      cpu: 100m
+
+# OpenShift Route for external access
+ui:
+  enabled: true
+  serviceType: ClusterIP
+----
+
+=== Deploy Standalone
+
+[source,bash]
+----
+# Deploy with values file
+helm install openbao openbao/openbao \
+  --namespace openbao \
+  --values openbao-standalone-values.yaml
+
+# Wait for pods to be ready
+oc get pods -n openbao -w
+----
+
+== Deployment Mode 3: High Availability (Recommended)
+
+For production environments, deploy in HA mode with Raft:
+
+=== Create HA Values File
+
+Create `openbao-ha-values.yaml`:
+
+[source,yaml]
+----
+global:
+  # Enable OpenShift-specific settings
+  openshift: true
+
+server:
+  # High Availability configuration
+  ha:
+    enabled: true
+    replicas: 3  # Odd number for Raft consensus
+    
+    # Raft storage configuration
+    raft:
+      enabled: true
+      setNodeId: true
+      
+      config: |
+        ui = true
+        
+        listener "tcp" {
+          tls_disable = 1
+          address = "[::]:8200"
+          cluster_address = "[::]:8201"
+          telemetry {
+            unauthenticated_metrics_access = "true"
+          }
+        }
+        
+        storage "raft" {
+          path = "/openbao/data"
+          
+          retry_join {
+            leader_api_addr = "http://openbao-0.openbao-internal:8200"
+          }
+          retry_join {
+            leader_api_addr = "http://openbao-1.openbao-internal:8200"
+          }
+          retry_join {
+            leader_api_addr = "http://openbao-2.openbao-internal:8200"
+          }
+        }
+        
+        service_registration "kubernetes" {}
+        
+        telemetry {
+          prometheus_retention_time = "30s"
+          disable_hostname = true
+        }
+
+  # Resource requests and limits
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 250m
+    limits:
+      memory: 1Gi
+      cpu: 1000m
+
+  # Persistent volume for data
+  dataStorage:
+    enabled: true
+    size: 10Gi
+    # storageClass: "gp3-csi"
+
+  # Pod anti-affinity for HA
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: openbao
+              component: server
+          topologyKey: kubernetes.io/hostname
+
+  # Readiness probe
+  readinessProbe:
+    enabled: true
+    path: "/v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204"
+  
+  # Liveness probe
+  livenessProbe:
+    enabled: true
+    path: "/v1/sys/health?standbyok=true"
+    initialDelaySeconds: 60
+
+# Injector configuration
+injector:
+  enabled: true
+  replicas: 2  # HA for the injector too
+  
+  resources:
+    requests:
+      memory: 64Mi
+      cpu: 50m
+    limits:
+      memory: 256Mi
+      cpu: 250m
+
+  # Affinity for injector pods
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: openbao-agent-injector
+            topologyKey: kubernetes.io/hostname
+
+# UI configuration
+ui:
+  enabled: true
+  serviceType: ClusterIP
+----
+
+=== Deploy HA Cluster
+
+[source,bash]
+----
+# Deploy with HA values
+helm install openbao openbao/openbao \
+  --namespace openbao \
+  --values openbao-ha-values.yaml
+
+# Watch pods come up
+oc get pods -n openbao -w
+
+# Expected output (after some time):
+# NAME                                    READY   STATUS    RESTARTS   AGE
+# openbao-0                               0/1     Running   0          60s
+# openbao-1                               0/1     Running   0          60s
+# openbao-2                               0/1     Running   0          60s
+# openbao-agent-injector-xxx              1/1     Running   0          60s
+# openbao-agent-injector-yyy              1/1     Running   0          60s
+----
+
+NOTE: The OpenBao pods show 0/1 ready because they are sealed and need initialization.
+
+== OpenShift-Specific Configuration
+
+=== Creating a Route for External Access
+
+[source,yaml]
+----
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: openbao
+  namespace: openbao
+spec:
+  host: openbao.apps.cluster.example.com
+  port:
+    targetPort: 8200
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  to:
+    kind: Service
+    name: openbao
+    weight: 100
+----
+
+Apply the route:
+[source,bash]
+----
+oc apply -f openbao-route.yaml
+
+# Get the route URL
+oc get route openbao -n openbao -o jsonpath='{.spec.host}'
+----
+
+=== SecurityContextConstraints (SCC)
+
+The Helm chart should work with the default restricted SCC. If you encounter permission issues:
+
+[source,bash]
+----
+# Check SCC assigned to pods
+oc get pods -n openbao -o yaml | grep -i scc
+
+# If needed, create a custom SCC (usually not required)
+----
+
+== Initializing and Unsealing OpenBao
+
+After deployment, OpenBao needs to be initialized and unsealed.
+
+=== Initialize the Cluster
+
+[source,bash]
+----
+# Port-forward to the first pod
+oc port-forward openbao-0 8200:8200 -n openbao &
+
+# Set environment variable
+export BAO_ADDR='http://127.0.0.1:8200'
+
+# Check status
+bao status
+
+# Initialize with 5 key shares and 3 threshold
+bao operator init -key-shares=5 -key-threshold=3 -format=json > openbao-init.json
+
+# View the initialization output
+cat openbao-init.json
+----
+
+CAUTION: Store the `openbao-init.json` file securely. It contains the unseal keys and root token!
+
+=== Unseal All Nodes
+
+Each node needs to be unsealed:
+
+[source,bash]
+----
+# Unseal openbao-0 (3 times with different keys)
+bao operator unseal  # Enter first key
+bao operator unseal  # Enter second key
+bao operator unseal  # Enter third key
+
+# Verify openbao-0 is unsealed
+bao status
+
+# Unseal openbao-1
+oc exec -it openbao-1 -n openbao -- bao operator unseal  # 3 times
+
+# Unseal openbao-2
+oc exec -it openbao-2 -n openbao -- bao operator unseal  # 3 times
+----
+
+=== Verify Raft Cluster
+
+[source,bash]
+----
+# Login with root token
+bao login $(cat openbao-init.json | jq -r '.root_token')
+
+# Check Raft peer list
+bao operator raft list-peers
+
+# Expected output:
+# Node       Address                        State       Voter
+# ----       -------                        -----       -----
+# openbao-0  openbao-0.openbao-internal:8201 leader      true
+# openbao-1  openbao-1.openbao-internal:8201 follower    true
+# openbao-2  openbao-2.openbao-internal:8201 follower    true
+----
+
+== Accessing the UI
+
+Once unsealed, access the OpenBao UI:
+
+=== Via Port Forward (Development)
+
+[source,bash]
+----
+# Port forward
+oc port-forward svc/openbao 8200:8200 -n openbao
+
+# Open browser: http://localhost:8200
+----
+
+=== Via Route (Production)
+
+[source,bash]
+----
+# Get the route
+oc get route openbao -n openbao
+
+# Open browser: https://openbao.apps.cluster.example.com
+----
+
+Login with the root token from initialization, or with credentials once authentication is configured.
+
+== Upgrading OpenBao
+
+To upgrade an existing deployment:
+
+[source,bash]
+----
+# Update Helm repository
+helm repo update
+
+# Check available versions
+helm search repo openbao --versions
+
+# Upgrade with your values file
+helm upgrade openbao openbao/openbao \
+  --namespace openbao \
+  --values openbao-ha-values.yaml
+
+# Watch the rolling update
+oc get pods -n openbao -w
+----
+
+NOTE: After upgrade, pods may need to be unsealed again if they restart.
+
+== Uninstalling OpenBao
+
+To remove OpenBao:
+
+[source,bash]
+----
+# Uninstall the Helm release
+helm uninstall openbao -n openbao
+
+# Delete PVCs (WARNING: This deletes all data!)
+oc delete pvc -l app.kubernetes.io/name=openbao -n openbao
+
+# Delete namespace
+oc delete project openbao
+----
+
+== Troubleshooting
+
+=== Pods Not Starting
+
+[source,bash]
+----
+# Check pod status
+oc describe pod openbao-0 -n openbao
+
+# Check pod logs
+oc logs openbao-0 -n openbao
+
+# Check events
+oc get events -n openbao --sort-by='.lastTimestamp'
+----
+
+=== PVC Issues
+
+[source,bash]
+----
+# Check PVC status
+oc get pvc -n openbao
+
+# If pending, check storage class
+oc describe pvc data-openbao-0 -n openbao
+----
+
+=== Raft Join Failures
+
+If pods cannot join the Raft cluster:
+
+[source,bash]
+----
+# Check internal DNS resolution
+oc exec -it openbao-0 -n openbao -- nslookup openbao-internal
+
+# Check connectivity between pods
+oc exec -it openbao-0 -n openbao -- wget -O- http://openbao-1.openbao-internal:8200/v1/sys/health
+----
+
+== What is Coming Next?
+
+In Part 4, we will deploy OpenBao using a GitOps approach with Argo CD. This includes:
+
+* Managing OpenBao configuration in Git
+* Using Helm with Argo CD Applications
+* Handling initialization securely
+* Multi-cluster deployment patterns
+
+== Conclusion
+
+You now have OpenBao running on OpenShift in high-availability mode. This deployment:
+
+* Survives pod failures and restarts
+* Uses Raft for distributed consensus
+* Integrates with OpenShift security model
+* Is ready for production use (after unsealing automation)
+
+Key points to remember:
+
+* Use HA mode for production
+* Store unseal keys securely
+* Configure pod anti-affinity for true HA
+* Consider auto-unseal for operational ease (Part 8)
+
+== Resources
+
+* https://openbao.org/docs/platform/k8s/helm[OpenBao Helm Chart Documentation^]
+* https://github.com/openbao/openbao-helm[OpenBao Helm Chart GitHub^]
+* https://openbao.org/docs/platform/k8s/helm/run[Running OpenBao on Kubernetes^]

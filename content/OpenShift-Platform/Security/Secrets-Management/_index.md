@@ -5,6 +5,6 @@ chapter: true
 layout: summary
 pre: "<i class='fas fa-key'></i> "
 
-tags: ["OpenShift", "Security", "Secrets", "Vault", "External Secrets"]
+tags: ["OpenShift", "Security", "Secrets", "Vault", "OpenBao", "External Secrets", "PKI", "Encryption"]
 ---
 
