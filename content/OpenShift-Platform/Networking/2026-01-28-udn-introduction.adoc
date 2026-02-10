@@ -4,7 +4,7 @@ description: "OpenShift User Defined Networking - Simple Layer 2 CUDN and UDN"
 date: "2026-01-27"
 doctype: book
 
-draft: false
+draft: true
 
 featured_image: /openshift-platform/networking/images/udn-overview/bla.png
 show_featured_image_summary: true
