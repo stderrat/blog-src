@@ -1,0 +1,176 @@
+---
+title: "OpenShift User Defined Networking - UDN localnet"
+description: "OpenShift User Defined Networking - UDN localnet"
+date: "2026-01-27"
+doctype: book
+
+draft: false
+
+featured_image: /openshift-platform/networking/images/udn-overview/bla.png
+show_featured_image_summary: true
+show_featured_image_article: true
+disableBreadcrumb: false
+
+authors:
+  - Thomas Jungbauer
+  - Toni Schmidbauer
+type: post
+categories:
+   - OpenShift
+   - Virtualization
+   - Networking
+   - KubeVirt
+
+tags: ["OCP", "Networking", "UDN", "CUDN", "User Defined Networking", "Multus"]
+
+aliases: [
+]
+---
+
+:imagesdir: /openshift-platform/networking/images/udn-overview
+:icons: font
+:toc:
+
+localnet
+
+<!--more-->
+
+namespace
+
+[source,yaml]
+----------
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: "udn-localnet"
+  name: testvms-udn
+----------
+
+
+bridge mapping
+
+[source,yaml]
+----------
+apiVersion: nmstate.io/v1
+kind: NodeNetworkConfigurationPolicy
+metadata:
+  name: mapping-vlan-999 <1>
+spec:
+  desiredState:
+    ovn:
+      bridge-mappings:
+      - bridge: ovs-bridge-storage0
+        localnet: vlan-999
+        state: present
+----------
+<1> used in cudn config
+
+cudn localnet
+
+[source,yaml]
+----------
+apiVersion: k8s.ovn.org/v1
+kind: ClusterUserDefinedNetwork
+metadata:
+  name: vlan-999
+spec:
+  namespaceSelector:
+    matchLabels:
+      environment: "udn-localnet"
+  network:
+    topology: Localnet
+    localnet:
+      role: Secondary
+      physicalNetworkName: vlan-999 # <1>
+      ipam: {lifecycle: Persistent}
+      subnets: ["192.168.99.0/24"]
+      vlan:
+        mode: Access
+        access:
+          id: 999
+----------
+<1> must match nncp name
+
+primary localnet Cluster UDN
+
+[source,yaml]
+----------
+apiVersion: k8s.ovn.org/v1
+kind: ClusterUserDefinedNetwork
+metadata:
+  name: vlan-999
+spec:
+  namespaceSelector:
+    matchLabels:
+      environment: "udn-localnet"
+  network:
+    topology: Localnet
+    localnet:
+      role: Primary
+      physicalNetworkName: vlan-999 # <1>
+      ipam: {lifecycle: Persistent}
+      subnets: ["192.168.99.0/24"]
+      vlan:
+        mode: Access
+        access:
+          id: 999
+----------
+
+-> error geht nix
+
+secondary localnet UDN
+
+[source,yaml]
+----------
+apiVersion: k8s.ovn.org/v1
+kind: UserDefinedNetwork
+metadata:
+  name: vlan-999
+  namespace: testvms-udn
+spec:
+  topology: Localnet
+  localnet:
+    role: Secondary
+    physicalNetworkName: vlan-999 # <1>
+    ipam: {lifecycle: Persistent}
+    subnets: ["192.168.99.0/24"]
+    vlan:
+      mode: Access
+      access:
+        id: 999
+----------
+
+[source,yaml]
+----------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: network-pod
+  namespace: testvms-udn
+  annotations:
+    k8s.v1.cni.cncf.io/networks: testvms-udn/vlan-999 # <1>
+spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: httpd
+      image: registry.redhat.io/rhel10/toolbox
+      command:
+        - sh
+        - -c
+        - 'echo "hello world" && sleep infinity'
+----------
+<1> name of NAD
+
+
+- vlan id has to be in nad
+- vlan's must have same ip range in nads even if nad in different namespaces
+
+was geht
+- cudn l2/l3 als primary und secondary
+- cudn localnet geht nur als secondary
+
+- udn geht nur l2/l3 primary und secondary

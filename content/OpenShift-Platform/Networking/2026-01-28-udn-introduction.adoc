@@ -1,0 +1,409 @@
+---
+title: "OpenShift User Defined Networking - Simple Layer 2 CUDN and UDN"
+description: "OpenShift User Defined Networking - Simple Layer 2 CUDN and UDN"
+date: "2026-01-27"
+doctype: book
+
+draft: false
+
+featured_image: /openshift-platform/networking/images/udn-overview/bla.png
+show_featured_image_summary: true
+show_featured_image_article: true
+disableBreadcrumb: false
+
+authors:
+  - Thomas Jungbauer
+  - Toni Schmidbauer
+type: post
+categories:
+   - OpenShift
+   - Virtualization
+   - Networking
+   - KubeVirt
+
+tags: ["OCP", "Networking", "UDN", "CUDN", "User Defined Networking", "Multus"]
+
+aliases: [
+]
+---
+
+:imagesdir: /openshift-platform/networking/images/udn-overview
+:icons: font
+:toc:
+
+This article provides a short and crisp overview of UDN capabilities. The UDN documentation (link..) is elaborate but quite confusing.
+
+<!--more-->
+
+- UDN can configure the primary and the secondary network
+  - primary is the main interface in a pod
+  - secondary means a second interface in a pod
+
+- there is UDN and CUDN (Cluster UDN) CUDN require cluster admin privileges
+
+- BEFORE creating a UDN we need a namespace with the right labels
+  _k8s.ovn.org/primary-user-defined-network_
+
+- UDN supports
+  - Layer 2, a switch spanning all cluster nodes
+  - Layer 3, a switch/router per node, with IP subnets per node and routing between nodes
+  - with CUDN and Virt -> announce bpg routes to network
+
+- CUDN
+  - no default namespace
+  - no openshift-* namespace
+  - localnet:
+    - _spec.network.physicalNetworkName_ must match bridgemapping in ovn NNCP
+    - use _spec.network.localnet.subnets_ and _spec.network.localnet.excludeSubnets_ to avoid conflict with external ip's
+
+
+- a pod has still the default ip, this is how k8s works. but ovs rules deny access to that ip (primary udn)
+  need to be verified
+  - cannot acccess image registry,s2i will not  work
+
+- limitations
+  - no resolvable pod ip's, services, external works
+  - health check done by kubelet only to default pod ip
+  - udn crds can not be modified after creation
+  - node ports are acccessible for udn pods not accessible on the SAME host but from other hosts
+  - _Warning: Failed to create pod sandbox._ if we run out of ips
+  - layer 2 udn with egress requires a default gateway (in the egress ip network?)
+
+- pods with primay udn can resolve k8s api
+
+== Example: Cluster User Defined Network with Layer 2 topology
+
+namespaces
+
+[source,yaml]
+----------
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: namespace-1
+  labels:
+    environment: tenant1
+    k8s.ovn.org/primary-user-defined-network: ''
+
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: namespace-2
+  labels:
+    environment: tenant1
+    k8s.ovn.org/primary-user-defined-network: ''
+----------
+
+cudn
+[source,yaml]
+----------
+apiVersion: k8s.ovn.org/v1
+kind: ClusterUserDefinedNetwork
+metadata:
+  name: cluster-udn-tenant1
+spec:
+  namespaceSelector:
+    matchLabels:
+      environment: tenant1
+  network:
+    layer2:
+      role: Primary
+      subnets:
+        - 172.31.0.0/24
+    topology: Layer2
+----------
+
+.UDN UI
+image::udn-ui.png?width=480[UDN UI]
+
+status cudn
+[source,yaml]
+----------
+status:
+  conditions:
+    - lastTransitionTime: '2026-01-29T09:56:41Z'
+      message: 'NetworkAttachmentDefinition has been created in following namespaces: [namespace-1, namespace-2]'
+      reason: NetworkAttachmentDefinitionCreated
+      status: 'True'
+      type: NetworkCreated
+----------
+
+creates a nad in every namespace
+
+
+example nad for namespace 2, namespace 1 nad is similar
+[source,yaml]
+----------
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  annotations:
+    k8s.ovn.org/network-id: '4'
+    k8s.ovn.org/network-name: cluster_udn_cluster-udn-tenant1
+  name: cluster-udn-tenant1
+  namespace: namespace-2
+  labels:
+    k8s.ovn.org/user-defined-network: ''
+spec:
+  config: |
+  {
+    "cniVersion": "1.0.0",
+    "joinSubnet": "100.65.0.0/16,fd99::/64",
+    "name": "cluster_udn_cluster-udn-tenant1",
+    "netAttachDefName": "namespace-2/cluster-udn-tenant1",
+    "role": "primary",
+    "subnets": "172.31.0.0/24",
+    "topology": "layer2",
+    "type": "ovn-k8s-cni-overlay"
+  }
+
+----------
+
+.UDN Network Attachment Definition
+image::udn-nad.png?width=480[UDN NAD]
+
+example pods
+
+[source,yaml]
+----------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: network-pod
+  namespace: namespace-1
+spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: httpd
+      image: registry.redhat.io/rhel10/toolbox
+      command:
+        - sh
+        - -c
+        - 'echo "hello world" && sleep infinity'
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: network-pod
+  namespace: namespace-2
+spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: httpd
+      image: registry.redhat.io/rhel10/toolbox
+      command:
+        - sh
+        - -c
+        - 'echo "hello world" && sleep infinity'
+----------
+
+[source,bash]
+----------
+sh-5.2$ ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host
+       valid_lft forever preferred_lft forever
+2: eth0@if111: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1400 qdisc noqueue state UP group default
+    link/ether 0a:58:0a:82:00:5c brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet 10.130.0.92/23 brd 10.130.1.255 scope global eth0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::858:aff:fe82:5c/64 scope link
+       valid_lft forever preferred_lft forever
+3: ovn-udn1@if113: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1400 qdisc noqueue state UP group default
+    link/ether 0a:58:ac:1f:00:04 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet 172.31.0.4/24 brd 172.31.0.255 scope global ovn-udn1
+       valid_lft forever preferred_lft forever
+    inet6 fe80::858:acff:fe1f:4/64 scope link
+       valid_lft forever preferred_lft forever
+----------
+
+
+[source,bash]
+----------
+sh-5.2$ ping -c1 172.31.0.6
+PING 172.31.0.6 (172.31.0.6) 56(84) bytes of data.
+64 bytes from 172.31.0.6: icmp_seq=1 ttl=64 time=1.32 ms
+
+--- 172.31.0.6 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 1.323/1.323/1.323/0.000 ms
+sh-5.2$ ping -c1 10.130.0.93
+PING 10.130.0.93 (10.130.0.93) 56(84) bytes of data.
+From 10.130.0.92 icmp_seq=1 Destination Host Unreachable
+
+--- 10.130.0.93 ping statistics ---
+1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 0ms
+----------
+
+== Example: User Defined Network with Layer 2 topology
+
+- The Layer2 subnets field is mandatory when the ipamLifecycle field is specified
+
+- To allow default network pods to connect to a user-defined network pod, you can use the
+k8s.ovn.org/open-default-ports annotation. This annotation opens specific ports on the user-defined
+network pod for access from the default network. (section 3.1.9)
+
+create ns without label
+
+[source,yaml]
+----------
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: namespace-secondary-1
+  labels:
+    environment: tenant2
+---
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: namespace-secondary-2
+  labels:
+    environment: tenant2
+----------
+
+create cudn secondary
+
+[source,yaml]
+----------
+---
+apiVersion: k8s.ovn.org/v1
+kind: ClusterUserDefinedNetwork
+metadata:
+  name: cluster-udn-tenant2-secondary
+spec:
+  namespaceSelector:
+    matchLabels:
+      environment: tenant2
+  network:
+    layer2:
+      role: Secondary
+      subnets:
+        - 172.32.0.0/24
+    topology: Layer2
+----------
+
+nad gets created automatically
+
+[source,yaml]
+----------
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  annotations:
+    k8s.ovn.org/network-id: '5'
+    k8s.ovn.org/network-name: cluster_udn_cluster-udn-tenant2-secondary
+  name: cluster-udn-tenant2-secondary
+  namespace: namespace-secondary-1
+  labels:
+    k8s.ovn.org/user-defined-network: ''
+spec:
+  config: '{"cniVersion":"1.0.0","name":"cluster_udn_cluster-udn-tenant2-secondary","netAttachDefName":"namespace-secondary-2/cluster-udn-tenant2-secondary","role":"secondary","subnets":"172.32.0.0/24","topology":"layer2","type":"ovn-k8s-cni-overlay"}'
+----------
+
+create pods
+
+[source,yaml]
+----------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: network-pod
+  namespace: namespace-secondary-1
+  annotations:
+    k8s.v1.cni.cncf.io/networks: namespace-secondary-1/cluster-udn-tenant2-secondary <1>
+spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: httpd
+      image: registry.redhat.io/rhel10/toolbox
+      command:
+        - sh
+        - -c
+        - 'echo "hello world" && sleep infinity'
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: network-pod
+  namespace: namespace-secondary-2
+  annotations:
+    k8s.v1.cni.cncf.io/networks: namespace-secondary-2/cluster-udn-tenant2-secondary <2>
+spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: httpd
+      image: registry.redhat.io/rhel10/toolbox
+      command:
+        - sh
+        - -c
+        - 'echo "hello world" && sleep infinity'
+----------
+<1> important annotation
+<2> important annotation
+
+network config within pod
+
+[source,bash]
+----------
+sh-5.2$ ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host
+       valid_lft forever preferred_lft forever
+2: eth0@if123: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1400 qdisc noqueue state UP group default
+    link/ether 0a:58:0a:82:00:66 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet 10.130.0.102/23 brd 10.130.1.255 scope global eth0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::858:aff:fe82:66/64 scope link
+       valid_lft forever preferred_lft forever
+3: net1@if125: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1400 qdisc noqueue state UP group default
+    link/ether 0a:58:ac:20:00:04 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet 172.32.0.4/24 brd 172.32.0.255 scope global net1
+       valid_lft forever preferred_lft forever
+    inet6 fe80::858:acff:fe20:4/64 scope link
+       valid_lft forever preferred_lft forever
+----------
+
+ping other pod with cudn secondary
+
+[source,bash]
+----------
+sh-5.2$ ping -c 1 10.130.0.101
+PING 10.130.0.101 (10.130.0.101) 56(84) bytes of data.
+64 bytes from 10.130.0.101: icmp_seq=1 ttl=64 time=1.25 ms
+
+--- 10.130.0.101 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 1.251/1.251/1.251/0.000 ms
+sh-5.2$ ping -c 1 172.32.0.2
+PING 172.32.0.2 (172.32.0.2) 56(84) bytes of data.
+64 bytes from 172.32.0.2: icmp_seq=1 ttl=64 time=1.10 ms
+
+--- 172.32.0.2 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 1.099/1.099/1.099/0.000 ms
+----------
+
+
+
+
+
+3.1.4 bug -> bilder vertauscht...

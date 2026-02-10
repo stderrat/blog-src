@@ -1,0 +1,34 @@
+---
+title: "Home Lab - The Overview"
+description: "Home Lab - The Overview"
+date: "2026-01-29"
+doctype: book
+weight: 10
+
+draft: true
+
+featured_image: /other/images/homelab/homelab_logo.png
+show_featured_image_summary: true
+show_featured_image_article: true
+disableBreadcrumb: false
+
+authors: [Toni Schmidbauer]
+type: post
+categories:
+   - Other
+   - HomeLab
+
+tags: ["Other", "Home Lab"]
+
+aliases: [
+]
+---
+
+:imagesdir: /other/images/homelab/
+:icons: font
+:toc:
+
+This is our homelab.
+
+
+<!--more-->
