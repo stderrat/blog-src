@@ -1,11 +1,11 @@
 --- 
-title: "The Complete Guide to OpenBao - Standalone Installation - Part 2"
+title: "The Guide to OpenBao - Standalone Installation - Part 2"
 description: "Installing OpenBao as a standalone service outside of Kubernetes for testing and edge deployments"
-date: "2026-02-09"
+date: "2026-02-12"
 doctype: book
 weight: 99
 
-series: "The Complete Guide to OpenBao"
+series: "The Guide to OpenBao"
 series_part: 2
 
 featured_image: /openshift-platform/security/secrets-management/openbao/images/logos/part2_openbao_logo.png
@@ -15,7 +15,7 @@ disableBreadcrumb: true
 
 authors: [Thomas Jungbauer]
 type: post
-draft: true
+draft: false
 categories:
    - OpenShift
    - Security
@@ -70,14 +70,14 @@ OpenBao can be installed through multiple methods:
 |Medium
 |===
 
-NOTE: For this article, we will focus on MacOS for local testings with binary and container image (using Podman) and Red Hat Enterprise Linux to setup and example production ready server.
+NOTE: For this article, we will focus on macOS for local testing with binary and container image (using Podman) and Red Hat Enterprise Linux to set up an example production-ready server.
 The deployment on the Kubernetes environment will be discussed in the next article.
 
 == Method 1: Package Manager Installation
 
 === RHEL/Fedora/CentOS
 
-On RHEL or CentOS, before you can install OpenBao you need to install Epel repository. To do so, you first need to enable Code Ready Repository. The following commands will do the trick. Be sure that your system is registered, in case of RHEL.
+On RHEL or CentOS, before you can install OpenBao you need to install the EPEL repository. To do so, you first need to enable the Code Ready Repository. The following commands will do the trick. Be sure that your system is registered, in case of RHEL.
 
 WARNING: If you get the error "Repositories disabled by configuration." you need to tell the subscription manager that you want to manage the repositories. This can be done permanently or temporarily. You can use the command: **sudo subscription-manager config --rhsm.manage_repos=1** to do so.
 
@@ -164,8 +164,7 @@ This will start the server. The UI is accessible at http://localhost:8200 where 
 
 == Method 2: Container Image
 
-For quick testing or isolated environments, container images are ideal. Luckily, OpenBao, offers several types of contaiers, suitable for 
-any environment. We will use the image hosted on **quay.io** and is based on **RHEL UBI** and can be found at: https://quay.io/openbao/openbao-ubi[quay.io/openbao/openbao-ubi^]
+For quick testing or isolated environments, container images are ideal. Luckily, OpenBao offers several types of containers suitable for any environment. We will use the image hosted on **quay.io**, which is based on **RHEL UBI** and can be found at: https://quay.io/openbao/openbao-ubi[quay.io/openbao/openbao-ubi^]
 
 === Using Podman
 
@@ -277,9 +276,9 @@ HA Enabled      false
 
 OpenBao does a good job to secure your secrets, however, memory paging (or swap) can undermine the protection. Your OS should either have swap disabled completely or encrypt the swap space. 
 
-As I am testing on a macOS the swap space is encrypted out of the box. 
+As I am testing on macOS, the swap space is encrypted out of the box. 
 
-However, OpenBao documented what must be done for various operating systems at https://openbao.org/docs/install/#post-installation-hardening[Post-installation hardening^]
+However, OpenBao has documented what must be done for various operating systems at https://openbao.org/docs/install/#post-installation-hardening[Post-installation hardening^]
 
 == Production Standalone Setup
 
@@ -307,8 +306,8 @@ listener "tcp" {
   address         = "0.0.0.0:8200"
   cluster_address = "0.0.0.0:8201"
   tls_disable     = false
-  tls_cert_file   = "/etc/openbao/tls/server.crt"
-  tls_key_file    = "/etc/openbao/tls/server.key"
+  tls_cert_file   = "/etc/openbao.d/tls/tls.crt"
+  tls_key_file    = "/etc/openbao.d/tls/tls.key"
 }
 
 # API address for clients
@@ -340,7 +339,7 @@ For production, you should use proper certificates. For testing, create self-sig
 
 WARNING: This is only for testing purposes. In production, you should use proper certificates.
 
-. First Preare the TLS directory if it does not exist
+. First, prepare the TLS directory if it does not exist
 +
 [source,bash]
 ----
@@ -369,7 +368,7 @@ DNS.1 = openbao.example.com
 IP.1 = 127.0.0.1 <1>
 EOF
 ----
-<1> The IP address of the server. In this case we are using the localhost, but you can add your IPs here.
+<1> The IP address of the server. In this case we are using localhost, but you can add your IPs here.
 
 
 . Then generate the certificate:
@@ -492,10 +491,10 @@ HA Enabled         false
 
 === Initialize OpenBao
 
-Before we use  OpenBao we need to initialize it. This will create the unseal keys and the root token. The unseal keys ares used to ... well unseal the OpenBao service. 
-The root key is used as a master key to authenticate against the OpenBao service. This key has access to ALL secrets. **Treat this root key with care**
+Before we use OpenBao, we need to initialize it. This will create the unseal keys and the root token. The unseal keys are used to … well, unseal the OpenBao service.
+The root token is used as a master key to authenticate against the OpenBao service. This token has access to ALL secrets. **Treat this root token with care.**
 
-We will initialize OpenBao with default options of5 key shares and 3 threshold. This means that we need 3 different unseal keys to unseal the OpenBao service.
+We will initialize OpenBao with default options of 5 key shares and a threshold of 3. This means that we need 3 different unseal keys to unseal the OpenBao service.
 
 [source,bash]
 ----
@@ -625,7 +624,7 @@ token/    token    auth_token_c7feca17    token based credentials    n/a
 bao secrets enable -path=secret kv-v2
 ----
 +
-This enables the KV (key/value)secrets engine at the path `secret`.
+This enables the KV (key/value) secrets engine at the path `secret`.
 +
 [source,bash]
 ----
@@ -641,11 +640,11 @@ bao kv get secret/test
 +
 This retrieves the test secret from the path `secret/test`.
 
-Thats it for the basic verification. You can now start to use OpenBao in your production environment. Let's see what we can do in the UI.
+That's it for the basic verification. You can now start to use OpenBao in your production environment. Let's see what we can do in the UI.
 
 == Visiting the UI
 
-If you watached the previous commands closely you will have noticed that the UI has been enabled in the configuration file: 
+If you watched the previous commands closely, you will have noticed that the UI has been enabled in the configuration file: 
 
 [source,ini]
 ----
@@ -663,8 +662,8 @@ Here you will see several options to explore. For now we are interested in the S
 .OpenBao Secrets Engine
 image::part2_openbao_secrets_engine.png?width=480px[OpenBao Secrets Engine]
 
-We have created th path "secret" and inside a secret called "test". 
-Which we can retrieve now: 
+We have created the path "secret" and inside it a secret called "test".
+We can retrieve it now: 
 
 .OpenBao Secret Retrieval
 image::part2_test_secret_retrieval.png?width=480px[OpenBao Secret Retrieval]

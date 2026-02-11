@@ -1,11 +1,11 @@
 --- 
-title: "The Complete Guide to OpenBao - GitOps Deployment with Argo CD - Part 4"
+title: "The Guide to OpenBao - GitOps Deployment with Argo CD - Part 4"
 description: "Deploying and managing OpenBao using GitOps principles with Argo CD for declarative, version-controlled secret management infrastructure"
-date: "2026-02-11"
+date: "2026-02-14"
 doctype: book
 weight: 97
 
-series: "The Complete Guide to OpenBao"
+series: "The Guide to OpenBao"
 series_part: 4
 
 featured_image: /openshift-platform/security/secrets-management/openbao/images/Logo_OpenBao.png

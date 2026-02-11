@@ -1,11 +1,11 @@
 --- 
-title: "The Complete Guide to OpenBao - OpenShift Deployment with Helm - Part 3"
+title: "The Guide to OpenBao - OpenShift Deployment with Helm - Part 3"
 description: "Deploying OpenBao on OpenShift and Kubernetes using the official Helm chart for production-ready secret management"
-date: "2026-02-10"
+date: "2026-02-13"
 doctype: book
 weight: 98
 
-series: "The Complete Guide to OpenBao"
+series: "The Guide to OpenBao"
 series_part: 3
 
 featured_image: /openshift-platform/security/secrets-management/openbao/images/Logo_OpenBao.png

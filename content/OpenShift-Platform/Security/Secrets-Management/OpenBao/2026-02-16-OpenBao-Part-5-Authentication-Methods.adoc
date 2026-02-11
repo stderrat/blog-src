@@ -1,11 +1,11 @@
 --- 
-title: "The Complete Guide to OpenBao - Authentication Methods - Part 5"
+title: "The Guide to OpenBao - Authentication Methods - Part 5"
 description: "Configuring authentication methods in OpenBao including Kubernetes auth, OIDC, LDAP, and AppRole for secure access control"
-date: "2026-02-12"
+date: "2026-02-16"
 doctype: book
 weight: 96
 
-series: "The Complete Guide to OpenBao"
+series: "The Guide to OpenBao"
 series_part: 5
 
 featured_image: /openshift-platform/security/secrets-management/openbao/images/Logo_OpenBao.png

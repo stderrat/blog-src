@@ -1,11 +1,11 @@
 --- 
-title: "The Complete Guide to OpenBao - End-to-End Example - Part 10"
+title: "The Guide to OpenBao - End-to-End Example - Part 10"
 description: "Complete end-to-end example deploying a secure application with OpenBao including dynamic database credentials, TLS certificates, and GitOps configuration"
-date: "2026-02-17"
+date: "2026-02-23"
 doctype: book
 weight: 91
 
-series: "The Complete Guide to OpenBao"
+series: "The Guide to OpenBao"
 series_part: 10
 
 featured_image: /openshift-platform/security/secrets-management/openbao/images/Logo_OpenBao.png

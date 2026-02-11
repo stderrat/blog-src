@@ -1,0 +1,304 @@
+--- 
+title: "The Guide to OpenBao - Introduction - Part 1"
+description: "Introduction to OpenBao - What it is, why it exists, and when to use it for secret management"
+date: "2026-02-11"
+doctype: book
+weight: 100
+
+series: "The Guide to OpenBao"
+series_part: 1
+
+featured_image: /openshift-platform/security/secrets-management/openbao/images/logos/part1_openbao_logo.png
+show_featured_image_summary: true
+show_featured_image_article: true
+disableBreadcrumb: true
+
+authors: [Thomas Jungbauer]
+type: post
+draft: false
+categories:
+   - OpenShift
+   - Security
+   - Secret Management
+
+tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "Encryption"] 
+
+aliases: [ 
+	 "/openshift/security/openbao/2026-02-08-openbao-introduction/",
+]
+---
+
+:imagesdir: /openshift-platform/security/secrets-management/openbao/images/
+:icons: font
+:toc:
+
+
+I finally had some time to dig into Secret Management. For my demo environments, SealedSecrets is usually enough to quickly test something. But if you want to deploy a real application with Secret Management, you need to think of a more permanent solution. 
+
+This article is the first of a series of articles about **OpenBao**, a HashiCorp Vault fork. Today, we will explore what OpenBao is, why it was created, and when you should consider using it for your secret management needs. If you are familiar with HashiCorp Vault, you will find many similarities, but also some important differences that we will discuss.
+
+<!--more--> 
+
+== Introduction
+
+In general, sensitive information in any system should be stored in a secure way. When it comes to OpenShift or Kubernetes, this is especially true, since the secrets are stored in the etcd database. Even if etcd is encrypted at rest, anybody can decode a given base64 string which is stored in the Secret.
+
+NOTE: Base64 is not an encryption format. It is an encoding format.
+
+For example, the string `Thomas` encoded as base64 is `VGhvbWFzCg==`. This is simply masked plain text and it is not secure to share these values, especially not on Git. To make your CI/CD pipelines or GitOps process secure, you need to think of a secure way to manage your Secrets.
+
+This is where OpenBao comes in.
+
+== What is OpenBao?
+
+https://openbao.org[OpenBao^] is an identity-based secrets and encryption management system. It is an open-source, community driven fork of HashiCorp Vault and provides secure storage, fine-grained access control, and lifecycle management for secrets such as API or SSH keys, passwords, certificates, and encryption keys.
+
+The core OpenBao workflow consists of four stages:
+
+* **Authentication**: Verifying the identity of the client to determine if they are who they say they are. Once authenticated, a token is created and associated with a so-called policy.
+* **Validation**: Checking if the client has the required permissions
+* **Authorization**: Granting access based on policies that provide or deny access to certain paths and operations in OpenBao.
+* **Access**: Limiting what the client can do with the secret
+
+At its core, OpenBao:
+
+* Stores and encrypts sensitive information at rest and in transit
+* Provides fine-grained access controls (ACL)
+* Supports dynamic secret generation
+* Offers a comprehensive audit trail (must be enabled)
+* Enables encryption as a service
+
+== The History: Why OpenBao Exists
+
+OpenBao is a community-driven, open-source fork of HashiCorp Vault. But why was it created?
+
+In August 2023, HashiCorp announced a significant change to the licensing of their products, including Vault. They moved from the Mozilla Public License 2.0 (MPL 2.0) to the Business Source License 1.1 (BSL 1.1).
+
+The BSL 1.1 license includes restrictions on competitive use:
+
+* Competitors could no longer use Vault's code to offer competing services
+* Cloud providers and managed service providers faced restrictions
+* The open-source community lost the freedom to fork and commercialize
+
+=== The Fork
+
+In response to this license change, the Linux Foundation announced the OpenBao project in December 2023. OpenBao is:
+
+* A fork of HashiCorp Vault (from version 1.14.x)
+* Licensed under the OSI-approved Mozilla Public License 2.0
+* Governed by a community-driven model
+* Maintained independently of HashiCorp
+* Continues to enable innovation without license restrictions
+
+
+== OpenBao vs. HashiCorp Vault: Key Differences
+
+While OpenBao shares its heritage with Vault, there are several important differences:
+
+=== Licensing
+
+[cols="1,2,2"]
+|===
+|Aspect |OpenBao |HashiCorp Vault
+
+|License
+|MPL 2.0 (OSI-approved open source)
+|BSL 1.1 (with staged conversion)
+
+|Governance
+|Community-driven (Linux Foundation)
+|HashiCorp/IBM controlled
+
+|Commercial restrictions
+|None
+|Restrictions on competitive use
+
+|Enterprise Features
+|Community-driven additions
+|Paid Enterprise tier
+
+|Support
+|Community support
+|Paid support available
+
+|Branding
+|bao CLI, OpenBao naming
+|vault CLI, Vault naming
+
+|===
+
+=== Technical Differences
+
+* **Token Format** - OpenBao uses shorter tokens in the format `sbr.<<random>>`, while Vault uses longer tokens (`hvs.`, `hvb.`, `hvr.` prefixes followed by long random strings). Old Vault tokens are still accepted according to their TTLs, but newly issued tokens follow the OpenBao format.
+
+* **Plugin Ecosystem** - OpenBao comes with fewer built-in plugins by default, focusing on OSI-licensed integrations. Proprietary cloud vendor plugins have been moved to external repositories.
+
+* **Storage Backend** - OpenBao has simplified its storage options, primarily supporting Raft as the recommended backend. 
+
+* **API Compatibility** - OpenBao's API is designed to be compatible with Vault, meaning existing clients and integrations should work without modification. However, some edge cases may require updates.
+
+== Core Concepts
+
+Before diving into installation and configuration in the next articles, it is essential to understand the fundamental concepts of OpenBao:
+
+=== Secrets Engines
+
+Secrets engines are components that store, generate, or encrypt data. OpenBao supports multiple types:
+
+* **KV (Key-Value)**: Simple static secret storage with optional versioning
+* **PKI**: Certificate Authority for generating TLS certificates
+* **Database**: Dynamic credential generation for databases
+* **Transit**: Encryption as a Service (EaaS)
+* **SSH**: SSH key signing and OTP generation
+
+=== Authentication Methods
+
+Authentication methods verify client identity before granting access:
+
+* **Kubernetes**: Uses Kubernetes service account tokens. Essential for Kubernetes/OpenShift deployments.
+* **OIDC**: OpenID Connect for user authentication, like Keycloak, Okta, or Azure AD.
+* **LDAP**: Directory service authentication, like Active Directory, OpenLDAP, or Microsoft AD.
+* **AppRole**: Machine-oriented authentication for applications. Ideal for CI/CD pipelines.
+* **Token**: Direct token-based authentication. The root token is created during initialization.
+
+=== Storage Backend
+
+OpenBao encrypts all data before writing to storage. Supported backends include:
+
+* **Integrated Raft** (recommended): Built-in distributed storage
+* **Consul**: HashiCorp's service discovery and KV store (less common with OpenBao)
+* **File**: Single-node deployments only
+* **PostgreSQL/MySQL**: Database-backed storage
+
+=== Policies
+
+Policies define what a client can do after authentication. They use path-based access control (deny-by-default mode):
+
+[source,hcl]
+----
+path "secret/data/myapp/*" {
+  capabilities = ["read", "list"]
+}
+
+path "pki/issue/my-role" {
+  capabilities = ["create", "update"]
+}
+
+path "database/creds/myapp-role" {
+  capabilities = ["read"]
+}
+----
+
+=== Tokens
+
+Tokens are the primary authentication credential in OpenBao. After successful authentication, clients receive a token that:
+
+* Has a TTL (Time To Live)
+* Is associated with one or more policies
+* Can be renewed (if renewable)
+* Can create child tokens
+
+=== Seal/Unseal
+
+OpenBao starts in a *sealed* state where it cannot access encrypted data. The unseal process requires multiple key shares (using Shamir's Secret Sharing) or auto-unseal mechanisms to decrypt the master key.
+
+=== Leases
+
+Most secrets in OpenBao have an associated lease - a duration after which the secret expires. This enables:
+
+* Automatic secret rotation
+* Revocation of compromised credentials
+* Audit trail of secret usage
+
+== Use Cases
+
+=== Dynamic Database Credentials
+
+Instead of storing static database passwords:
+
+1. Application authenticates to OpenBao
+2. Requests database credentials
+3. OpenBao creates a temporary database user
+4. Returns credentials with a short TTL
+5. Credentials automatically expire
+
+Benefits: No long-lived credentials, automatic rotation, per-application isolation.
+
+=== Certificate Management with PKI
+
+Instead of manually managing TLS certificates:
+
+1. Configure OpenBao as an intermediate CA
+2. Applications request certificates on demand
+3. Short-lived certificates (hours/days instead of years)
+4. Automatic renewal before expiration
+
+Benefits: No certificate sprawl, automated rotation, reduced attack surface.
+
+=== Encryption as a Service
+
+Instead of implementing encryption in each application:
+
+1. Applications send plaintext to OpenBao's Transit engine
+2. OpenBao encrypts with managed keys
+3. Applications store ciphertext
+4. Decryption requests go through OpenBao
+
+Benefits: Centralized key management, separation of duties, key rotation without re-encryption.
+
+=== Kubernetes Secret Injection
+
+Instead of storing secrets in Kubernetes Secrets:
+
+1. Deploy OpenBao with Kubernetes auth
+2. Configure injector or External Secrets Operator
+3. Pods automatically receive secrets at startup
+4. Secrets never stored in etcd
+
+Benefits: Secrets not in cluster, dynamic injection, centralized management.
+
+== When to Use OpenBao
+
+OpenBao is an excellent choice when you need:
+
+* **Centralized Secret Management** - If you have secrets scattered across configuration files, environment variables, and various secret stores, OpenBao provides a single source of truth.
+* **Dynamic Secrets** - For use cases where you need short-lived, automatically rotated credentials (e.g., database passwords), OpenBao can generate them on-demand.
+* **Encryption as a Service** - If applications need encryption capabilities without managing encryption keys, OpenBao's Transit engine provides this functionality.
+* **Certificate Management** - OpenBao's PKI engine can act as a Certificate Authority, issuing and managing TLS certificates.
+* **Compliance Requirements** - For environments with strict audit requirements, OpenBao provides comprehensive audit logging of all secret access.
+
+== When NOT to Use OpenBao
+
+OpenBao might be overkill for:
+
+* **Simple, Static Secrets** - If you only have a few static secrets that rarely change, simpler solutions like Sealed Secrets or External Secrets Operator with a basic backend might suffice.
+* **Small Teams with Limited Resources** - OpenBao requires operational expertise to maintain. If you do not have the resources to operate it properly, consider managed alternatives.
+* **Single-Application Deployments** - If you have a single application with minimal secret requirements, the complexity of OpenBao may not be justified.
+
+
+== Architecture Overview
+
+A typical OpenBao deployment consists of:
+
+.Architecture Overview
+image::part1_openbao_architecture.png[Architecture Overview]
+
+* **Multiple Nodes**: For high availability (HA), OpenBao runs as a cluster
+* **Raft Consensus**: Leader election and data replication
+* **Persistent Storage**: Encrypted data stored on persistent volumes
+* **Load Balancer**: Distributes client requests
+
+
+== Conclusion
+
+OpenBao provides a powerful, open-source solution for secret management that addresses the challenges of modern cloud-native environments. Its fork from HashiCorp Vault means it benefits from years of development while remaining truly open source.
+
+In the next article, we will start with a standalone installation to understand the fundamentals before moving to Kubernetes deployments.
+
+== Resources
+
+* https://openbao.org[OpenBao Official Website^]
+* https://openbao.org/docs[OpenBao Documentation^]
+* https://github.com/openbao/openbao[OpenBao GitHub Repository^]
+* https://www.linuxfoundation.org/press/linux-foundation-launches-openbao[Linux Foundation OpenBao Announcement^]
+

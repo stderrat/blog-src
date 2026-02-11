@@ -1,11 +1,11 @@
 --- 
-title: "The Complete Guide to OpenBao - Operations and Troubleshooting - Part 9"
+title: "The Guide to OpenBao - Operations and Troubleshooting - Part 9"
 description: "Day-2 operations, common issues and solutions, log analysis, migration from Vault, and CLI command reference for OpenBao"
-date: "2026-02-16"
+date: "2026-02-20"
 doctype: book
 weight: 92
 
-series: "The Complete Guide to OpenBao"
+series: "The Guide to OpenBao"
 series_part: 9
 
 featured_image: /openshift-platform/security/secrets-management/openbao/images/Logo_OpenBao.png

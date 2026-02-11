@@ -1,11 +1,11 @@
 --- 
-title: "The Complete Guide to OpenBao - High Availability and Production Best Practices - Part 8"
+title: "The Guide to OpenBao - High Availability and Production Best Practices - Part 8"
 description: "Production hardening for OpenBao including auto-unseal, disaster recovery, backup strategies, monitoring, and performance tuning"
-date: "2026-02-15"
+date: "2026-02-19"
 doctype: book
 weight: 93
 
-series: "The Complete Guide to OpenBao"
+series: "The Guide to OpenBao"
 series_part: 8
 
 featured_image: /openshift-platform/security/secrets-management/openbao/images/Logo_OpenBao.png
