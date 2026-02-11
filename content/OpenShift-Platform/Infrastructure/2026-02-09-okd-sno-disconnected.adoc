@@ -112,20 +112,29 @@ apiVersion: mirror.openshift.io/v2alpha1
 mirror:
   platform:
     channels:
-    - name: 4-scos-stable
+    - name: 4-scos-stable <1>
       type: okd
-      minVersion: 4.21.0-okd-scos.3
+      minVersion: 4.21.0-okd-scos.3 <2>
       maxVersion: 4.21.0-okd-scos.3
     graph: false
   operators: []
   additionalImages: []
 ----
 
-Our private registry is based on https://goharbor.io[Harbor] for our experiments, but any Docker v2 compatible registry should work. Then only thing required is a project
-within Harbor called _openshift_ and a user/password for pulling/pushing images to this project. The project name might
-be configurable with _oc mirror_, but this requires further investigation.
+The hard part for use was finding the right values for _channels_ and
+the min/max versions. Once again OKD
+https://amd64.origin.releases.ci.openshift.org/[release status page]
+was helpful.
 
-_oc mirror_ wants to verify signatures so we had to download a public key and provide the _OCP_SIGNATURE_URL_:
+Our private registry is based on https://goharbor.io[Harbor] for our
+experiments, but any Docker v2 compatible registry should work. Then
+only thing required is a project within Harbor called _openshift_ and
+a user/password for pulling/pushing images to this project. The
+project name might be configurable with _oc mirror_, but this requires
+further investigation.
+
+_oc mirror_ wants to verify signatures so we had to download a public
+key and provide the _OCP_SIGNATURE_URL_:
 
 [source, shell]
 ----
