@@ -52,13 +52,11 @@ Podman is also required, same rules as above apply:
 - https://github.com/tosmi/nixos-config/blob/3a6bc775d3164d080390590522956ad5399a34c6/macos/fuji/flake.nix#L147[flake.nix]
 
 We followed the
-https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html/using_image_mode_for_rhel_to_build_deploy_and_manage_operating_systems/creating-bootc-compatible-base-disk-images-by-using-bootc-image-builder[RHEL
-documentation] for created a bootable qcow image from a bootc
+https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html/using_image_mode_for_rhel_to_build_deploy_and_manage_operating_systems/creating-bootc-compatible-base-disk-images-by-using-bootc-image-builder[RHEL documentation] for created a bootable qcow image from a bootc
 container image.
 
 According to the https://github.com/osbuild/bootc-image-builder?tab=readme-ov-file#-installation[upstream image builder docs], we need to make sure
-that our podman machine runs rootful. Otherwise image builder will not
-work.
+that our podman machine runs rootful. Otherwise image builder will not work. So lets do this:
 
 [source,bash]
 ----------
@@ -67,7 +65,6 @@ $ podman machine set --rootful
 $ podman machine start
 $ podman machine info
 ----------
-
 
 Next we need to pull the _bootc-image-builder_ image:
 
@@ -119,12 +116,12 @@ Now we are ready to trigger _bootc-image-builder_:
 
 [source,bash]
 ----------
-sudo podman run \
+podman run \
     --rm \
     --privileged \
     --pull=newer \
     --security-opt label=type:unconfined_t \
-    -v /var/lib/containers/storage:/var/lib/containers/storage \
+    -v /var/lib/containers/storage:/var/lib/containers/storage \ <1>
     -v ./config.toml:/config.toml:ro \
     -v ./output:/output \
     registry.redhat.io/rhel10/bootc-image-builder:latest \
@@ -132,3 +129,4 @@ sudo podman run \
     --config /config.toml \
   registry.redhat.io/rhel10/rhel-bootc:latest
 ----------
+<1> We had to add this dir into the container, maybe this is required because we run podman in a VM on macos (podman machine)
