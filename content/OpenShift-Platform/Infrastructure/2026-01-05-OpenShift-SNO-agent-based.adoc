@@ -1,0 +1,37 @@
+---
+title: "OpenShift Single Node with Agent Based Installer "
+description: "OpenShift Single Node with Agent Based Installer "
+date: "2026-01-05"
+doctype: book
+weight: 10
+
+draft: true
+
+featured_image: /openshift-platform/virtualization/images/network-overview/Logo_VirtualizationNetworking.png
+show_featured_image_summary: true
+show_featured_image_article: true
+disableBreadcrumb: false
+
+authors: [Toni Schmidbauer]
+type: post
+categories:
+   - OpenShift
+   - Single Node
+   - Agent Based Installation
+   - PXE
+
+tags: ["OCP", "OpenShift", "Single Node", "Installation", "Agent Based", "ipxe"]
+
+aliases: [
+]
+---
+
+:imagesdir: /openshift-platform/infrastructure/images/sno-agent-based
+:icons: font
+:toc:
+
+In this article we would like to document our current OpenShift home lab setup. It consists of one Single Node control plane host and one additonal worker. Those machines are quite beefy and allow us to test various OpenShift features like OpenShift Virtualization. We also have six network interfaces per node which allows playing around with different networking configurations.
+
+Goal of the setup was to use the agent based installer with network booting (iPXE) to automate the installation of the control plane node and the additional worker. As this is a lab environment, re-installation of a fresh environment should be as painless as possible.
+
+<!--more-->
