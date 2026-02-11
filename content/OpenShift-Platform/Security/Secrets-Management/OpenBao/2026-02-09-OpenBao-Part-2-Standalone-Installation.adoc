@@ -8,7 +8,7 @@ weight: 99
 series: "The Complete Guide to OpenBao"
 series_part: 2
 
-featured_image: /openshift-platform/security/secrets-management/openbao/images/Logo_OpenBao.png
+featured_image: /openshift-platform/security/secrets-management/openbao/images/logos/part2_openbao_logo.png
 show_featured_image_summary: true
 show_featured_image_article: true
 disableBreadcrumb: true
@@ -338,28 +338,57 @@ telemetry {
 
 For production, you should use proper certificates. For testing, create self-signed ones:
 
+WARNING: This is only for testing purposes. In production, you should use proper certificates.
+
+. First Preare the TLS directory if it does not exist
++
 [source,bash]
 ----
-# Create TLS directory if it does not exist
 sudo mkdir -p /etc/openbao.d/tls
+----
 
+. Then create a configuration file for the TLS certificates:
++
+[source,bash]
+----
+# Create TLS config
+cat <<EOF > openbao.cnf
+[req]
+distinguished_name = req_distinguished_name
+x509_extensions = v3_req
+prompt = no
+
+[req_distinguished_name]
+CN = openbao.example.com
+
+[v3_req]
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = openbao.example.com
+IP.1 = 127.0.0.1 <1>
+EOF
+----
+<1> The IP address of the server. In this case we are using the localhost, but you can add your IPs here.
+
+
+. Then generate the certificate:
++
+[source,bash]
+----
 # Generate private key
 sudo openssl genrsa -out /etc/openbao.d/tls/tls.key 4096
 
 # Generate certificate signing request
-sudo openssl req -new -key /etc/openbao.d/tls/tls.key \
-  -out /etc/openbao.d/tls/tls.csr \
-  -subj "/CN=openbao.example.com"
+sudo openssl req -new -key /etc/openbao.d/tls/tls.key -out /etc/openbao.d/tls/tls.csr -subj "/CN=openbao.example.com"
 
 # Generate self-signed certificate
-sudo openssl x509 -req -days 365 \
-  -in /etc/openbao.d/tls/tls.csr \
-  -signkey /etc/openbao.d/tls/tls.key \
-  -out /etc/openbao.d/tls/tls.crt
+sudo openssl x509 -req -days 365 -in /etc/openbao.d/tls/tls.csr -signkey /etc/openbao.d/tls/tls.key -out /etc/openbao.d/tls/tls.crt -extfile openbao.cnf -extensions v3_req
 
 # Set permissions
-sudo chown -R openbao:openbao /etc/openbao/tls
+sudo chown -R openbao:openbao /etc/openbao.d/tls
 sudo chmod 600 /etc/openbao.d/tls/tls.key
+sudo chmod 755 /etc/openbao.d/tls
 ----
 
 === Step 3: Create Systemd Service
@@ -424,41 +453,52 @@ After starting OpenBao for the first time, it needs to be initialized and unseal
 
 === Set Environment Variables
 
+NOTE: We will do the following commands as root user.
+
+WARNING: Be sure that the hostname is resolvable. In this case I am using the test domain: openbao.example.com. 
+
 [source,bash]
 ----
 # Set the OpenBao address
 export BAO_ADDR='https://openbao.example.com:8200'
 
 # If using self-signed certificates
-export BAO_CACERT='/etc/openbao/tls/server.crt'
-# Or skip verification (testing only!)
-export BAO_SKIP_VERIFY=true
+export BAO_CACERT='/etc/openbao.d/tls/tls.crt'
 ----
 
 === Check Status
+
+You will see that OpenBao is running but not yet initialized. This will be the next step.
 
 [source,bash]
 ----
 bao status
 
-# Expected output (before initialization):
-# Key                Value
-# ---                -----
-# Seal Type          shamir
-# Initialized        false <1>
-# Sealed             true
-# ...
+Key                Value
+---                -----
+Seal Type          shamir
+Initialized        false <1>
+Sealed             true
+Total Shares       0
+Threshold          0
+Unseal Progress    0/0
+Unseal Nonce       n/a
+Version            2.4.4-1.el9
+Build Date         2025-11-24
+Storage Type       file
+HA Enabled         false
 ----
 <1> Not yet initialized
 
 === Initialize OpenBao
 
+Before we use  OpenBao we need to initialize it. This will create the unseal keys and the root token. The unseal keys ares used to ... well unseal the OpenBao service. 
+The root key is used as a master key to authenticate against the OpenBao service. This key has access to ALL secrets. **Treat this root key with care**
+
+We will initialize OpenBao with default options of5 key shares and 3 threshold. This means that we need 3 different unseal keys to unseal the OpenBao service.
+
 [source,bash]
 ----
-# Initialize with default settings (5 key shares, 3 threshold)
-bao operator init
-
-# Or with custom settings
 bao operator init -key-shares=5 -key-threshold=3 -format=json > /root/openbao-init.json
 ----
 
@@ -487,6 +527,8 @@ The output looks like:
 
 === Unseal OpenBao
 
+Now everything is set up and we can use the unseal keys to unseal the OpenBao service.
+
 You need to provide 3 (threshold) different unseal keys:
 
 [source,bash]
@@ -510,55 +552,127 @@ After providing enough keys:
 ----
 bao status
 
-# Expected output:
-# Key                     Value
-# ---                     -----
-# Seal Type               shamir
-# Initialized             true
-# Sealed                  false <1>
-# Total Shares            5
-# Threshold               3
-# Version                 2.x.x
-# Storage Type            raft
-# HA Enabled              true
+Key             Value
+---             -----
+Seal Type       shamir
+Initialized     true
+Sealed          false <1>
+Total Shares    5
+Threshold       3
+Version         2.4.4-1.el9
+Build Date      2025-11-24
+Storage Type    file
+Cluster Name    openbao-standalone
+Cluster ID      d07874ef-df52-e45f-1723-ade333c6d609
+HA Enabled      false
 ----
 <1> Now unsealed and ready
 
+Now we can login with the root token to the OpenBao service.
+
 === Login with Root Token
+
+Since we have not created any users yet, we will use the root token to authenticate.
 
 [source,bash]
 ----
-bao login
-
 # Enter the root token from initialization
+bao login
 ----
 
 == Basic Verification
 
 Let us verify the installation works:
 
+. List enabled secrets engines
++
 [source,bash]
 ----
-# Check server status
-bao status
-
-# List enabled secrets engines
 bao secrets list
+----
++
+This lists the enabled secrets engines.
++
+[source,bash]
+----
+Path          Type         Accessor              Description
+----          ----         --------              -----------
+cubbyhole/    cubbyhole    cubbyhole_84c3d2a5    per-token private secret storage
+identity/     identity     identity_61809171     identity store
+sys/          system       system_034ae772       system endpoints used for control, policy and debugging
+----
 
-# List enabled auth methods
+. List enabled auth methods
++
+[source,bash]
+----
 bao auth list
+----
++
+This lists the enabled authentication methods.
++
+[source,bash]
+----
+Path      Type     Accessor               Description                Version
+----      ----     --------               -----------                -------
+token/    token    auth_token_c7feca17    token based credentials    n/a
+----
 
-# Write a test secret
+. Create a test secret
++
+[source,bash]
+----
 bao secrets enable -path=secret kv-v2
+----
++
+This enables the KV (key/value)secrets engine at the path `secret`.
++
+[source,bash]
+----
 bao kv put secret/test message="Hello from OpenBao"
-
-# Read the secret
+----
++
+This creates a test secret at the path `secret/test`.
++
+[source,bash]
+----
 bao kv get secret/test
 ----
++
+This retrieves the test secret from the path `secret/test`.
+
+Thats it for the basic verification. You can now start to use OpenBao in your production environment. Let's see what we can do in the UI.
+
+== Visiting the UI
+
+If you watached the previous commands closely you will have noticed that the UI has been enabled in the configuration file: 
+
+[source,ini]
+----
+# UI enabled
+ui = true
+----
+
+The UI is accessible at http://openbao.example.com:8200. You can login with the root token from the initialization.
+
+.OpenBao Login Form
+image::part2_openbao_login_form.png?width=480px[OpenBao Login Form]
+
+Here you will see several options to explore. For now we are interested in the Secrets Engine section.
+
+.OpenBao Secrets Engine
+image::part2_openbao_secrets_engine.png?width=480px[OpenBao Secrets Engine]
+
+We have created th path "secret" and inside a secret called "test". 
+Which we can retrieve now: 
+
+.OpenBao Secret Retrieval
+image::part2_test_secret_retrieval.png?width=480px[OpenBao Secret Retrieval]
+
 
 == Security Hardening Checklist
 
-Before using OpenBao in production:
+Before using OpenBao in production you should always consider the following checklist:
 
 [cols="1,3"]
 |===
@@ -568,7 +682,7 @@ Before using OpenBao in production:
 |Always enable TLS with valid certificates
 
 |Root Token
-|Revoke root token after initial setup, create admin users
+|Revoke root token after initial setup and create admin users instead
 
 |Unseal Keys
 |Distribute to different people/locations, consider auto-unseal
@@ -585,61 +699,6 @@ Before using OpenBao in production:
 |Updates
 |Keep OpenBao updated
 |===
-
-=== Enable Audit Logging
-
-[source,bash]
-----
-# Enable file audit device
-bao audit enable file file_path=/var/log/openbao/audit.log
-----
-
-=== Revoke Root Token (After Creating Admin Users)
-
-[source,bash]
-----
-# First, create admin policies and users (covered in Part 5)
-# Then revoke the root token
-bao token revoke <root-token>
-----
-
-== Troubleshooting Common Issues
-
-=== OpenBao Won't Start
-
-Check logs:
-[source,bash]
-----
-sudo journalctl -u openbao -n 50
-----
-
-Common causes:
-* Configuration syntax errors
-* Permission issues on directories
-* Port already in use
-* TLS certificate problems
-
-=== Cannot Connect
-
-[source,bash]
-----
-# Check if OpenBao is listening
-ss -tlnp | grep 8200
-
-# Test connectivity
-curl -k https://localhost:8200/v1/sys/health
-----
-
-=== Seal Issues After Restart
-
-If OpenBao seals after restart (normal behavior):
-[source,bash]
-----
-# Unseal again with threshold keys
-bao operator unseal
-----
-
-Consider implementing auto-unseal (covered in Part 8).
 
 == What is Coming Next?
 
