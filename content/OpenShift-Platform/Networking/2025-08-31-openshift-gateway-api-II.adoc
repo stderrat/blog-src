@@ -47,6 +47,13 @@ objects.
 
 <!--more-->
 
+WARNING: b2cc commented that deploying the gateway in the
+_openshift-ingress_ namespace, as we did below, is not support by
+Red Hat. We are not aware this is documented somewhere (please let use
+now if it is). Only after opening a support ticket he learning that
+this not supported. We will keep the examples below as they are, so
+be careful and this may eat your cat.
+
 == References
 
 . link:/openshift/2025/08/gateway-api/[A first look into the Kubernetes Gateway API on OpenShift]
