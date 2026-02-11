@@ -84,18 +84,21 @@ WARNING: If you get the error "Repositories disabled by configuration." you need
 ==== RHEL
 
 . Enable Code Ready Repository
++
 [source,bash]
 ----
 sudo subscription-manager repos --enable codeready-builder-for-rhel-9-$(arch)-rpms
 ----
 
 . Install EPEL Repository
++
 [source,bash]
 ----
 sudo dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
 ----
 
-. Install OpenBai
+. Install OpenBao
++
 [source,bash]
 ----
 sudo dnf install -y openbao
@@ -104,18 +107,21 @@ sudo dnf install -y openbao
 ==== CentOS
 
 . Enable Code Ready Repository on CentOS
++
 [source,bash]
 ----
 sudo dnf config-manager --set-enabled crb
 ----
 
 . Install EPEL Repository
++
 [source,bash]
 ----
 sudo dnf install epel-release epel-next-release
 ----
 
-. Install OpenBai
+. Install OpenBao
++
 [source,bash]
 ----
 sudo dnf install -y openbao
@@ -123,9 +129,10 @@ sudo dnf install -y openbao
 
 === macOS (Homebrew)
 
+. Install OpenBao
++
 [source,bash]
 ----
-# Install OpenBao
 brew install openbao
 ----
 
@@ -278,38 +285,11 @@ However, OpenBao documented what must be done for various operating systems at h
 
 For a proper standalone installation, follow these steps:
 
-=== Step 1: Create System User
+=== Step 1: Create Configuration File
 
-[source,bash]
-----
-# Create a dedicated user
-sudo useradd --system --home /etc/openbao --shell /bin/false openbao
-----
+Create `/etc/openbao.d/openbao.hcl`:
 
-=== Step 2: Create Directory Structure
-
-[source,bash]
-----
-# Create directories
-sudo mkdir -p /etc/openbao
-sudo mkdir -p /var/lib/openbao/data
-sudo mkdir -p /var/log/openbao
-
-# Set ownership
-sudo chown -R openbao:openbao /etc/openbao
-sudo chown -R openbao:openbao /var/lib/openbao
-sudo chown -R openbao:openbao /var/log/openbao
-
-# Set permissions
-sudo chmod 750 /etc/openbao
-sudo chmod 750 /var/lib/openbao
-----
-
-=== Step 3: Create Configuration File
-
-Create `/etc/openbao/config.hcl`:
-
-[source,hcl]
+[source,ini]
 ----
 # Full configuration for standalone OpenBao server
 
@@ -354,35 +334,35 @@ telemetry {
 }
 ----
 
-=== Step 4: Generate TLS Certificates
+=== Step 2: Generate TLS Certificates
 
 For production, you should use proper certificates. For testing, create self-signed ones:
 
 [source,bash]
 ----
-# Create TLS directory
-sudo mkdir -p /etc/openbao/tls
+# Create TLS directory if it does not exist
+sudo mkdir -p /etc/openbao.d/tls
 
 # Generate private key
-sudo openssl genrsa -out /etc/openbao/tls/server.key 4096
+sudo openssl genrsa -out /etc/openbao.d/tls/tls.key 4096
 
 # Generate certificate signing request
-sudo openssl req -new -key /etc/openbao/tls/server.key \
-  -out /etc/openbao/tls/server.csr \
+sudo openssl req -new -key /etc/openbao.d/tls/tls.key \
+  -out /etc/openbao.d/tls/tls.csr \
   -subj "/CN=openbao.example.com"
 
 # Generate self-signed certificate
 sudo openssl x509 -req -days 365 \
-  -in /etc/openbao/tls/server.csr \
-  -signkey /etc/openbao/tls/server.key \
-  -out /etc/openbao/tls/server.crt
+  -in /etc/openbao.d/tls/tls.csr \
+  -signkey /etc/openbao.d/tls/tls.key \
+  -out /etc/openbao.d/tls/tls.crt
 
 # Set permissions
 sudo chown -R openbao:openbao /etc/openbao/tls
-sudo chmod 600 /etc/openbao/tls/server.key
+sudo chmod 600 /etc/openbao.d/tls/tls.key
 ----
 
-=== Step 5: Create Systemd Service
+=== Step 3: Create Systemd Service
 
 Create `/etc/systemd/system/openbao.service`:
 
@@ -393,7 +373,7 @@ Description=OpenBao Secret Management
 Documentation=https://openbao.org/docs
 Requires=network-online.target
 After=network-online.target
-ConditionFileNotEmpty=/etc/openbao/config.hcl
+ConditionFileNotEmpty=/etc/openbao.d/openbao.hcl
 
 [Service]
 User=openbao
@@ -406,7 +386,7 @@ SecureBits=keep-caps
 AmbientCapabilities=CAP_IPC_LOCK
 CapabilityBoundingSet=CAP_SYSLOG CAP_IPC_LOCK
 NoNewPrivileges=yes
-ExecStart=/usr/local/bin/bao server -config=/etc/openbao/config.hcl
+ExecStart=/usr/bin/bao server -config=/etc/openbao.d/openbao.hcl
 ExecReload=/bin/kill --signal HUP $MAINPID
 KillMode=process
 KillSignal=SIGINT
@@ -420,7 +400,7 @@ LimitMEMLOCK=infinity
 WantedBy=multi-user.target
 ----
 
-=== Step 6: Start the Service
+=== Step 4: Start the Service
 
 [source,bash]
 ----
