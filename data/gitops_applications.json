@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-02-02",
+  "lastUpdated": "2026-02-13",
   "repository": "https://github.com/tjungbauer/openshift-clusterconfig-gitops",
   "categories": {
     "security": { "name": "Security & Compliance", "icon": "shield-alt", "color": "#dc3545" },
