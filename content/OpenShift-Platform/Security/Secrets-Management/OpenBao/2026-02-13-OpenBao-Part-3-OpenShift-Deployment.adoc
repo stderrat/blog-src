@@ -138,17 +138,13 @@ server:
   ha:
     enabled: true <2>
     replicas: 3 <3>
-    
-    route:
-      enabled: true <4>
-      host: openbao.apps.cluster.example.com <5>
 
     # Raft storage configuration
     raft:
-      enabled: true <6>
+      enabled: true <4>
       setNodeId: true
       
-      config: | <7>
+      config: | <5>
         ui = true
         
         listener "tcp" {
@@ -181,6 +177,12 @@ server:
           disable_hostname = true
         }
 
+  route:
+    enabled: true <6>
+    host: openbao.apps.cluster.example.com <7>
+    tls:
+      termination: edge
+
   # Resource requests and limits
   resources:
     requests:
@@ -209,10 +211,10 @@ ui: <10>
 <1> **OpenShift specific**: Activate OpenShift Mode: Critical setting, if you install on OpenShift. It adjusts the Helm chart to use Routes instead of Ingress and modifies RoleBindings to work with OpenShift's stricter authentication.
 <2> High Availability (HA): Deploys OpenBao as a StatefulSet rather than a Deployment.
 <3> Raft Consensus Quorum: Sets the cluster size to 3. Raft requires an **odd number of nodes** to handle leader elections and avoid split-brain scenarios. This cluster can survive the loss of 1 node.
-<4> **OpenShift specific**: Route: Tells Helm to create an OpenShift Route object automatically.
-<5> **OpenShift specific**: Host: The external DNS address where users and applications will access the OpenBao API and UI.
-<6> Integrated Raft Storage: Enables the internal Raft storage backend, removing the need for external dependencies like Consul or Etcd.
-<7> Server Configuration (HCL): The actual OpenBao server configuration file. Note that **tls_disable = 1** is used because the OpenShift Route handles TLS termination at the edge, passing unencrypted traffic to the pod.
+<4> Integrated Raft Storage: Enables the internal Raft storage backend, removing the need for external dependencies like Consul or Etcd.
+<5> Server Configuration (HCL): The actual OpenBao server configuration file. Note that **tls_disable = 1** is used because the OpenShift Route handles TLS termination at the edge, passing unencrypted traffic to the pod.
+<6> **OpenShift specific**: Route: Tells Helm to create an OpenShift Route object automatically.
+<7> **OpenShift specific**: Host: The external DNS address where users and applications will access the OpenBao API and UI.
 <8> Persistent Storage: Allocates a 10Gi Persistent Volume Claim (PVC) for each of the 3 pods to store encrypted data and Raft logs.
 <9> Injector Redundancy: Runs 2 replicas of the sidecar injector. If the injector service is down, new application pods attempting to start with secrets will fail.
 <10> Web UI: Enables the graphical dashboard service.
