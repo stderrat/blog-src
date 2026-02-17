@@ -1,12 +1,12 @@
 --- 
-title: "The Guide to OpenBao - GitOps Deployment with Argo CD - Part 4"
+title: "The Guide to OpenBao - GitOps Deployment with Argo CD - Part 5"
 description: "Deploying and managing OpenBao using GitOps principles with Argo CD for declarative, version-controlled secret management infrastructure"
-date: "2026-02-14"
+date: "2026-04-15"
 doctype: book
-weight: 97
+weight: 96
 
 series: "The Guide to OpenBao"
-series_part: 4
+series_part: 5
 
 featured_image: /openshift-platform/security/secrets-management/openbao/images/Logo_OpenBao.png
 show_featured_image_summary: true
@@ -25,7 +25,7 @@ categories:
 tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "GitOps", "Argo CD"] 
 
 aliases: [ 
-	 "/openshift/security/openbao/2026-02-11-openbao-gitops-deployment/",
+	 "/openshift/security/openbao/2026-02-15-openbao-gitops-deployment/",
 ]
 ---
 
@@ -468,7 +468,7 @@ spec:
 
 === Approach 4: Auto-Unseal with KMS (Recommended for Production)
 
-Configure auto-unseal to eliminate manual unsealing. This is covered in detail in Part 8.
+Configure auto-unseal to eliminate manual unsealing. This is covered in detail in Part 9.
 
 [source,yaml]
 ----
@@ -643,7 +643,7 @@ spec:
 
 == What is Coming Next?
 
-In Part 5, we will configure authentication methods for OpenBao:
+In Part 6, we will configure authentication methods for OpenBao:
 
 * Kubernetes authentication for pods
 * OIDC for user access
@@ -659,7 +659,7 @@ Key takeaways:
 * Pin Helm chart versions for reproducibility
 * Use sync waves for proper deployment order
 * Handle initialization with Jobs or manual processes
-* Consider auto-unseal for production (Part 8)
+* Consider auto-unseal for production (Part 9)
 * Store init data securely outside of Git
 
 == Resources

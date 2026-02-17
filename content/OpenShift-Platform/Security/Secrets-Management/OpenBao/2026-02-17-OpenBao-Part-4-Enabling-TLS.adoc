@@ -1,0 +1,651 @@
+--- 
+title: "The Guide to OpenBao - Enabling TLS on OpenShift - Part 4"
+description: "Enable TLS for OpenBao and the Agent Injector on OpenShift using cert-manager for encryption in transit and production-ready secret management"
+date: "2026-02-17"
+doctype: book
+weight: 97
+
+series: "The Guide to OpenBao"
+series_part: 4
+
+featured_image: /openshift-platform/security/secrets-management/openbao/images/logos/part4_openbao_logo.png
+show_featured_image_summary: true
+show_featured_image_article: true
+disableBreadcrumb: true
+
+authors: [Thomas Jungbauer]
+type: post
+draft: false
+categories:
+   - OpenShift
+   - Security
+   - Secret Management
+
+tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "TLS", "cert-manager"] 
+
+aliases: [ 
+	 "/openshift/security/openbao/2026-02-14-openbao-enabling-tls/",
+]
+---
+
+:imagesdir: /openshift-platform/security/secrets-management/openbao/images/
+:icons: font
+:toc:
+
+In link:/openshift-platform/security/secrets-management/openbao/2026-02-13-openbao-part-3-openshift-deployment/[Part 3] we deployed OpenBao on OpenShift in HA mode with TLS disabled: the OpenShift Route terminates TLS at the edge, and traffic from the Route to the pods is plain HTTP. While this is ok for quick tests, for a production-ready deployment, you should consider TLS for the entire journey. This article explains why and how to enable TLS end-to-end using the cert-manager operator, what to consider, and the exact steps to achieve it.
+
+<!--more--> 
+
+== Introduction
+
+Part 3 uses `tls_disable = 1` in the OpenBao listener and relies on the OpenShift Route for TLS. That gives encryption between the client and the Route, but **not** between the Route and the OpenBao pods or between pods (e.g. Raft). Enabling TLS on OpenBao itself adds encryption in transit everywhere and aligns with defense-in-depth and compliance requirements. After all, we are talking about a secrets management system here and should not compromise security.
+
+
+This part assumes:
+
+* OpenBao is already deployed as in link:/openshift-platform/security/secrets-management/openbao/2026-02-13-openbao-part-3-openshift-deployment/[Part 3] (HA with Raft, Agent Injector enabled).
+* The **cert-manager operator** is installed and configured on your OpenShift cluster.
+
+NOTE: The article link:https://your-blog/openshift-platform/security/certificates/ssl-certificate-management/[SSL Certificate Management for OpenShift] describes the setup and usage of the cert-manager operator as an example.
+
+== Why Enable TLS?
+
+Enabling TLS for OpenBao makes sense for several reasons:
+
+* **Encryption in transit**: Traffic between the Route and the pods, and between OpenBao peers (Raft), is encrypted. Secrets and tokens are never sent in plain text on the cluster network.
+* **Defense in depth**: Even if the Route or network is misconfigured, backend traffic remains protected.
+* **Compliance**: Many standards (e.g. PCI-DSS, SOC 2) require encryption in transit for sensitive data; TLS to the application (OpenBao) helps satisfy this.
+* **Agent Injector**: The injector webhook is called by the Kubernetes API server. Using TLS for the webhook (with a valid certificate) is required for production and when running multiple replicas.
+* **Consistency**: Using HTTPS everywhere simplifies client configuration and avoids mixing HTTP/HTTPS in the same environment.
+
+== What Must Be Considered?
+
+* **Two TLS contexts**: Each needs its own certificate and configuration.
+  . OpenBao server (API and Raft)
+  . Agent Injector (mutating webhook)
+
+* **Certificate SANs**: Server certificates must include **all names** used to reach OpenBao: Route host, internal service names (e.g. openbao.openbao.svc, openbao-0.openbao-internal.openbao.svc), 127.0.0.1 and ::1 for in-pod traffic, and any external DNS you use. The injector certificate must match the injector Service DNS name (e.g. openbao-agent-injector-svc.openbao.svc).
+
+* **cert-manager**: Using cert-manager gives automatic issuance and renewal. You need a ClusterIssuer (or an Issuer) in the OpenBao namespace.
+
+NOTE: In this example, we will use a self-signed CA for the OpenBao server and the Agent Injector. In a production environment, you should use a trusted CA.
+
+* **OpenShift Route**: With backend TLS enabled, you can keep the Route in reencrypt mode: the Route terminates TLS from the client and opens a new TLS connection to the pod. Alternatively, use passthrough if you want end-to-end TLS without re-encryption at the Route.
+
+* **Raft join**: After switching to TLS, retry_join and cluster addresses must use https:// and the correct hostnames. Existing unseal keys and root token are unchanged; only the transport is different.
+
+* **Clients**: CLI and applications must use https:// for BAO_ADDR and, if you use a private CA, BAO_CACERT (or the system trust store) so that the client trusts the server certificate.
+
+
+== Prerequisites
+
+* OpenBao HA deployment from link:/openshift-platform/security/secrets-management/openbao/2026-02-13-openbao-part-3-openshift-deployment/[Part 3] (namespace `openbao`, Helm release `openbao`).
+* cert-manager operator installed on OpenShift.
+* Sufficient rights to create Issuers, Certificates, and Secrets in the `openbao` namespace.
+
+
+== Overview of Steps
+
+. Create a **Certificate Authority (CA)** in the `openbao` namespace (or use an existing ClusterIssuer).
+. Issue a **Certificate for the OpenBao server** (API + Raft) and store it in a Secret.
+. Issue a **Certificate for the Agent Injector** and reference it in the Helm values.
+. Update **Helm values** to mount the server cert and CA, and configure the listener and Raft for TLS.
+. **Upgrade** the Helm release; initialize and unseal openbao-0 (new cluster) or re-unseal (existing).
+. **Verify** access via HTTPS and configure clients (`BAO_ADDR`, `BAO_CACERT`).
+
+
+== Step 1: Certificate Authority (CA) for OpenBao
+
+If you already have a ClusterIssuer (e.g. Let’s Encrypt or an enterprise CA), you can use it for the server and injector certificates and skip this step. For a self-signed CA in the OpenBao namespace (typical for internal cluster TLS), create the following.
+
+WARNING: This self-signed CA is only for testing purposes. In a production environment, you should use a trusted CA, preferably your own.
+
+. Create a self-signed CA Issuer in the openbao namespace:
++
+NOTE: You might have your own CA or a ClusterIssuer already. You can use them, instead of creating a new one.
++
+[source,yaml]
+----
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: openbao-selfsigned
+  namespace: openbao <1>
+spec:
+  selfSigned: {} <2>
+----
+<1> The namespace where the OpenBao deployment is running.
+<2> The self-signed CA Issuer.
+
+. Create a self-signed CA Certificate in the openbao namespace:
++
+This will now actually request the CA certificate from the self-signed CA Issuer. This process is fully automated by cert-manager because everything is self-signed. The requested certificate will be stored in the secret openbao-ca-secret and is available immediately.
++
+[source,yaml]
+----
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: openbao-ca
+  namespace: openbao <1>
+spec:
+  isCA: true <2>
+  commonName: OpenBao CA
+  secretName: openbao-ca-secret <3>
+  duration: 87660h <4>
+  privateKey: <5>
+    algorithm: ECDSA
+    size: 256 <6>
+    rotationPolicy: Always <6>
+  issuerRef:
+    name: openbao-selfsigned <7>
+    kind: Issuer <8>
+    group: cert-manager.io
+----
+<1> The namespace where the OpenBao deployment is running.
+<2> The certificate is a CA certificate.
+<3> The name of the secret where the certificate and key will be stored.
+<4> The duration of the certificate. In this case 10 years.
+<5> The private key algorithm and size.
+<6> The rotation policy of the private key.
+<7> The issuer of the certificate.
+<8> The kind of the issuer. Can be Issuer or ClusterIssuer.
+
+
+== Step 2: Create an Issuer for the OpenBao Server and Agent Injector
+
+Create an Issuer for the OpenBao Server and Agent Injector. This Issuer will reference the CA certificate and key stored in the secret openbao-ca-secret.
+
+[source,yaml]
+----
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: openbao-ca-issuer
+  namespace: openbao
+spec:
+  ca:
+    secretName: openbao-ca-secret 
+----
+
+The name of the secret where the CA certificate and key are stored.
+
+== Step 3: Certificate for the OpenBao Server
+
+Now it is time to create the certificate for the OpenBao server. The server certificate must include **every hostname** used to reach OpenBao: the Route host, the headless service, and each Raft member. Adjust the dnsNames and optional uris to match your cluster and Route.
+
+Create the following Certificate object:
+
+[source,yaml]
+----
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: openbao-server-tls
+  namespace: openbao
+spec:
+  secretName: openbao-server-tls <1>
+  duration: 8760h <2>
+  renewBefore: 720h  <3>
+  commonName: openbao.openbao.svc <4>
+  dnsNames:
+    - openbao.apps.cluster.example.com # Route host (adjust to your domain) <5>
+    - openbao <6>
+    - openbao.openbao
+    - openbao.openbao.svc
+    - openbao.openbao.svc.cluster.local
+    - openbao-internal
+    - openbao-internal.openbao
+    - openbao-internal.openbao.svc
+    - openbao-internal.openbao.svc.cluster.local
+    - openbao-0.openbao-internal
+    - openbao-0.openbao-internal.openbao
+    - openbao-0.openbao-internal.openbao.svc
+    - openbao-0.openbao-internal.openbao.svc.cluster.local
+    - openbao-1.openbao-internal
+    - openbao-1.openbao-internal.openbao
+    - openbao-1.openbao-internal.openbao.svc
+    - openbao-2.openbao-internal
+    - openbao-2.openbao-internal.openbao
+    - openbao-2.openbao-internal.openbao.svc
+  ipAddresses: <7>
+    - 127.0.0.1
+    - "::1"
+  issuerRef:
+    name: openbao-ca-issuer <8>
+    kind: Issuer
+    group: cert-manager.io
+----
+<1> The name of the secret where the certificate and key will be stored.
+<2> The duration of the certificate. In this case 1 year.
+<3> The duration before the certificate is renewed. In this case 30 days.
+<4> The common name of the certificate. This is the service name of the OpenBao server.
+<5> The Route host. Adjust to your domain.
+<6> The headless service names, all should be included.
+<7> Required for in-pod traffic: Readiness/liveness probes and local bao commands (e.g. raft join, operator unseal) connect to 127.0.0.1:8200. Without these IP SANs you get "tls: bad certificate" or "x509: cannot validate certificate for 127.0.0.1 because it doesn’t contain any IP SANs".
+<8> The issuer of the certificate, this time openbao-ca-issuer.
+
+After a few moments the certificate will be ready and the secret will be created. The cert-manager will store the signed certificate and key in the Secret openbao-server-tls with keys tls.crt and tls.key. The Helm chart can mount this secret for the OpenBao listener.
+
+== Step 4: Certificate for the Agent Injector
+
+The Agent Injector runs as a webhook; the Kubernetes API server calls it over TLS. The certificate must match the Service DNS name of the injector. Create a Certificate that references the same CA Issuer. In this example we use a short-lived certificate valid for 24 hours, renewed when 10% of the validity period remains.
+
+Save as openbao-injector-cert.yaml:
+
+[source,yaml]
+----
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: injector-certificate
+  namespace: openbao
+spec:
+  secretName: injector-tls <1>
+  duration: 24h <2>
+  renewBefore: 144m
+  commonName: Agent Inject Cert <3>
+  dnsNames:
+    - openbao-agent-injector-svc <4>
+    - openbao-agent-injector-svc.openbao
+    - openbao-agent-injector-svc.openbao.svc
+    - openbao-agent-injector-svc.openbao.svc.cluster.local
+  issuerRef:
+    name: openbao-ca-issuer
+    kind: Issuer
+    group: cert-manager.io
+----
+<1> The name of the secret where the certificate and key will be stored.
+<2> The duration of the certificate. In this case 24 hours. (renewal is done 10% before expiry)
+<3> The injector service name.
+<4> The injector service name is defined by the Helm chart. If you override the injector service name, adjust dnsNames accordingly.
+
+== Step 5: Helm Values for Server TLS
+
+With all the certificates created, we can update the Helm values so that OpenBao uses the server certificate and listens with TLS. You need to:
+
+* Mount the Secret openbao-server-tls into the OpenBao pods.
+
+* Set the listener to use tls_cert_file and tls_key_file and disable tls_disable.
+
+* Switch Raft retry_join and cluster addresses to https://.
+
+* Add the environment variable BAO_CACERT to the OpenBao pods.
+
+Before we start, we need to export the CA certificate from the secret openbao-ca-secret and save its value:
+
+[source,bash]
+----
+oc get secret openbao-ca-secret -n openbao -o jsonpath='{.data.ca\.crt}' | base64 -d
+----
+
+This will return the certificate like this:
+
+[source,bash]
+----
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+----
+
+Save this, you will need it in the next step.
+
+Now we need to create the Helm values file. This time we will enable TLS. Refer to Part 3 of this series to see what the initial values file looks like.
+
+Create or update openbao-ha-values-tls.yaml (building on your Part 3 values):
+
+[source,yaml]
+----
+global:
+  # Enable OpenShift-specific settings
+  openshift: true
+
+  # Required when TLS is enabled: tells the chart to use HTTPS for readiness/liveness
+  # probes and for in-pod API_ADDR (127.0.0.1:8200). Otherwise you get "client sent
+  # an HTTP request to an HTTPS server" from the probes.
+  tlsDisable: false <1>
+
+server:
+  extraEnvironmentVars:
+    BAO_CACERT: /openbao/tls/openbao-server-tls/ca.crt <2>
+
+  # High Availability configuration
+  ha:
+    enabled: true
+    replicas: 3
+
+    # Raft storage configuration
+    raft:
+      enabled: true
+      setNodeId: true
+
+      config: |
+        ui = true
+
+        listener "tcp" {
+          tls_disable = 0 <3>
+          address = "[::]:8200"
+          cluster_address = "[::]:8201"
+          tls_cert_file = "/openbao/tls/openbao-server-tls/tls.crt" <4>
+          tls_key_file  = "/openbao/tls/openbao-server-tls/tls.key" <5>
+          tls_min_version = "tls12" <6>
+          telemetry {
+            unauthenticated_metrics_access = "true"
+          }
+        }
+
+        storage "raft" {
+          path = "/openbao/data"
+
+          retry_join {
+            leader_api_addr = "https://openbao-0.openbao-internal:8200" <7>
+            leader_tls_servername = "openbao-0.openbao-internal"
+            leader_ca_cert_file = "/openbao/tls/openbao-server-tls/ca.crt" <8>
+          }
+          retry_join {
+            leader_api_addr = "https://openbao-1.openbao-internal:8200"
+            leader_tls_servername = "openbao-1.openbao-internal"
+            leader_ca_cert_file = "/openbao/tls/openbao-server-tls/ca.crt"
+          }
+          retry_join {
+            leader_api_addr = "https://openbao-2.openbao-internal:8200"
+            leader_tls_servername = "openbao-2.openbao-internal"
+            leader_ca_cert_file = "/openbao/tls/openbao-server-tls/ca.crt"
+          }
+        }
+
+        service_registration "kubernetes" {}
+
+        telemetry {
+          prometheus_retention_time = "30s"
+          disable_hostname = true
+        }
+
+  route:
+    enabled: true
+    host: openbao.apps.cluster.example.com
+    tls: <9>
+      # Route terminates client TLS; backend can use reencrypt or passthrough
+      termination: reencrypt
+      insecureEdgeTerminationPolicy: Redirect
+      destinationCACertificate: | <10>
+        -----BEGIN CERTIFICATE-----
+        # CA Certificate
+        -----END CERTIFICATE-----
+
+  extraVolumes: <11>
+    - type: secret
+      name: openbao-server-tls
+      path: /openbao/tls
+      readOnly: true
+
+  extraVolumeMounts: <12>
+    - name: openbao-server-tls
+      mountPath: /openbao/tls
+      readOnly: true
+
+  # Resource requests and limits
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 250m
+    limits:
+      memory: 1Gi
+      cpu: 1000m
+
+  # Persistent volume for data
+  dataStorage:
+    enabled: true
+    size: 10Gi
+    # storageClass: "gp3-csi"
+
+# Injector configuration
+injector:
+  enabled: true
+  replicas: 2  # HA for the injector too
+  certs: <13>
+    secretName: injector-tls
+    # For a private CA: set caBundle to the CA cert (PEM) so the Kubernetes API server trusts the injector webhook. E.g. oc get secret openbao-ca-secret -n openbao -o jsonpath='{.data.ca\.crt}' | base64 -d
+    caBundle:  "BASE64_ENCODED_CA_CERTIFICATE"
+    certName: tls.crt
+    keyName: tls.key
+
+# UI configuration
+ui:
+  enabled: true
+----
+<1> **global.tlsDisable**: Set to false when the server listener uses TLS. This makes the chart use HTTPS for readiness/liveness probes and for the in-pod API_ADDR env var. If you leave it true (default), probes and local clients will use HTTP and you will see "client sent an HTTP request to an HTTPS server".
+<2> The environment variable BAO_CACERT is set to the CA certificate file path. This is helpful to execute the boa command inside the container.
+<3> The listener tls_disable is set to 0 to enable TLS.
+<4> The listener tls_cert_file is set to the certificate file path.
+<5> The listener tls_key_file is set to the key file path.
+<6> The listener tls_min_version is set to tls12.
+<7> The leader API address is set to the HTTPS address.
+<8> The leader CA certificate file is set to the CA certificate file path.
+<9> The Route tls termination is set to reencrypt.
+<10> The destination CA certificate is set to the CA certificate. Be sure not to add any extra lines or spaces.
+<11> The extra volumes are mounted at the /openbao/tls path.
+<12> The extra volume mounts are mounted at the /openbao/tls path.
+<13> The injector certs are set to the injector TLS secret name. The caBundle must be provided in base64 format.
+
+NOTE: The secret key names must match what cert-manager writes: tls.crt and tls.key. The OpenBao Helm chart mounts each entry in extraVolumes at path + name (e.g. with path: /openbao/tls and name: openbao-server-tls the secret is mounted at /openbao/tls/openbao-server-tls/). The listener tls_cert_file and tls_key_file must use that full path.
+
+WARNING: Be sure to change the Route host in the Helm values to the one you are using. In addition, make sure that the CA certificate is added correctly to the Route. Do not add any extra lines or spaces and do not forget the | after destinationCACertificate: and the -----BEGIN CERTIFICATE----- and -----END CERTIFICATE----- lines.
+
+== Step 6: Upgrade the Helm Release
+
+Perform a Helm upgrade so the new volumes and configuration are applied. Pods will restart and pick up TLS; Raft will use HTTPS for join and replication.
+
+[source,bash]
+----
+helm upgrade openbao openbao/openbao \
+  --namespace openbao \
+  --values openbao-ha-values-tls.yaml
+----
+
+Watch the rollout. The first pod (openbao-0) will log "raft retry join initiated" and stay 0/1 Ready until it is initialized and unsealed (new cluster) or until it forms quorum (existing cluster).
+
+=== New cluster: initialize and unseal openbao-0
+
+openbao-0 will not become Ready until it is initialized and unsealed. Fetch the certificate, use port-forward and talk to OpenBao over HTTPS with the CA:
+
+[source,bash]
+----
+# 1. Save the CA cert (for BAO_CACERT)
+oc get secret openbao-ca-secret -n openbao -o jsonpath='{.data.ca\.crt}' | base64 -d > openbao-ca.crt
+
+# 2. Port-forward to openbao-0 (background)
+oc port-forward openbao-0 8200:8200 -n openbao &
+
+# 3. Use HTTPS and CA cert
+export BAO_ADDR='https://127.0.0.1:8200'
+export BAO_CACERT="$PWD/openbao-ca.crt"
+
+# 4. Check status, then initialize (only once) and unseal 3 times
+bao status
+bao operator init -key-shares=5 -key-threshold=3 -format=json > openbao-init.json
+bao operator unseal
+bao operator unseal
+bao operator unseal
+bao status
+----
+
+After unsealing, openbao-0 becomes leader and goes 1/1 Ready. Then start openbao-1 and openbao-2 and join or unseal them as in Part 3 (use https://).
+
+Perform the following steps for the other pods - join the raft cluster and unseal them (3 times):
+
+[source,bash]
+----
+oc exec -ti openbao-1 -- bao operator raft join https://openbao-0.openbao-internal:8200
+
+# 3 times with 3 different unseal keys
+oc exec -ti openbao-1 -- bao operator unseal
+Unseal Key (will be hidden):
+----
+
+Repeat the same steps for openbao-2.
+
+=== Existing cluster: re-unseal after restart
+
+The existing cluster is already initialized. Re-unseal the pods (and re-join the raft cluster if necessary).
+
+
+[source,bash]
+----
+oc get pods -n openbao -w
+oc exec -ti openbao-1 -- bao operator raft join https://openbao-0.openbao-internal:8200
+oc exec -ti openbao-1 -- bao operator unseal  # three times; same for openbao-2
+----
+
+Repeat the same steps for openbao-2.
+
+== Step 7: Verify and Use HTTPS from Clients
+
+Verify server health over HTTPS (from inside the cluster):
+
+[source,bash]
+----
+curl -k https://openbao.apps.cluster.example.com/v1/sys/health | jq
+----
+
+NOTE: Be sure to use the Route host in the Helm values.
+
+From your workstation, use the Route URL with HTTPS. If the Route host is signed by your internal CA, set BAO_CACERT to the CA file:
+
+[source,bash]
+----
+export BAO_ADDR='https://openbao.apps.cluster.example.com'
+export BAO_CACERT='/path/to/openbao-ca.crt'
+bao status
+----
+
+NOTE: Be sure to use the Route host in the Helm values.
+
+Agent Injector: New pods that use the injector should start without webhook certificate errors. Check injector logs if you see TLS or certificate errors:
+
+[source,bash]
+----
+oc logs -n openbao -l app.kubernetes.io/name=openbao-agent-injector -f
+----
+
+== Troubleshooting
+
+=== MutatingWebhookConfiguration conflict (vault-k8s)
+
+
+[source,bash]
+----
+conflict occurred while applying object ... MutatingWebhookConfiguration: Apply failed with 1 conflict: conflict with "vault-k8s" using ... .webhooks[name="vault.hashicorp.com"].clientConfig.caBundle
+this is a server-side apply (SSA) field ownership conflict. The OpenBao chart uses the same webhook name (vault.hashicorp.com) as the HashiCorp Vault agent injector for annotation compatibility. The clientConfig.caBundle field is still owned by a previous manager (e.g. a prior Vault Helm release or the Vault injector), so Helm cannot update it when you change the injector certificate.
+----
+
+**Fix option 1** – Delete the webhook and re-upgrade (recommended)
+
+Remove the MutatingWebhookConfiguration so Helm can recreate it and own all fields. There will be a short window where the injector webhook is missing (new pods requesting injection may fail until the upgrade completes).
+
+[source,bash]
+----
+# Replace RELEASE_NAME with your Helm release name (e.g. openbao)
+RELEASE_NAME=openbao
+oc delete mutatingwebhookconfiguration ${RELEASE_NAME}-agent-injector-cfg
+
+# Re-run the upgrade
+helm upgrade ${RELEASE_NAME} openbao/openbao \
+  --namespace openbao \
+  --values openbao-ha-values-tls.yaml
+----
+
+**Fix option 2** – Force takeover of the conflicting field
+
+If you cannot delete the webhook (e.g. in production), take over the caBundle field with server-side apply, then run the Helm upgrade again:
+
+Export the MutatingWebhookConfiguration, set webhooks[0].clientConfig.caBundle to your injector CA (base64 PEM from openbao-ca-secret), then re-apply with --server-side --force-conflicts:
+
+[source,bash]
+----
+# Get the current object and the new CA bundle
+oc get mutatingwebhookconfiguration openbao-agent-injector-cfg -o yaml > mwc.yaml
+CA_BUNDLE=$(oc get secret openbao-ca-secret -n openbao -o jsonpath='{.data.ca\.crt}')
+
+# Edit mwc.yaml: set .webhooks[0].clientConfig.caBundle to the value of CA_BUNDLE (no quotes in YAML).
+# Then apply with force-conflicts so Helm can later manage it:
+oc apply -f mwc.yaml --server-side --force-conflicts
+
+# Re-run the Helm upgrade
+helm upgrade openbao openbao/openbao --namespace openbao --values openbao-ha-values-tls.yaml
+----
+
+NOTE: If you still have HashiCorp Vault’s agent injector installed on the same cluster, ensure only one injector is active for a given namespace (e.g. use namespace selectors) or uninstall the Vault injector to avoid two webhooks with the same name in different resources.
+
+
+=== Route / UI – tls: bad record MAC
+
+Pod logs show `tls: bad record MAC` from the router IP. The Route is likely using **edge** termination (HTTP to pod). Fix: Use reencrypt and set `destinationCACertificate` (Step 5).
+
+[source,bash]
+----
+oc get route openbao -n openbao -o jsonpath='{.spec.tls.termination}'
+----
+
+If the OpenBao UI does not load and the pod logs show:
+
+[source,bash]
+----
+http: TLS handshake error from 10.x.x.x:xxxxx: local error: tls: bad record MAC
+----
+
+the traffic is coming from the OpenShift router (the IP is typically a cluster pod IP). 
+
+**Cause**: The Route is likely using edge termination: the router terminates TLS at the edge and sends plain HTTP to the pod. The pod expects HTTPS, so the TLS layer receives non-TLS data and reports "bad record MAC".
+
+**Fix**: Use reencrypt (or passthrough) and set destinationCACertificate so the router talks HTTPS to the pod. See Step 5 above. Quick check:
+
+[source,bash]
+----
+oc get route openbao -n openbao -o jsonpath='{.spec.tls.termination}'
+# Must be "reencrypt" or "passthrough", not "edge"
+----
+
+If the output is edge, patch the Route to reencrypt and set spec.tls.destinationCACertificate to the CA PEM (Step 5).
+
+
+
+=== TLS handshake / 127.0.0.1 certificate errors 
+If you see in the pod logs:
+
+[source,bash]
+----
+remote error: tls: bad certificate (from 127.0.0.1)
+----
+
+or when running:
+
+[source,bash]
+----
+oc exec -ti openbao-0 — bao operator raft join https://…​;: x509: cannot validate certificate for 127.0.0.1 because it doesn’t contain any IP SANs
+----
+
+The server certificate does not include 127.0.0.1 (and optionally ::1) as Subject Alternative Names. Readiness/liveness probes and in-pod bao commands connect to the listener on 127.0.0.1, so the certificate must include these IP SANs.
+
+**Fix**: Add ipAddresses to the OpenBao server Certificate and let cert-manager re-issue:
+
+[source,bash]
+----
+# Edit the Certificate (or re-apply the YAML from Step 3 with ipAddresses added)
+oc edit certificate openbao-server-tls -n openbao
+# Add under spec:
+#   ipAddresses:
+#     - 127.0.0.1
+#     - "::1"
+
+# cert-manager will issue a new cert; wait until the secret is updated
+oc get certificate openbao-server-tls -n openbao
+# Restart OpenBao pods so they load the new cert
+oc rollout restart statefulset/openbao -n openbao
+----
+
+== Resources
+
+* https://openbao.org/docs/platform/k8s/helm/configuration/[OpenBao Helm configuration^]
+* https://openbao.org/docs/platform/k8s/helm/examples/injector-tls-cert-manager/[OpenBao Agent Injector TLS with cert-manager^]
+* https://cert-manager.io/docs/[cert-manager documentation^]

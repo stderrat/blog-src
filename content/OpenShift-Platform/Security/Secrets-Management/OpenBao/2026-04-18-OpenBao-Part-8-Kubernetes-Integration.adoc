@@ -1,12 +1,12 @@
 --- 
-title: "The Guide to OpenBao - Kubernetes Integration - Part 7"
+title: "The Guide to OpenBao - Kubernetes Integration - Part 8"
 description: "Integrating OpenBao with Kubernetes workloads using Agent Injector, CSI Provider, and External Secrets Operator"
-date: "2026-02-18"
-doctype: book
-weight: 94
+date: "2026-04-18"
+doctype: book 
+weight: 93
 
 series: "The Guide to OpenBao"
-series_part: 7
+series_part: 8
 
 featured_image: /openshift-platform/security/secrets-management/openbao/images/Logo_OpenBao.png
 show_featured_image_summary: true
@@ -769,7 +769,7 @@ annotations:
 
 == What is Coming Next?
 
-In Part 8, we will cover high availability and production best practices:
+In Part 9, we will cover high availability and production best practices:
 
 * Auto-unseal configuration
 * Disaster recovery
