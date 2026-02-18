@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-02-02",
+  "lastUpdated": "2026-02-18",
   "repository": "https://github.com/tjungbauer/openshift-clusterconfig-gitops",
   "categories": {
     "security": { "name": "Security & Compliance", "icon": "shield-alt", "color": "#dc3545" },
@@ -24,6 +24,8 @@
     {"id": "install-cyclonedx", "name": "install-cyclonedx", "path": "clusters/management-cluster/install-cyclonedx", "description": "Install Cyclonedx to store SBOMs", "namespace": "default", "category": "platform", "icon": "list-check", "version": "1.0.0", "keywords": ["secure-supply-chain"], "helmDependencies": ["cyclonedx"]},
     {"id": "internal-registry", "name": "internal-registry", "path": "clusters/management-cluster/internal-registry", "description": "Configures the internal OpenShift registry", "namespace": "openshift-image-registry", "category": "storage", "icon": "cube", "version": "1.0.0", "keywords": []},
     {"id": "node-configuration", "name": "node-labels", "path": "clusters/management-cluster/node-configuration", "description": "Manage the labelling of the nodes using openshift-gitops 1.6+ and Server Side Apply", "namespace": "default", "category": "platform", "icon": "sliders-h", "version": "1.0.0", "keywords": []},
+    {"id": "openbao", "name": "openbao", "path": "clusters/management-cluster/openbao", "description": "Installing Openbao Secrets Management System", "namespace": "openbao", "category": "security", "icon": "shield-alt", "version": "1.0.0", "keywords": ["security"], "helmDependencies": ["cert-manager","openbao"]},
+    {"id": "openbao-ca-certificate", "name": "ca-certificate", "path": "clusters/management-cluster/openbao-ca-certificate", "description": "Request CA Certificate from cert-manager (used for Openbao)", "namespace": "default", "category": "security", "icon": "certificate", "version": "1.0.0", "keywords": ["security"], "helmDependencies": ["cert-manager"]},
     {"id": "setup-acm", "name": "setup-acm", "path": "clusters/management-cluster/setup-acm", "description": "Deploys Advanced Cluster Managment (ACM) on target cluster.", "namespace": "open-cluster-management", "category": "security", "icon": "project-diagram", "version": "1.0.4", "keywords": ["acs"], "helmDependencies": ["rhacm-setup"]},
     {"id": "setup-acs", "name": "setup-acs", "path": "clusters/management-cluster/setup-acs", "description": "Deploys Advanced Cluster Security (ACS) on target cluster. If enabled Central will be deployed too.", "namespace": "stackrox", "category": "security", "icon": "shield-virus", "version": "1.0.0", "keywords": ["security"], "helmDependencies": ["rhacs-setup"]},
     {"id": "setup-acs-backup", "name": "setup-acs-backup", "path": "clusters/management-cluster/setup-acs-backup", "description": "Deploys Backup for Advanced Cluster Security (ACS) on target cluster.", "namespace": "stackrox", "category": "security", "icon": "shield-virus", "version": "1.0.0", "keywords": ["security"], "helmDependencies": ["rhacs-backup"]},
