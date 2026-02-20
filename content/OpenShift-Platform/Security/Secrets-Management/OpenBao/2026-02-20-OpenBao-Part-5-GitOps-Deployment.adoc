@@ -1,0 +1,566 @@
+--- 
+title: "The Guide to OpenBao - GitOps Deployment with Argo CD - Part 5"
+description: "Deploying and managing OpenBao using GitOps principles with Argo CD for declarative, version-controlled secret management infrastructure"
+date: "2026-02-20"
+doctype: book
+weight: 96
+
+series: "The Guide to OpenBao"
+series_part: 5
+
+featured_image: /openshift-platform/security/secrets-management/openbao/images/logos/part5_openbao_logo.png
+show_featured_image_summary: true
+show_featured_image_article: true
+disableBreadcrumb: true
+
+authors: [Thomas Jungbauer]
+type: post
+draft: false
+categories:
+   - OpenShift
+   - Security
+   - Secret Management
+   - GitOps
+
+tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "GitOps", "Argo CD"] 
+
+aliases: [ 
+	 "/openshift/security/openbao/2026-02-15-openbao-gitops-deployment/",
+]
+---
+
+:imagesdir: /openshift-platform/security/secrets-management/openbao/images/
+:icons: font
+:toc:
+
+Following the GitOps mantra "If it is not in Git, it does not exist", this article demonstrates how to deploy and manage OpenBao using Argo CD. This approach provides version control, audit trails, and declarative management for your secret management infrastructure.
+
+<!--more--> 
+
+== Introduction
+
+Deploying OpenBao via GitOps offers significant advantages:
+
+* **Version Control**: All configuration changes are tracked in Git
+* **Audit Trail**: Who changed what, when, and why
+* **Declarative**: Desired state is defined, not imperative commands
+* **Reproducible**: Same deployment process across environments
+* **Self-healing**: Argo CD ensures actual state matches desired state
+
+However, there are challenges specific to secret management:
+
+* Initial unsealing requires manual intervention or automationxw
+* Root tokens and unseal keys must be handled carefully
+* Chicken-and-egg problem: How to store OpenBao secrets before OpenBao exists?
+
+NOTE: This article will focus on the deployment of the applicaiotns for the OpenBao deployment. The problem with the automatic unsealing will be addressed in the next article.
+
+== Prerequisites
+
+Before you begin, ensure you have:
+
+* OpenShift GitOps (Argo CD) installed and configured
+* A Git repository for your cluster configuration
+* Understanding of the App-of-Apps pattern (see link:/gitopscollection/2024-04-02-configure_app_of_apps/[Configure App-of-Apps])
+* The official OpenBao Helm chart from link:/openshift-platform/security/secrets-management/openbao/2026-02-13-openbao-part-3-openshift-deployment/[Part 3]
+
+== The (Wrapper) Helm Chart
+
+The official OpenBao Helm Chart works well for deploying OpenBao itself. However, additional settings such as certificates are not covered there. Therefore, I created a (wrapper) Helm Chart that includes the official OpenBao Helm Chart, a https://github.com/tjungbauer/helm-charts/tree/main/charts/cert-manager[Cert-Manager Helm Chart^] that I created a while ago, and allows you to add additional objects in the templates folder. 
+
+I will follow the same setup as discussed in link:/openshift-platform/security/secrets-management/openbao/2026-02-17-openbao-part-4-enabling-tls[Part 4]. This means:
+
+. Create Issuer for Cert-Manager
+. Create CA Certificate for OpenBao
+. Create Certificate for OpenBao Server
+. Create Certificate for OpenBao Agent Injector
+. Install OpenBao Helm Chart
+
+However, there is **one significant issue** with this approach: we need the certificate details (especially the CA certificate) before we can install the OpenBao Helm Chart, since the certificate must be referenced in the values file. This is a chicken-and-egg problem—particularly if you use self-signed CA certificates.
+
+Since you typically create the CA certificate first and only once (or have it already), a separate Application for the CA certificate is a good approach. Once this is synchronised, the OpenBao Application can be updated and deployed. 
+
+This means we will need two Helm Charts: one for the CA certificate and one for OpenBao itself.
+
+=== Helm Chart for the CA Certificate
+
+Create a new Helm Chart for the CA certificate. This will use the https://github.com/tjungbauer/helm-charts/tree/main/charts/cert-manager[Cert-Manager Helm Chart^] as a dependency and will create the:
+
+* Issuer for Cert-Manager
+* Request the CA certificate from the Issuer
+* Create the *openbao* namespace
+
+The example I am using can be found at https://github.com/tjungbauer/openshift-clusterconfig-gitops/tree/main/clusters/management-cluster/openbao-ca-certificate[GitOps openbao-ca-certificate^].
+
+NOTE: Please check the link:/gitopscollection/2023-12-28-gitops-repostructure/[GitOps Repository Structure^] and subsequent articles for more information on how to structure your Git repository.
+
+In the **Chart.yaml** file you can see two dependencies:
+
+[source,yaml]
+----
+dependencies:
+  - name: tpl
+    version: ~1.0.0
+    repository: https://charts.stderr.at/
+  - name: cert-manager
+    version: ~2.0.3 <1>
+    repository: https://charts.stderr.at/
+    condition: cert-manager.enabled
+----
+<1> The Cert-Manager Helm Chart version must be at least 2.0.3 to support the namespace parameter for the Issuer.
+
+The **tpl** dependency is a library that contains templates for the namespace and other shared components (I keep this library in my link:/helm-charts/[Helm Charts^] repository). The **cert-manager** dependency is the Cert-Manager Helm Chart.
+
+The **values.yaml** file below contains the configuration for the Cert-Manager:
+
+NOTE: All settings that are passed to a subchart (cert-manager) must be prefixed with the name of the subchart. In this case, `cert-manager.`.
+
+[source,yaml]
+----
+namespace:
+  create: true <1>
+  name: "openbao"
+  description: "OpenBao Namespace"
+  displayName: "OpenBao Namespace"
+  additionalLabels:
+    pod-security.kubernetes.io/audit: restricted	
+    pod-security.kubernetes.io/audit-version: latest	
+    pod-security.kubernetes.io/warn: restricted	
+    pod-security.kubernetes.io/warn-version: latest	
+
+cert-manager: <2>
+  enabled: true <3>
+
+  issuer:
+      # Name of issuer
+    - name: openbao-selfsigned <4>
+
+      # -- Syncwave to create this issuer
+      syncwave: 5 <5>
+
+      # -- Type can be either ClusterIssuer or Issuer
+      type: Issuer
+    
+      # -- Enable this issuer.
+      # @default -- false
+      enabled: true
+
+      # -- Namespace for Issuer (ignored for ClusterIssuer). Defaults to the default namespace when not set.
+      namespace: openbao <6>
+
+      # -- Create a selfSigned issuer. The SelfSigned issuer doesn't represent a certificate authority as such, but instead denotes that certificates will "sign themselves" using a given private key.
+      selfSigned: true <7>
+
+  certificates: <8>
+    enabled: true
+
+    # List of certificates
+    certificate:
+      - name: openbao-ca
+        enabled: true
+        namespace: openbao
+        syncwave: "10"
+        secretName: openbao-ca-secret
+
+        duration: 87660h
+
+        dnsNames:
+          - openbao-ca
+
+        privateKey:
+          algorithm: ECDSA
+          size: 256
+          rotationPolicy: Always
+
+        isCA: true
+
+        # Reference to the issuer that shall be used.
+        issuerRef:
+          name: openbao-selfsigned
+          kind: Issuer
+----
+<1> Create the *openbao* namespace with various settings.
+<2> Enable the Cert-Manager subchart. All settings below will be passed to the Cert-Manager subchart.
+<3> Enables Cert-Manager.
+<4> Name of the issuer.
+<5> Syncwave for this issuer; it must be lower than the syncwave of the certificate.
+<6> Namespace for the issuer; supported since version 2.0.3 of the Cert-Manager Helm Chart.
+<7> Creates a self-signed issuer.
+<8> The certificate section and all the settings. Verify the link:/openshift-platform/security/secrets-management/openbao/2026-02-17-openbao-part-4-enabling-tls/#_step_1_certificate_authority_ca_for_openbao[Part 4] for more information.
+
+NOTE: This chart creates the **openbao** namespace, which is required for the OpenBao deployment.
+
+=== Helm Chart for the OpenBao Deployment
+
+Create a new Helm Chart for the OpenBao deployment. This will use the official https://github.com/openbao/openbao-helm[OpenBao Helm chart^] and the https://github.com/tjungbauer/helm-charts/tree/main/charts/cert-manager[Cert-Manager Helm Chart^] as dependencies and will create the:
+
+* OpenBao deployment (including Route)
+* Issuer for the OpenBao server using the CA certificate
+* Required OpenBao certificates based on the CA certificate
+
+I have added the full values.yaml file below. Please check the https://github.com/tjungbauer/openshift-clusterconfig-gitops/blob/main/clusters/management-cluster/openbao/values.yaml[GitOps openbao/values.yaml^] to fetch the full chart.
+
+
+NOTE: Besides the two certificates added here in the values.yaml file, I made two further changes: fullnameOverride and nameOverride are both set to *openbao*. This is good practice for setting the name of the deployment when using Argo CD.
+
+CAUTION: This values file contains the CA certificate in plain text. Whether that is acceptable is debatable—it is a public certificate, and here it is self-signed and used only in my demo environment.
+
+[source,yaml]
+----
+# Full values.yaml file for the OpenBao deployment
+
+########################################################
+# Cert-Manager
+########################################################
+cert-manager:
+  enabled: true
+
+  issuer:
+      # Name of issuer
+    - name: openbao-ca-issuer <1>
+
+      # -- Syncwave to create this issuer
+      syncwave: '-1'
+
+      # -- Type can be either ClusterIssuer or Issuer
+      type: Issuer
+
+      # -- Enable this issuer.
+      # @default -- false
+      enabled: true
+
+      # -- Namespace for Issuer (ignored for ClusterIssuer). Defaults to the default namespace when not set.
+      namespace: openbao
+
+      ca:
+        secretName: openbao-ca-secret
+
+  certificates:
+    enabled: true
+
+    # List of certificates
+    certificate:
+      ########################################################
+      # OpenBao Server TLS Certificate
+      ########################################################
+      - name: openbao-server-tls <2>
+        enabled: true
+        namespace: openbao
+        syncwave: "0"
+        secretName: openbao-server-tls
+
+        duration: 8760h
+        renewBefore: 720h
+
+        dnsNames:
+          - openbao.openbao.svc
+          - openbao.apps.ocp.aws.ispworld.at # Route host (adjust to your domain)
+          - openbao
+          - openbao.openbao
+          - openbao.openbao.svc
+          - openbao.openbao.svc.cluster.local
+          - openbao-internal
+          - openbao-internal.openbao
+          - openbao-internal.openbao.svc
+          - openbao-internal.openbao.svc.cluster.local
+          - openbao-0.openbao-internal
+          - openbao-0.openbao-internal.openbao
+          - openbao-0.openbao-internal.openbao.svc
+          - openbao-0.openbao-internal.openbao.svc.cluster.local
+          - openbao-1.openbao-internal
+          - openbao-1.openbao-internal.openbao
+          - openbao-1.openbao-internal.openbao.svc
+          - openbao-2.openbao-internal
+          - openbao-2.openbao-internal.openbao
+          - openbao-2.openbao-internal.openbao.svc
+
+        ipAddresses:
+          - 127.0.0.1
+          - "::1"
+
+        # Reference to the issuer that shall be used.
+        issuerRef:
+          name: openbao-ca-issuer
+          kind: Issuer
+
+      ########################################################
+      # Injector TLS Certificate
+      ########################################################
+      - name: injector-certificate <3>
+        enabled: true
+        namespace: openbao
+        syncwave: "0"
+        secretName: injector-tls
+
+        duration: 24h
+        renewBefore: 144m
+
+        dnsNames:
+          - openbao-agent-injector-svc
+          - openbao-agent-injector-svc.openbao
+          - openbao-agent-injector-svc.openbao.svc
+          - openbao-agent-injector-svc.openbao.svc.cluster.local
+
+        # Reference to the issuer that shall be used.
+        issuerRef:
+          name: openbao-ca-issuer
+          kind: Issuer
+
+########################################################
+# OpenBao Deployment
+########################################################
+openbao: <4>
+  # Override the full name of the deployment via Argo CD
+  fullnameOverride: openbao
+  nameOverride: openbao
+
+  global:
+    # Enable OpenShift-specific settings
+    openshift: true
+
+    # -- The namespace to deploy to. Defaults to the `helm` installation namespace.
+    namespace: openbao
+
+    # Required when TLS is enabled: tells the chart to use HTTPS for readiness/liveness
+    # probes and for in-pod API_ADDR (127.0.0.1:8200). Otherwise you get "client sent
+    # an HTTP request to an HTTPS server" from the probes.
+    tlsDisable: false
+
+  server:
+    extraEnvironmentVars:
+      BAO_CACERT: /openbao/tls/openbao-server-tls/ca.crt
+
+    # High Availability configuration
+    ha:
+      enabled: true
+      replicas: 3
+
+      # Raft storage configuration
+      raft:
+        enabled: true
+        setNodeId: true
+
+        config: |
+          ui = true
+
+          listener "tcp" {
+            tls_disable = 0
+            address = "[::]:8200"
+            cluster_address = "[::]:8201"
+            tls_cert_file = "/openbao/tls/openbao-server-tls/tls.crt"
+            tls_key_file  = "/openbao/tls/openbao-server-tls/tls.key"
+            tls_min_version = "tls12"
+            telemetry {
+              unauthenticated_metrics_access = "true"
+            }
+          }
+
+          storage "raft" {
+            path = "/openbao/data"
+
+            retry_join {
+              leader_api_addr = "https://openbao-0.openbao-internal:8200"
+              leader_tls_servername = "openbao-0.openbao-internal"
+              leader_ca_cert_file = "/openbao/tls/openbao-server-tls/ca.crt"
+            }
+            retry_join {
+              leader_api_addr = "https://openbao-1.openbao-internal:8200"
+              leader_tls_servername = "openbao-1.openbao-internal"
+              leader_ca_cert_file = "/openbao/tls/openbao-server-tls/ca.crt"
+            }
+            retry_join {
+              leader_api_addr = "https://openbao-2.openbao-internal:8200"
+              leader_tls_servername = "openbao-2.openbao-internal"
+              leader_ca_cert_file = "/openbao/tls/openbao-server-tls/ca.crt"
+            }
+          }
+
+          service_registration "kubernetes" {}
+
+          telemetry {
+            prometheus_retention_time = "30s"
+            disable_hostname = true
+          }
+
+    route:
+      enabled: true
+      host: openbao.apps.ocp.aws.ispworld.at
+      tls:
+        # Route terminates client TLS; backend can use reencrypt or passthrough
+        termination: reencrypt
+        insecureEdgeTerminationPolicy: Redirect
+        destinationCACertificate: |
+          -----BEGIN CERTIFICATE-----
+          MIIBWzCCAQCgAwIBAgIQNdbg4KIu9oi6dDClE8drmjAKBggqhkjOPQQDAjAAMB4X
+          DTI2MDIxODA5NDIxNFoXDTM2MDIxODIxNDIxNFowADBZMBMGByqGSM49AgEGCCqG
+          SM49AwEHA0IABIeYw35/kEHvyctLtOA5xMlyQNxUtXtfBbZMUfPh6AN5MFjIGuNS
+          cn07a3EpSpfY6/3DaPpu+4wYNFlc+/qDNYajXDBaMA4GA1UdDwEB/wQEAwICpDAP
+          BgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBQgyRk5Vv9K0VULcCgga5mRg4O9kTAY
+          BgNVHREBAf8EDjAMggpvcGVuYmFvLWNhMAoGCCqGSM49BAMCA0kAMEYCIQCwQ7lZ
+          Q0jzUjJFzpTGkQjU2+OB159LIQMSbSQ7dz8nVQIhAIDa7f87tjQxDxbJio+/vJx2
+          awFaWnueGOOQpvwCcV/+
+          -----END CERTIFICATE-----
+
+    extraVolumes:
+      - type: secret
+        name: openbao-server-tls
+        path: /openbao/tls
+        readOnly: true
+
+    extraVolumeMounts:
+      - name: openbao-server-tls
+        mountPath: /openbao/tls
+        readOnly: true
+
+    # Resource requests and limits
+    resources:
+      requests:
+        memory: 256Mi
+        cpu: 250m
+      limits:
+        memory: 1Gi
+        cpu: 1000m
+
+    # Persistent volume for data
+    dataStorage:
+      enabled: true
+      size: 10Gi
+      # storageClass: "gp3-csi"
+
+  # Injector configuration
+  injector:
+    enabled: true
+    replicas: 2  # HA for the injector too
+    certs:
+      secretName: injector-tls
+      # For a private CA: set caBundle to the CA cert (PEM) so the Kubernetes API server trusts the injector webhook. E.g. oc get secret openbao-ca-secret -n openbao -o jsonpath='{.data.ca\.crt}' | base64 -d
+      caBundle:  "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUJXekNDQVFDZ0F3SUJBZ0lRTmRiZzRLSXU5b2k2ZERDbEU4ZHJtakFLQmdncWhrak9QUVFEQWpBQU1CNFgKRFRJMk1ESXhPREE1TkRJeE5Gb1hEVE0yTURJeE9ESXhOREl4TkZvd0FEQlpNQk1HQnlxR1NNNDlBZ0VHQ0NxRwpTTTQ5QXdFSEEwSUFCSWVZdzM1L2tFSHZ5Y3RMdE9BNXhNbHlRTnhVdFh0ZkJiWk1VZlBoNkFONU1GaklHdU5TCmNuMDdhM0VwU3BmWTYvM0RhUHB1KzR3WU5GbGMrL3FETllhalhEQmFNQTRHQTFVZER3RUIvd1FFQXdJQ3BEQVAKQmdOVkhSTUJBZjhFQlRBREFRSC9NQjBHQTFVZERnUVdCQlFneVJrNVZ2OUswVlVMY0NnZ2E1bVJnNE85a1RBWQpCZ05WSFJFQkFmOEVEakFNZ2dwdmNHVnVZbUZ2TFdOaE1Bb0dDQ3FHU000OUJBTUNBMGtBTUVZQ0lRQ3dRN2xaClEwanpVakpGenBUR2tRalUyK09CMTU5TElRTVNiU1E3ZHo4blZRSWhBSURhN2Y4N3RqUXhEeGJKaW8rL3ZKeDIKYXdGYVdudWVHT09RcHZ3Q2NWLysKLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo="
+      certName: tls.crt
+      keyName: tls.key
+
+  # UI configuration
+  ui:
+    enabled: true
+----
+<1> Issuer for OpenBao. The syncwave is set to '-1' to create the issuer before the certificate request and the OpenBao deployment.
+<2> Certificate for the OpenBao server, with all DNS names and IP addresses used to reach it. The syncwave is set to '0' so the certificate is created after the issuer.
+<3> Certificate for the OpenBao Agent Injector, with all DNS names used to reach it. The syncwave is set to '0' so the certificate is created after the issuer.
+<4> OpenBao deployment configuration; the two overrides fullnameOverride and nameOverride are both set to *openbao*. See link:/openshift-platform/security/secrets-management/openbao/2026-02-17-openbao-part-4-enabling-tls/#_step_5_helm_values_for_server_tls[Part 4] for more information.
+
+
+
+
+
+
+
+== Creating Argo CD Applications
+
+Whilst the Helm Charts are ready, we need to create the Argo CD Applications for the CA certificate and the OpenBao deployment.
+If you read our blog carefully, you will notice that these Application resources are created automatically when I add something to the folder clusters/management-cluster :) 
+This is done by leveraging ApplicationSet resources and is fully described in the link:/gitopscollection/2023-12-28-gitops-repostructure/[GitOps Repository Structure^] and subsequent articles.
+
+For the sake of simplicity, I will show the created Application resources below. The setup is the same for both; they simply target a different path in the Git repository.
+
+[source,yaml]
+----
+# Full Application resource for the OpenBao CA Certificate
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: in-cluster-openbao-ca-certificate
+  namespace: openshift-gitops
+spec:
+  destination:
+    name: in-cluster <1>
+    namespace: default <2>
+  info:
+    - name: Description
+      value: ApplicationSet that Deploys on Management Cluster Configuration (using Git Generator)
+  project: in-cluster <3>
+  source:
+    path: clusters/management-cluster/openbao-ca-certificate <4>
+    repoURL: 'https://github.com/tjungbauer/openshift-clusterconfig-gitops' <5>
+    targetRevision: main
+  syncPolicy:
+    retry:
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+      limit: 5
+---
+# Full Application resource for the OpenBao deployment
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: in-cluster-openbao
+  namespace: openshift-gitops
+spec:
+  destination:
+    name: in-cluster <1>
+    namespace: openbao <2>
+  info:
+    - name: Description
+      value: ApplicationSet that Deploys on Management Cluster Configuration (using Git Generator)
+  project: in-cluster <3>
+  source:
+    path: clusters/management-cluster/openbao <6>
+    repoURL: 'https://github.com/tjungbauer/openshift-clusterconfig-gitops' <5>
+    targetRevision: main
+  syncPolicy:
+    retry:
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+      limit: 5
+----
+<1> Target cluster; here, the local cluster
+<2> Namespace of the target cluster; here, the OpenBao deployment will be installed.
+<3> Argo CD Project (must exist)
+<4> Path to the Git repository for the CA certificate
+<5> URL of the Git repository
+<6> Path to the OpenBao deployment
+
+This will create the following Applications:
+- in-cluster-openbao-ca-certificate
+- in-cluster-openbao
+
+NOTE: The ApplicationSet adds the prefix **in-cluster-** to each Application name so that they remain unique in Argo CD.
+
+.Argo CD: OpenBao Argo CD Applications
+image::part5_openbao_argocd.png[OpenBao Argo CD Applications]
+
+The first Application to synchronise is **in-cluster-openbao-ca-certificate**.
+
+It creates the following:
+
+* Namespace
+* CA Issuer
+* CA Certificate
+
+Then synchronise **in-cluster-openbao**. It creates:
+
+* OpenBao deployment
+* OpenBao Agent Injector
+* OpenBao Server TLS Certificate
+* OpenBao Agent Injector TLS Certificate
+
+== OpenBao is running—what next?
+
+Deploying OpenBao via GitOps gives you version control and declarative management for your secret management infrastructure.
+
+Whilst OpenBao is running and managed by Argo CD, the next step is to configure it: you will need to handle initialisation (for a new cluster) and unsealing (see link:/openshift-platform/security/secrets-management/openbao/2026-02-13-openbao-part-3-openshift-deployment/[Part 3] and link:/openshift-platform/security/secrets-management/openbao/2026-02-17-openbao-part-4-enabling-tls/[Part 4]). That manual approach does not scale. In the next article, I will discuss ways to automate initialisation and unsealing.
+
+
+Key takeaways:
+
+* Use sync waves to control deployment order
+* Consider auto-unseal for production (Part 6)
+* Store initialisation data securely outside Git
+
+== Resources
+
+* link:/gitopscollection/2024-04-02-configure_app_of_apps/[Configure App-of-Apps^]
+* https://argo-cd.readthedocs.io/en/stable/user-guide/helm/[Argo CD Helm Support^]
+* https://argo-cd.readthedocs.io/en/stable/user-guide/sync-waves/[Argo CD Sync Waves^]
