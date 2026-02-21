@@ -1,12 +1,12 @@
 --- 
-title: "The Guide to OpenBao - Authentication Methods - Part 6"
+title: "The Guide to OpenBao - Authentication Methods - Part 7"
 description: "Configuring authentication methods in OpenBao including Kubernetes auth, OIDC, LDAP, and AppRole for secure access control"
 date: "2026-04-16"
 doctype: book
-weight: 95
+weight: 94
 
 series: "The Guide to OpenBao"
-series_part: 6
+series_part: 7
 
 featured_image: /openshift-platform/security/secrets-management/openbao/images/Logo_OpenBao.png
 show_featured_image_summary: true
@@ -621,7 +621,7 @@ bao policy read myapp-policy
 
 == What is Coming Next?
 
-In Part 6, we will explore secrets engines:
+In Part 8, we will explore secrets engines:
 
 * KV (Key-Value) for static secrets
 * PKI for certificate management

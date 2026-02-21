@@ -1,12 +1,12 @@
 --- 
-title: "The Guide to OpenBao - End-to-End Example - Part 11"
+title: "The Guide to OpenBao - End-to-End Example - Part 12"
 description: "Complete end-to-end example deploying a secure application with OpenBao including dynamic database credentials, TLS certificates, and GitOps configuration"
 date: "2026-04-23"
 doctype: book
-weight: 90
+weight: 89
 
 series: "The Guide to OpenBao"
-series_part: 11
+series_part: 12
 
 featured_image: /openshift-platform/security/secrets-management/openbao/images/Logo_OpenBao.png
 show_featured_image_summary: true
@@ -82,7 +82,7 @@ Ensure you have:
 
 * OpenBao deployed and unsealed (Parts 2-4)
 * Argo CD installed and configured
-* External Secrets Operator installed (Part 7)
+* External Secrets Operator installed (Part 9)
 * A Git repository for your configuration
 
 == Step 1: Configure OpenBao
@@ -901,12 +901,13 @@ In this series, we covered:
 * **Part 3**: OpenShift deployment with Helm
 * **Part 4**: Enabling TLS on OpenShift with cert-manager
 * **Part 5**: GitOps deployment with Argo CD
-* **Part 6**: Authentication methods (Kubernetes, OIDC, LDAP, AppRole)
-* **Part 7**: Secrets engines (KV, PKI, Database, Transit)
-* **Part 8**: Kubernetes integration patterns
-* **Part 9**: High availability and production best practices
-* **Part 10**: Operations and troubleshooting
-* **Part 11**: Complete end-to-end example
+* **Part 6**: Initialisation, unsealing, and auto-unseal
+* **Part 7**: Authentication methods (Kubernetes, OIDC, LDAP, AppRole)
+* **Part 8**: Secrets engines (KV, PKI, Database, Transit)
+* **Part 9**: Kubernetes integration patterns
+* **Part 10**: High availability and production best practices
+* **Part 11**: Operations and troubleshooting
+* **Part 12**: Complete end-to-end example
 
 == Key Takeaways
 

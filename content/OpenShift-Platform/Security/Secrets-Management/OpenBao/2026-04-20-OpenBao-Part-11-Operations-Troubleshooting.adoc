@@ -1,12 +1,12 @@
 --- 
-title: "The Guide to OpenBao - Operations and Troubleshooting - Part 10"
+title: "The Guide to OpenBao - Operations and Troubleshooting - Part 11"
 description: "Day-2 operations, common issues and solutions, log analysis, migration from Vault, and CLI command reference for OpenBao"
 date: "2026-04-20"
 doctype: book
-weight: 91
+weight: 90
 
 series: "The Guide to OpenBao"
-series_part: 10
+series_part: 11
 
 featured_image: /openshift-platform/security/secrets-management/openbao/images/Logo_OpenBao.png
 show_featured_image_summary: true
@@ -687,7 +687,7 @@ bao token revoke -accessor <accessor>
 
 == What is Coming Next?
 
-In Part 11, the final article, we will bring everything together with an end-to-end example:
+In Part 12, the final article, we will bring everything together with an end-to-end example:
 
 * Complete application deployment
 * Database dynamic credentials
