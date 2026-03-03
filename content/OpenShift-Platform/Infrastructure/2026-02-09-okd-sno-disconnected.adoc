@@ -34,6 +34,8 @@ Because of reasons we had to setup a disconnected single node OKD "cluster". Thi
 OKD documentation sometimes refers to OpenShift image locations, we had to read multiple sections to get it working and we
 also consulted the OpenShift documentation at https://docs.redhat.com.
 
+NOTE: Updated on 2026-03-03: Fixed install-config.yaml
+
 <!--more-->
 
 First we need to download the _oc_ command in the version we would like to install. OKD provides them in their release page:
@@ -168,13 +170,13 @@ baseDomain: internal
 compute:
 - hyperthreading: Enabled
   name: worker
-  replicas: 0
+  replicas: 0 <1>
 controlPlane:
   hyperthreading: Enabled
   name: master
-  replicas: 3
+  replicas: 1 <2>
 metadata:
-  name: sno
+  name: okd-sno
 networking:
   clusterNetwork:
   - cidr: 10.128.0.0/14
@@ -185,21 +187,23 @@ networking:
 platform:
   none: {}
 fips: false
+sshKey: 'the key'
+bootstrapInPlace: <3>
+  installationDisk: /dev/vda
 pullSecret: |
   {
     "auths": {
-      "internal.registry": {
-        "auth": "<credentials base64 encoded>",
-        "email": "you@example.com"
+      "registry.internal": {
+        "auth": "<username:password base64 encoded"
+        "email": "some@email"
       }
     }
   }
-sshKey: 'ssh-ed25519 AAAA...'
-additionalTrustBundle: |
+additionalTrustBundle: | <4>
   -----BEGIN CERTIFICATE-----
   ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ
   -----END CERTIFICATE-----
-ImageDigestSources:
+ImageDigestSources: <5>
 - mirrors:
   - registry.internal/openshift/release
   source: quay.io/okd/scos-content
@@ -207,6 +211,11 @@ ImageDigestSources:
   - registry.internal/openshift/release-images
   source: quay.io/okd/scos-release
 ----
+<1> We set the number of worker to zero (0). Because this is a SNO installation. Workers nodes could be added later, even for a SNO cluster
+<2> We set the number of master nodes to one (1)
+<3> This tells the installer that we do not have a bootstrap node and it should create on large ignition config file
+<4> If required the CA certificate of our registry. This is required if the registry uses an internal certificate
+<5> ImageDigestSources configures CRIO to redirect requests to quay.io to our private registry.
 
 It's time to create the installation manifests and ignition configs. We created a directory _install_, copied the _install-config.yaml_ into this directory and triggered the _openshift-install_ command:
 
@@ -232,9 +241,17 @@ https://docs.okd.io/4.14/installing/installing_sno/install-sno-installing-sno.ht
 [source, shell]
 ----
 alias coreos-installer='podman run --privileged --pull always --rm -v /dev:/dev -v /run/udev:/run/udev -v $PWD:/data -w /data quay.io/coreos/coreos-installer:release'
-coreos-installer iso ignition embed -fi install/bootstrap.ign fcos-live.iso
+coreos-installer iso ignition embed -fi install/bootstrap-in-place-for-live-iso.ign fcos-live.iso
 coreos-installer iso kargs modify --append 'ip=10.0.0.99::10.0.0.1:255.255.255.0:sno.internal:ens33:none:10.0.0.255' fcos-live.iso
 ----
+
+We can take a look at the ISO bootstrap config and the kernels arguments with:
+
+[source,bash]
+----------
+coreos-installer iso ignition show fcos-live.iso
+coreos-installer iso kargs show fcos-live.iso
+----------
 
 For understanding the kernel boot arguments see https://access.redhat.com/solutions/5499911.
 
