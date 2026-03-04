@@ -32,7 +32,11 @@ aliases: [
 
 We had the honor of presenting at the 2nd Ansible Anwendertreffen in
 Austria. The topic was the onboarding of application teams to the
-Ansible Automation Platform. We created an extensive demo that:
+Ansible Automation Platform.
+
+<!--more-->
+
+We created an extensive demo that:
 
 - Onboards a new tenant into an AAP organization.
 - Each tenant gets a configuration as code repository, https://github.com/tosmi-ansible/template-org-config[cloned from a template^].
