@@ -1,0 +1,46 @@
+---
+title: "Onboarding to Ansible Automation Platform with Configuration as Code"
+description: "A detailed walkthrough of our presentation on onboarding application teams to Ansible Automation Platform using a Configuration as Code approach, presented at the 2nd Ansible Anwendertreffen in Austria."
+date: "2026-03-04"
+doctype: book
+weight: 10
+
+draft: false
+
+featured_image: /ansible/images/cats_onboarding.webp
+show_featured_image_summary: true
+show_featured_image_article: true
+disableBreadcrumb: false
+
+authors: [Thomas Schmidbauer]
+type: post
+categories:
+   - Ansible
+   - "Ansible Automation Platform"
+   - Onboarding
+   - "Configuration as Code"
+
+tags: ["Ansible", "Ansible Automation Platform", "Onboarding", "Configuration as Code", "GitOps", "DevOps"]
+
+aliases: [
+]
+---
+
+:imagesdir: /ansible/images/onboarding
+:icons: font
+:toc:
+
+We had the honor of presenting at the 2nd Ansible Anwendertreffen in
+Austria. The topic was the onboarding of application teams to the
+Ansible Automation Platform. We created an extensive demo that:
+
+- Onboards a new tenant into an AAP organization.
+- Each tenant gets a configuration as code repository, https://github.com/tosmi-ansible/template-org-config[cloned from a template^].
+- A push event to the config-as-code repository triggers an update of AAP objects.
+- Provides an https://github.com/tosmi-ansible/template-example-project[example repository^] for each tenant to get started.
+- The example repository provides a https://github.com/tosmi-ansible/template-org-config/blob/main/playbooks/devenv.yaml[webhook^] that creates an OpenShift Virtualization VM for testing code changes when a feature branch is created.
+- Contains a https://github.com/tosmi-ansible/template-org-config/blob/main/playbooks/cac-diff.yaml[playbook^] to display objects that are not currently managed by the tenant's configuration-as-code repository.
+
+The source code for the demo is available on https://github.com/tosmi-ansible/aap-onboarding[GitHub^].
+
+The https://github.com/tosmi-ansible/aap-onboarding/blob/main/README.md[README] contains more details about the implementation, and the slide deck is also https://github.com/tosmi-ansible/aap-onboarding/blob/main/docs/Ansible%20Anwender%20Treffen%20202602%20-%20Slides.pdf[available on GitHub^].
