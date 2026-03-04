@@ -30,15 +30,15 @@ aliases: [
 :icons: font
 :toc:
 
-Because of reasons we had to setup a disconnected single node OKD "cluster". This is our brain dump as the
+Because of reasons we had to set up a disconnected single node OKD "cluster". This is our brain dump as the
 OKD documentation sometimes refers to OpenShift image locations, we had to read multiple sections to get it working and we
 also consulted the OpenShift documentation at https://docs.redhat.com.
 
-NOTE: Updated on 2026-03-03: Fixed install-config.yaml
+NOTE: Updated on 2026-03-03: Fixed install-config.yaml and create manifest command
 
 <!--more-->
 
-First we need to download the _oc_ command in the version we would like to install. OKD provides them in their release page:
+First we need to download the _oc_ command in the version we would like to install. OKD provides it on its release page:
 
 https://github.com/okd-project/okd/releases/download/4.21.0-okd-scos.3/openshift-client-linux-amd64-rhel9-4.21.0-okd-scos.3.tar.gz
 
@@ -80,7 +80,7 @@ You can encode the credentials with:
 echo -n "username:password" | base64 -w0
 ----
 
-For mirroring all required OKD images to our private registry we created a _ImageSetConfiguration_:
+For mirroring all required OKD images to our private registry we created an _ImageSetConfiguration_:
 
 [source, yaml]
 ----
@@ -123,13 +123,13 @@ mirror:
   additionalImages: []
 ----
 
-The hard part for use was finding the right values for _channels_ and
-the min/max versions. Once again OKD
+The hard part for us was finding the right values for _channels_ and
+the min/max versions. Once again the OKD
 https://amd64.origin.releases.ci.openshift.org/[release status page]
 was helpful.
 
 Our private registry is based on https://goharbor.io[Harbor] for our
-experiments, but any Docker v2 compatible registry should work. Then
+experiments, but any Docker v2 compatible registry should work. The
 only thing required is a project within Harbor called _openshift_ and
 a user/password for pulling/pushing images to this project. The
 project name might be configurable with _oc mirror_, but this requires
@@ -144,14 +144,14 @@ curl -LO https://raw.githubusercontent.com/openshift/cluster-update-keys/master/
 export OCP_SIGNATURE_URL="https://storage.googleapis.com/openshift-ci-release/releases/signatures/openshift/release/"
 export OCP_SIGNATURE_VERIFICATION_PK="verifier-public-key-openshift-ci-4"
 
-# for debugging add --log-level debug, but we intermittent errors this options.
+# for debugging add --log-level debug, but we had intermittent errors with this option.
 # after removing --log-level debug oc mirror ran without problems
 oc mirror -c ImageSetConfiguration.yaml --authfile docker-auth.json --workspace file:///workspace docker://internal.registry --v2
 ----
 
-This will create the _ImageDigestMirrorSource_ in _/workspace/working-dir/cluster-resoruces/idms-oc-mirror.yaml_ and _ImageTagMirrorSource_ custom resources in _/workspace/working-dir/cluster-resources/itms-oc-mirror.yaml_.
+This will create the _ImageDigestMirrorSource_ in _/workspace/working-dir/cluster-resources/idms-oc-mirror.yaml_ and _ImageTagMirrorSource_ custom resources in _/workspace/working-dir/cluster-resources/itms-oc-mirror.yaml_.
 
-The content _ImageDigestMirrorSource_ will be reused in
+The content of _ImageDigestMirrorSource_ will be reused in
 the _install-config.yaml_. This is required to redirect image pulls done by the node from _quay.io_ to our private registry.
 
 Next we need DNS records for our cluster:
@@ -161,7 +161,7 @@ Next we need DNS records for our cluster:
 - *.apps.sno.internal (wildcard DNS entry for applications deployed on the cluster)
 
 Now we prepared the required _install-config.yaml_ file to trigger the _openshift-install_ command.
-We basically followed https://docs.okd.io/latest/installing/installing_sno/install-sno-installing-sno.html(Installing a Single Node OpenShift Cluster).
+We basically followed https://docs.okd.io/latest/installing/installing_sno/install-sno-installing-sno.html[Installing a Single Node OpenShift Cluster].
 
 [source, yaml]
 ----
@@ -194,7 +194,7 @@ pullSecret: |
   {
     "auths": {
       "registry.internal": {
-        "auth": "<username:password base64 encoded"
+        "auth": "<username:password base64 encoded>",
         "email": "some@email"
       }
     }
@@ -211,23 +211,22 @@ ImageDigestSources: <5>
   - registry.internal/openshift/release-images
   source: quay.io/okd/scos-release
 ----
-<1> We set the number of worker to zero (0). Because this is a SNO installation. Workers nodes could be added later, even for a SNO cluster
+<1> We set the number of workers to zero (0). Because this is a SNO installation. Worker nodes could be added later, even for a SNO cluster
 <2> We set the number of master nodes to one (1)
-<3> This tells the installer that we do not have a bootstrap node and it should create on large ignition config file
+<3> This tells the installer that we do not have a bootstrap node and it should create one large ignition config file
 <4> If required the CA certificate of our registry. This is required if the registry uses an internal certificate
 <5> ImageDigestSources configures CRIO to redirect requests to quay.io to our private registry.
 
 It's time to create the installation manifests and ignition configs. We created a directory _install_, copied the _install-config.yaml_ into this directory and triggered the _openshift-install_ command:
 
 [source, shell]
----
+----
 $ mkdir install
 $ cp install-config.yaml install/
-$ openshift-install create manifests --dir=install
-$ openshift-install create ignition-configs --dir=install
----
+$ openshift-install --dir=install create single-node-ignition-config
+----
 
-We are not ready to download the installation ISO and to embed our ignition config into it. We also want
+We are now ready to download the installation ISO and to embed our ignition config into it. We also want
 to set kernel boot arguments to configure the network interface with a static IP address.
 
 [source, shell]
@@ -245,7 +244,7 @@ coreos-installer iso ignition embed -fi install/bootstrap-in-place-for-live-iso.
 coreos-installer iso kargs modify --append 'ip=10.0.0.99::10.0.0.1:255.255.255.0:sno.internal:ens33:none:10.0.0.255' fcos-live.iso
 ----
 
-We can take a look at the ISO bootstrap config and the kernels arguments with:
+We can take a look at the ISO bootstrap config and the kernel arguments with:
 
 [source,bash]
 ----------
