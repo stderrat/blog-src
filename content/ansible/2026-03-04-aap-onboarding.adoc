@@ -12,7 +12,7 @@ show_featured_image_summary: true
 show_featured_image_article: true
 disableBreadcrumb: false
 
-authors: [Thomas Schmidbauer]
+authors: [Toni Schmidbauer]
 type: post
 categories:
    - Ansible
