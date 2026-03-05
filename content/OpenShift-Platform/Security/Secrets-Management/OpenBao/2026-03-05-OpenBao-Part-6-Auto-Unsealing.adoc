@@ -1,0 +1,801 @@
+---
+title: "The Guide to OpenBao - Initialisation, Unsealing, and Auto-Unseal - Part 6"
+description: "Configuring OpenBao for automatic unsealing with a Key Management Service, static key, or transit seal; manual and GitOps-friendly approaches"
+date: "2026-03-05"
+doctype: book
+weight: 95
+
+series: "The Guide to OpenBao"
+series_part: 6
+
+featured_image: /openshift-platform/security/secrets-management/openbao/images/logos/part6_openbao_logo.png
+show_featured_image_summary: true
+show_featured_image_article: true
+disableBreadcrumb: true
+
+authors: [Thomas Jungbauer]
+type: post
+draft: true
+categories:
+   - OpenShift
+   - Security
+   - Secret Management
+   - GitOps
+
+tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "GitOps", "Argo CD", "Auto-unseal", "KMS"]
+
+aliases: [
+   "/openshift/security/openbao/2026-02-21-openbao-auto-unsealing/",
+]
+---
+
+:imagesdir: /openshift-platform/security/secrets-management/openbao/images/
+:icons: font
+:toc:
+
+After deploying OpenBao via GitOps (link:/openshift-platform/security/secrets-management/openbao/2026-02-20-openbao-part-5-gitops-deployment/[Part 5]), OpenBao must be initialised and then unsealed before it becomes functional. You usually do not want to do this unsealing manually, since this is not scalable especially in bigger, productive environments. This article explains how to handle initialisation and unsealing, and possible options to configure an **auto-unseal** process so that OpenBao unseals itself on every restart without manual key entry.
+
+<!--more-->
+
+== What is happening?
+
+OpenBao starts in a *sealed* state. You must:
+
+. Initialise (once): run `bao operator init` to generate unseal keys (or recovery keys when using auto-unseal).
+. Unseal (after each restart): provide a threshold of unseal keys so each node can decrypt the root key. In the previous articles, we used a threshold of 3 (out of 5). This means that you need to run **bao operator unseal** three times with different keys on every node after every start before the service becomes available.
+
+Unseal workflow (assuming a threshold of 3 and 5 nodes and initialisation already happened):
+
+```mermaid {align="center" zoom="true"}
+---
+title: "Unseal Workflow"
+config:
+  theme: 'dark'
+---
+flowchart LR
+  A["openbao-0 starts → 3× unseal using different keys"]
+  A --> B["openbao-1 starts → 3× unseal using different keys"]
+  B --> C["openbao-2 starts → 3× unseal using different keys"]
+  C --> D[OpenBao is ready]
+```
+
+
+WARNING: This is a chicken-egg problem: you need to start somewhere, but you cannot start without the keys.
+
+Manual unsealing does not scale very well and for production, **auto-unseal** is recommended.
+
+This article covers:
+
+* Practical approaches to initialisation and unsealing (manual, Jobs, init containers).
+* Potential auto-unseal options: with AWS KMS, static key, and transit seal.
+
+== Handling Initialisation and Unsealing
+
+The challenge with GitOps is that initialisation and unsealing are one-off or stateful operations. Below are several approaches. The problem is always the same: where do you start? You must have the unseal keys available to start the process. Do you keep them locally, do you keep them in a Kubernetes Secret, do you use an external Key Management System (KMS)? The most robust for production in my opinion is auto-unseal using a KMS (see <<_approach_4_auto_unseal_with_kms_recommended_for_production>> and the following sections). It uses an external Key Management System (KMS) to store the keys. This way, the keys are not stored in the cluster and are not exposed to the risk of being compromised. 
+
+Let's have a look at the different options.
+
+--- 
+
+=== Approach 1: Manual Initialisation (simplest)
+
+While manual initialisation and unsealing is the simplest approach, it is not recommended for production. Still, I would like to mention it here for completeness and at least provide a simple for loop to unseal the OpenBao service (on Kubernetes/OpenShift). 
+
+NOTE: Manual unsealing is still a valid option when you have a small cluster and assume that it is not required often.
+
+After Argo CD deploys OpenBao, the first pod, openbao-0, will not become ready until it is initialised and unsealed. Once done, the next pod, openbao-1, will try to start and wait until it is unsealed, and then the third pod, and so on.
+
+The following, simplified script will go through the pods and unseal them one by one. It initialises the first pod and stores the unseal keys in the file **openbao-init.json** locally on your machine. From there it takes three different keys and unseals the OpenBao service.
+Since it takes a while until other pods are pulling the image and starting, we will use a sleep timer of 30 seconds between each pod. This may or may not be enough depending on your network and cluster speed. As said, this is a very simplified script:
+
+NOTE: The CLI tool *oc* can be replaced by *kubectl* in case you are using a different cluster. In addition, you will need the jq command line tool to parse the JSON file.
+
+WARNING: If your OpenBao was initialised previously, you can remove the first three commands and start with the unseal commands.
+
+[source,bash]
+----
+# Initialise the first pod, assuming the Pod openbao-0 is already running.
+# You can skip this if OpenBao was initialised previously.
+echo "Initialising OpenBao on openbao-0 (keys will be saved to openbao-init.json)..."
+oc exec -it openbao-0 -n openbao -- bao operator init \
+  -key-shares=5 -key-threshold=3 -format=json > openbao-init.json <1>
+echo "Init complete. Unseal keys and root token are in openbao-init.json."
+
+# Unseal each pod (three times each with different keys)
+echo "Unsealing pods openbao-0, openbao-1, openbao-2 (3 key steps each)..."
+for i in 0 1 2; do
+  sleep_timer=30
+  SLEEPER_TMP=1
+
+  echo "Unsealing openbao-$i..."
+  for j in 1 2 3; do <2>
+    KEY=$(cat openbao-init.json | jq -r ".unseal_keys_b64[$((j-1))]")
+    oc exec -it openbao-$i -n openbao -- bao operator unseal $KEY
+  done
+
+  echo "openbao-$i unsealed. Waiting ${sleep_timer}s for next pod to be ready..."
+
+  while [[ $SLEEPER_TMP -le "$sleep_timer" ]]; do <3>
+    if (( SLEEPER_TMP % 10 == 0 )); then
+      echo -n "$SLEEPER_TMP"
+    else
+      echo -n "."
+    fi
+    sleep 1
+    SLEEPER_TMP=$((SLEEPER_TMP + 1))
+  done
+
+  echo ""
+
+done
+
+echo "All pods unsealed. Store init data securely (e.g. in a password manager)."
+# Store init data securely (e.g. in a password manager)
+----
+<1> Initialise the first pod, assuming the Pod openbao-0 is already running. This will store the keys (including the root token) in the file **openbao-init.json**.
+<2> Unseal each pod (three times each with different keys). The keys are taken from the **openbao-init.json** file.
+<3> Wait 30 seconds between each pod to give the other pods time to start and pull the image ... super-fancy sleep timer.
+
+CAUTION: The unseal keys as well as the root token are stored in the **openbao-init.json** file. This file is stored locally on your machine. Make sure to store it securely and do not share it with anyone.
+
+---
+
+
+
+=== Approach 2: Kubernetes Job for initialisation
+
+A Job can run after OpenBao is deployed, initialise it if needed, and store the init output (unseal keys and root token) in a Kubernetes Secret. You can then unseal manually or with a second Job that reads from that Secret. This section assumes the init output is stored in a Kubernetes Secret and explains how to create that Secret from the Job and how to use it.
+
+==== How the Secret is created
+
+The init Job runs `bao operator init` and then creates the Secret using `oc` (or `kubectl`). The Secret name and key used here are `openbao-init-data` and `init.json` (the file contains the JSON output of `bao operator init`, including `unseal_keys_b64` and `root_token`). One advantage of this approach is that you can integrate it into your GitOps pipeline. However, we can argue whether it is a good idea to store the unseal keys and the root token as a Secret in the same cluster where OpenBao is running.
+
+**Example structure of `init.json`**:
+
+[source,json]
+----
+{
+  "unseal_keys_b64": [
+    "key1",
+    "key2",
+    "key3",
+    "key4",
+    "key5"
+  ],
+  "unseal_keys_hex": [
+    "hex1",
+    "hex2",
+    "hex3",
+    "hex4",
+    "hex5"
+  ],
+  "unseal_shares": 5,
+  "unseal_threshold": 3,
+  "recovery_keys_b64": null,
+  "recovery_keys_hex": null,
+  "recovery_keys_shares": 0,
+  "recovery_keys_threshold": 0,
+  "root_token": "root.token"
+}
+----
+
+You need at least `unseal_threshold` keys (e.g. 3) from `unseal_keys_b64` to unseal each node. Store this file securely; anyone with access can unseal OpenBao and the `root_token` has full admin access.
+
+==== RBAC Configuration
+
+The Job’s service account (`openbao-init`) must be allowed to create (and optionally get/update) Secrets in the `openbao` namespace. Create a Role and RoleBinding:
+
+[source,yaml]
+----
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openbao-init <1>
+  namespace: openbao
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: openbao-init-secret-writer
+  namespace: openbao
+rules: <2>
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create", "get", "update", "patch"]
+  - apiGroups: [""] <3>
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""] <4>
+    resources: ["pods/exec"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding <5>
+metadata:
+  name: openbao-init-secret-writer
+  namespace: openbao
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: openbao-init-secret-writer
+subjects:
+  - kind: ServiceAccount
+    name: openbao-init
+    namespace: openbao
+----
+<1> The ServiceAccount is used by the Job(s) to create the Secret and unseal the OpenBao pods.
+<2> The Role is used by the Job to create the Secret. The rules might be extended to include the permission to execute into the pods to unseal the OpenBao service (see below).
+<3> Permissions to get and list the Pods, required for the unseal process later
+<4> Permissions to execute into the Pods, required for the unseal process later
+<5> The RoleBinding is used by the Job to create the Secret.
+
+The Job must also be able to reach the OpenBao API (e.g. `openbao.openbao.svc:8200`). This is usually possible when running in the same namespace as the OpenBao service.
+
+The example below shows a working Job manifest that will perform the initialisation and the creation of the Secret in the `openbao` namespace. The manifest is already prepared for Argo CD with useful annotations.
+It runs an init container to initialise the OpenBao service and a main container to create the Secret. The init container writes (using the OpenBao CLI) the init.json file to a shared volume and the main container (using the kubectl command) creates the Secret from that file.
+In addition, the Secret containing the CA certificate is mounted as a volume and the BAO_CACERT environment variable is set to the path of the CA certificate.
+
+==== Init Job that creates the Secret
+
+[source,yaml]
+----
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: openbao-init
+  namespace: openbao
+  annotations: <1>
+    argocd.argoproj.io/sync-wave: "30"
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  template:
+    spec:
+      serviceAccountName: openbao-init <2>
+      initContainers: <3>
+        - name: openbao-init
+          image: ghcr.io/openbao/openbao:latest
+          command: <4>
+            - /bin/sh
+            - -c
+            - |
+              if [ -f /etc/openbao-ca/ca.crt ]; then
+                export BAO_CACERT=/etc/openbao-ca/ca.crt
+                export BAO_ADDR=https://openbao:8200
+                echo "Using TLS CA from /etc/openbao-ca/ca.crt"
+              else
+                export BAO_ADDR=http://openbao:8200
+                echo "Using plain HTTP"
+              fi
+
+              until bao status 2>&1 | grep -q "Initialized"; do
+                echo "Waiting for OpenBao..."
+                sleep 5
+              done
+
+              if bao status | grep -q "Initialized.*false"; then
+                echo "Initialising OpenBao..."
+                bao operator init -key-shares=5 -key-threshold=3 \
+                  -format=json > /shared/init.json
+                echo "Init complete; init.json written to shared volume."
+              else
+                echo "OpenBao already initialised (skipping init)."
+              fi
+          volumeMounts:
+            - name: openbao-ca
+              mountPath: /etc/openbao-ca
+              readOnly: true
+            - name: shared
+              mountPath: /shared
+      containers: <5>
+        - name: create-secret
+          image: bitnami/kubectl:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              if [ -f /shared/init.json ]; then
+                echo "Creating Secret openbao-init-data from init.json..."
+                kubectl create secret generic openbao-init-data \
+                  --from-file=init.json=/shared/init.json \
+                  -n openbao --dry-run=client -o yaml | kubectl apply -f -
+                echo "Initialisation complete!"
+              else
+                echo "No init.json (OpenBao already initialised or init skipped)."
+              fi
+          volumeMounts:
+            - name: shared
+              mountPath: /shared
+              readOnly: true
+      volumes:
+        - name: openbao-ca
+          secret:
+            secretName: openbao-ca-secret
+            optional: true
+        - name: shared <6>
+          emptyDir: {}
+      restartPolicy: Never
+  backoffLimit: 3
+----
+<1> The annotations are used by Argo CD to trigger the Job after the OpenBao deployment.
+<2> The ServiceAccount is used by the Job to initialise the OpenBao service.
+<3> The init container runs the OpenBao CLI (wait for API, then operator init) and writes init.json to a shared volume.
+<4> The command is used to initialise the OpenBao service.
+<5> The main container runs kubectl to create the Secret from that file. This avoids needing a single image that bundles both `bao` and `kubectl`.
+<6> The shared volume is used to store the init.json file.
+
+NOTE: As a result the secret `openbao-init-data` is created in the `openbao` namespace. It contains the unseal keys and the root token.
+
+==== Using the Secret in a Job (unseal)
+
+A second Job can use the Secret `openbao-init-data` that was created by the init Job to unseal each OpenBao pod. A lot is happening here:
+
+ . The init container extracts the unseal keys from the Secret using `jq` and writes them to a shared volume.
+ . The main container is reading the unseal keys from the shared volume and unseals the first pod
+ . Then the process is waiting for 30 seconds, to give the next pod time to pull the image and start
+ . The process is repeated for the next pod and so on until all pods are unsealed.
+
+
+First of all, the unseal Job needs permission to `exec` into the OpenBao pods. Add a Role that grants the Job’s service account `create` on `pods/exec` in the `openbao` namespace.
+To make it easier, we can extend the Role `openbao-init-secret-writer` that was created in the init Job.
+
+NOTE: These rules were already applied with the configuration for the init Job, but we will repeat them here for completeness.
+
+[source,yaml]
+----
+rules: <1>
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+----
+<1> The role `openbao-init-secret-writer` must be extended to include the permission to execute into the pods to unseal the OpenBao service.
+
+
+[source,yaml]
+----
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: openbao-unseal
+  namespace: openbao
+  annotations:
+    argocd.argoproj.io/sync-wave: "35"
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  template:
+    spec:
+      serviceAccountName: openbao-init <1>
+      initContainers:
+        - name: extract-keys
+          image: quay.io/codefreshplugins/curl-jq
+          command:
+            - /bin/sh
+            - -c
+            - |
+              if [ ! -f /secrets/init.json ]; then
+                echo "Secret not found; run init Job first."
+                exit 1
+              fi
+              for i in 0 1 2; do
+                jq -r ".unseal_keys_b64[$i]" /secrets/init.json | tr -d '\n' > "/shared/key$i" <2>
+              done
+              echo "Unseal keys extracted to shared volume."
+          volumeMounts:
+            - name: init-secret
+              mountPath: /secrets
+              readOnly: true
+            - name: shared
+              mountPath: /shared
+      containers: <3>
+        - name: unseal
+          image: bitnami/kubectl:latest
+          command: <4>
+            - /bin/sh
+            - -c
+            - |
+              if [ -f /etc/openbao-ca/ca.crt ]; then
+                export BAO_CACERT=/etc/openbao-ca/ca.crt
+                export BAO_ADDR=https://openbao:8200
+                echo "Using TLS CA from /etc/openbao-ca/ca.crt"
+              else
+                export BAO_ADDR=http://openbao:8200
+                echo "Using plain HTTP"
+              fi
+
+              sleep_timer=30
+
+              if [ ! -f /shared/key0 ]; then
+                echo "Keys not found; extract-keys init container may have failed."
+                exit 1
+              fi
+
+              echo "Unsealing pods openbao-0, openbao-1, openbao-2 (3 key steps each), ${sleep_timer}s delay between pods..."
+              for pod in openbao-0 openbao-1 openbao-2; do
+                echo "Unsealing $pod..."
+                for i in 0 1 2; do
+                  key=$(cat "/shared/key$i" | tr -d '\n')
+                  kubectl exec -n openbao "$pod" -- sh -c 'bao operator unseal "$1"' _ "$key" || true
+                done
+                echo "$pod unsealed."
+                if [ "$pod" != "openbao-2" ]; then
+                  echo "Waiting ${sleep_timer}s for next pod to be ready..."
+                  SLEEPER_TMP=1
+                  while [ "$SLEEPER_TMP" -le "$sleep_timer" ]; do
+                    if [ $(( SLEEPER_TMP % 10 )) -eq 0 ]; then
+                      echo -n "$SLEEPER_TMP"
+                    else
+                      echo -n "."
+                    fi
+                    sleep 1
+                    SLEEPER_TMP=$(( SLEEPER_TMP + 1 ))
+                  done
+                  echo ""
+                fi
+              done
+              echo "Unseal complete."
+          volumeMounts:
+            - name: shared
+              mountPath: /shared
+              readOnly: true
+            - name: openbao-ca
+              mountPath: /etc/openbao-ca
+              readOnly: true
+      volumes: <5>
+        - name: init-secret
+          secret:
+            secretName: openbao-init-data
+        - name: shared
+          emptyDir: {}
+        - name: openbao-ca
+          secret:
+            secretName: openbao-ca-secret
+            optional: true
+      restartPolicy: Never
+  backoffLimit: 2
+----
+<1> The ServiceAccount is used by the Job to unseal the OpenBao pods. Here we are using the same ServiceAccount as the one used to initialise the OpenBao service.
+<2> The init container extracts unseal keys from init.json using jq and writes them to a shared volume.
+<3> The main container runs kubectl to exec into each OpenBao pod and run `bao operator unseal` (the OpenBao image is used inside the target pods).
+<4> The command is used to unseal the OpenBao service.
+<5> The volumes that are mounted: init-secret (contains the unseal keys), shared (contains the extracted unseal keys, shared between containers), openbao-ca (contains the CA certificate).
+
+WARNING: Both Jobs are using the same ServiceAccount and therefore the same RBAC rules. It is also possible to use a different ServiceAccount for the unseal Job.
+
+NOTE: Store init data securely. Keeping unseal keys in a cluster Secret is convenient but less secure than auto-unseal or an external secrets manager. Restrict access to the `openbao-init-data` Secret (e.g. RBAC and network policies) and consider rotating or moving keys to a more secure store after bootstrap.
+
+---
+
+=== Approach 3: Auto-unseal with Key Management Service KMS (recommended for production)
+
+Configure a KMS (e.g. AWS KMS, Azure Key Vault, GCP Cloud KMS, Transit etc.) so that OpenBao unseals itself on every restart. You initialise **once** and thereafter no manual unseal step is needed. 
+
+NOTE: The rest of this article will mention the different options. However, I can only demonstrate a real example using the AWS KMS option.
+
+==== Auto-unseal options overview
+
+Without auto-unseal, you must run `bao operator unseal` with a threshold of keys after each restart. With auto-unseal, OpenBao uses a seal backend to protect the root key and unseals itself on startup.
+
+Supported options:
+
+[cols="1,1,2"]
+|===
+| Option | Use case | Notes
+| 1. AWS KMS | AWS (EKS, OpenShift on AWS) | IRSA or IAM user; no keys in cluster with IRSA.
+| 2. Azure Key Vault | Azure (AKS, OpenShift on Azure) | Service principal or managed identity.
+| 3. Google Cloud KMS | GCP (GKE) | Service account key or Workload Identity.
+| 5. Transit | Existing Vault/OpenBao as root of trust; or a *dedicated seal-only OpenBao* that exists only to unseal production | External transit engine; token in a Secret.
+|===
+
+==== Why use OpenBao when the seal is in KMS? Why not keep all secrets in KMS and skip OpenBao?
+
+When using a cloud KMS (or Key Vault) for auto-unseal, a natural question is: why not store and retrieve *all* secrets from the KMS and run without OpenBao at all? OpenBao remains useful for operators and applications for several reasons:
+
+* **KMS is for keys, not a full secrets platform.** AWS KMS, Azure Key Vault keys, and GCP Cloud KMS are built to encrypt and decrypt small blobs (e.g. data encryption keys, or OpenBao’s seal blob). They are not a general-purpose secrets store with versioning, path-based access, dynamic credentials, and per-request audit. OpenBao provides that layer: applications request secrets by path, get short-lived tokens, and you get a single place to define who can read what.
+
+* **Dynamic secrets.** OpenBao can generate short-lived credentials on demand (e.g. database users, cloud IAM roles, PKI certificates). The KMS does not create or rotate such credentials; it only holds keys. If you need “give this pod a DB password that expires in 1 hour,” that is OpenBao’s domain, not the KMS.
+
+* **Fine-grained, identity-aware access.** OpenBao supports auth methods (Kubernetes, OIDC, AppRole, LDAP) and path-based policies. You can say “this service account may read only `secret/data/myapp/*`.” The KMS has IAM or Key Vault RBAC, but not the same model of “one API, many identities, many paths” that applications and operators use day to day.
+
+* **Audit and compliance.** OpenBao logs every secret read and write with identity and path. That gives a clear audit trail of who accessed which secret and when. KMS audit logs key usage, which is different from “which application read which secret at what time” in a unified way.
+
+* **Abstraction and portability.** Applications talk to OpenBao’s API. You can move the seal or the storage backend (or even the cloud) without changing how applications request secrets. If you put everything directly in a cloud KMS, you tie every app to that vendor’s API and limits.
+
+* **Encryption as a service (Transit).** OpenBao’s Transit secrets engine lets applications encrypt data with a key without ever seeing the key—useful for application-level encryption and key rotation. KMS can do something similar, but OpenBao integrates that with the same auth and audit as the rest of your secrets.
+
+NOTE: In short: the KMS is the *root of trust* for the seal (so OpenBao can unseal itself). OpenBao is the *secrets management platform* that applications and operators use for storing, retrieving, generating, and auditing secrets. Both layers complement each other.
+
+General flow (same for all options):
+
+. Set up the seal backend (KMS key, Key Vault, static key, or transit server).
+. Add the appropriate `seal "..."` stanza to OpenBao configuration (e.g. in Helm `server.ha.raft.config`).
+. Deploy OpenBao; pods start and remain sealed until initialised.
+. Run one-time initialisation: `bao operator init -recovery-shares=5 -recovery-threshold=3`.
+. From then on, restarts are automatically unsealed.
+
+
+==== Option: AWS KMS
+
+Best for: EKS, OpenShift on AWS (ROSA), or any Kubernetes on AWS.
+
+===== Create a KMS key
+
+Create a **symmetric** KMS key used only for the OpenBao seal (do not use for application data).
+
+* **AWS WebUI:** 
+** search for: KMS → Create key → Symmetric, Encrypt/Decrypt
+** Optionally set an alias (e.g. `openbao-unseal`).
+** OPTIONAL: Define key administrative permissions
+** OPTIONAL: Define key usage permissions
+** Edit key policy
+
+
+* **AWS CLI:** (requires the AWS CLI to be installed and configured)
++
+[source,bash]
+----
+aws kms create-key \
+  --description "OpenBao auto-unseal key" \
+  --key-usage ENCRYPT_DECRYPT
+
+aws kms create-alias \
+  --alias-name openbao-unseal \
+  --target-key-id <key-id-from-above>
+----
++
+Note the **Key ID** or **Alias** and the **region** (e.g. `us-west-1`) from the output of the command.
+
+===== Key policy for OpenBao
+
+The OpenBao process needs permission to use the key. Create an IAM policy. In the UI you can configure this directly when creating the key. When using the CLI, create a `policy.json` file with the following content:
+
+[source,json]
+----
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "kms:Encrypt",
+        "kms:Decrypt",
+        "kms:DescribeKey"
+      ],
+      "Resource": "arn:aws:kms:<REGION>:<ACCOUNT_ID>:key/<KEY_ID>" <1>
+    }
+  ]
+}
+----
+<1> Replace `<REGION>`, `<ACCOUNT_ID>`, and `<KEY_ID>` with your values (or use the key ARN).
+
+===== Create an IAM user for the seal
+
+When using static credentials (e.g. on OpenShift or when IRSA is not available), create a dedicated IAM user that has permission only to use the KMS key above. Use that user's access keys in the Kubernetes Secret.
+
+* **AWS WebUI:** 
+** search for: IAM → Users → Create user
+** User name: e.g. `openbao-seal`
+** DO NOT select "Provide user access to the AWS Management Console" (programmatic access only)
+** Create user
+** Open the created user → Permissions → Add permissions → Create inline policy (or Attach policies → Create policy)
+** In the policy editor, choose JSON and paste the policy from <<Key policy for OpenBao>>, replacing `<REGION>`, `<ACCOUNT_ID>`, and `<KEY_ID>` with your KMS key ARN or alias
+** Name the policy (e.g. `OpenBaoSealKMS`) and attach it to the user
+** Security credentials → Create access key → Application running outside AWS (or "Third-party service") → Create access key
+** Save the Access key ID and Secret access key; you will put them in the Kubernetes Secret `openbao-aws-credentials`.
+
+* **AWS CLI:** (requires the AWS CLI to be installed and configured)
++
+Create a policy file (e.g. `openbao-seal-policy.json`) with the same JSON as in <<Key policy for OpenBao>>, then create the user, attach the policy, and create access keys:
++
+[source,bash]
+----
+# Replace REGION, ACCOUNT_ID, and KEY_ID in the policy (or use alias: arn:aws:kms:REGION:ACCOUNT_ID:alias/openbao-unseal)
+aws iam create-policy \
+  --policy-name OpenBaoSealKMS \
+  --policy-document file://openbao-seal-policy.json
+
+aws iam create-user --user-name openbao-seal
+
+aws iam attach-user-policy \
+  --user-name openbao-seal \
+  --policy-arn arn:aws:iam::ACCOUNT_ID:policy/OpenBaoSealKMS
+
+aws iam create-access-key --user-name openbao-seal
+----
++
+NOTE: The last command returns `AccessKeyId` and `SecretAccessKey`; store them in the Secret `openbao-aws-credentials` with key `AWS_REGION` set to your region (e.g. `us-west-1`).
+
+===== Create the Secret
+
+Create the Secret `openbao-aws-credentials` in the `openbao` namespace. It contains the access key, secret access key, and region.
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: openbao-aws-credentials
+  namespace: openbao
+type: Opaque
+stringData: <1>
+  AWS_ACCESS_KEY_ID: <your-access-key>
+  AWS_SECRET_ACCESS_KEY: <your-secret-key>
+  AWS_REGION: <your-region>
+----
+<1> Replace `<your-access-key>`, `<your-secret-key>`, and `<your-region>` with the values from the previous steps.
+
+===== Helm / Argo CD configuration (AWS)
+
+Add the `seal "awskms"` block inside the same HCL config that contains `listener`, `storage "raft"`. In Helm values this is typically under `openbao.server.ha.raft.config`.
+
+WARNING: Be sure to update the region and key ID.
+
+The values file we used for Argo CD can be found at: https://github.com/tjungbauer/openshift-clusterconfig-gitops/blob/main/clusters/management-cluster/openbao/values.yaml[OpenBao Argo CD values file^]
+
+[source,yaml]
+----
+openbao:
+  server:
+
+    extraSecretEnvironmentVars: <1>
+      - envName: AWS_ACCESS_KEY_ID
+        secretName: openbao-aws-credentials
+        secretKey: AWS_ACCESS_KEY_ID
+      - envName: AWS_SECRET_ACCESS_KEY
+        secretName: openbao-aws-credentials
+        secretKey: AWS_SECRET_ACCESS_KEY
+      - envName: AWS_REGION
+        secretName: openbao-aws-credentials
+        secretKey: AWS_REGION
+
+    ha:
+      raft:
+        config: |
+          ui = true
+
+          seal "awskms" { <2>
+            region     = "us-east-1"
+            kms_key_id = "alias/openbao-unseal"
+          }
+
+          listener "tcp" {
+            tls_disable = 0
+            address     = "[::]:8200"
+            cluster_address = "[::]:8201"
+            tls_cert_file   = "/openbao/tls/openbao-server-tls/tls.crt"
+            tls_key_file    = "/openbao/tls/openbao-server-tls/tls.key"
+            tls_min_version = "tls12"
+          }
+
+          storage "raft" {
+            path = "/openbao/data"
+          }
+
+          service_registration "kubernetes" {}
+----
+<1> If you use static credentials (e.g. for OpenShift), inject them via a Secret.
+<2> This must be added. Be sure to update your region and key ID.
+
+IMPORTANT: The `seal "awskms"` block alone is not enough. OpenBao must have AWS credentials available at runtime. If you see an error such as `NoCredentialProviders: no valid providers in chain` or `error fetching AWS KMS wrapping key information`, the pod has no credentials. You must either inject static credentials from a Secret (see below) or use IRSA so the pod can assume an IAM role.
+
+---
+
+
+=== Approach 4: Init container with external secret store
+
+Another option is to use an init container that retrieves secrets from an external source. Two use cases can be considered here:
+
+* **Shamir unseal:** The init container fetches the unseal keys from an external secret manager and then runs `bao operator unseal` (or writes keys to a file used by a sidecar/unseal script). This is the classic “external secret store” idea (e.g. using AWS Secrets Manager, HashiCorp Vault, another Kubernetes cluster).
+* **Transit seal token:** The init container fetches the *token* that production OpenBao uses to call the dedicated unseal service (see <<_dedicated_unseal_service_seal_only_openbao>>). That token is written to a file or shared volume so the main OpenBao process can use it in `seal "transit"`. The token never lives in a Kubernetes Secret in Git or in plain YAML; it is fetched at pod start from the external store.
+
+Below is a generic placeholder for the init container. 
+
+==== Option: init Container example
+
+NOTE: The following options are generic and more theoretical. Unlike the other options, I could not test them in a real environment yet. This may be covered in a future article.
+
+Generic placeholder (implement according to your secret store):
+
+[source,yaml]
+----
+# Additional values for the Helm chart
+server:
+  extraInitContainers:
+    - name: fetch-secrets
+      image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+      command:
+        - /bin/sh
+        - -c
+        - |
+          # Fetch unseal keys OR transit token from external secret manager
+          echo "Waiting for OpenBao to be ready..."
+          sleep 30
+          # Your fetch logic here (e.g. aws secretsmanager get-secret-value, vault kv get, curl to API) <1>
+      env:
+        - name: EXTERNAL_SECRET_ENDPOINT <2>
+          value: "https://your-external-secret-store.example.com"
+----
+<1> Replace with your fetch logic.
+<2> Replace with your external secret store endpoint.
+
+---
+
+==== Option: Transit seal
+
+When you already have a Vault or OpenBao cluster and want it to act as the root of trust (e.g. central Vault encrypts the seal key), you can use this option.
+
+To prepare everything, you need to do the following:
+
+* Enable the **Transit** secrets engine on the external Vault/OpenBao and create a key (e.g. `openbao-unseal`).
+* Grant the token used by this OpenBao permission to encrypt/decrypt with that key.
+* Store the token in a Kubernetes Secret and inject via `extraSecretEnvironmentVars`
+
+CAUTION: Do not put the token in the config file.
+
+The following HCL configuration is used to configure the OpenBao cluster to use the transit seal.
+
+[source,hcl]
+----
+seal "transit" {
+  address         = "https://external-vault.example.com:8200"
+  token           = "s.xxx"
+  disable_renewal = "false"
+  key_name        = "openbao-unseal"
+  mount_path      = "transit/"
+}
+----
+
+See the link:https://openbao.org/docs/configuration/seal/transit/[OpenBao transit seal] documentation for further details.
+
+===== Dedicated unseal service (seal-only OpenBao)
+
+A common and recommended pattern is to run a **separate, standalone OpenBao instance** whose *only* role is to provide the seal for your production OpenBao. In other words: the external OpenBao holds the unseal keys—via its Transit secrets engine—and the production OpenBao cluster uses the transit seal to auto-unseal by calling that external instance. No application secrets or other workloads run on the dedicated instance; it exists solely to unseal the production OpenBao.
+
+**Why use a dedicated unseal service?**
+
+* **Separation of concerns:** The root of trust for unsealing lives outside the production cluster. If the production OpenBao is compromised or rebuilt, the seal keys remain in the dedicated instance.
+* **Simpler operations:** You unseal and manage only one small, locked-down OpenBao (the seal service). The production OpenBao unseals itself automatically via transit.
+* **No cloud KMS required:** On-premise or air-gapped environments can use this pattern instead of AWS KMS, Azure Key Vault, or GCP Cloud KMS.
+* **Clear trust boundary:** The dedicated instance can be hardened, network-isolated, and backed up independently.
+
+**Architecture (high level):**
+
+. *Dedicated unseal service:* A standalone OpenBao (single node is often enough) with the Transit secrets engine enabled and a dedicated transit key (e.g. `production-openbao-unseal`). This instance is initialised and unsealed once; you keep its unseal keys and root token very secure. It does not store application secrets.
+. *Production OpenBao:* Your HA OpenBao cluster (e.g. in Kubernetes) is configured with `seal "transit"` pointing at the dedicated service URL and a token that has permission only to use that transit key. On startup, each production node asks the dedicated OpenBao to decrypt its seal blob and thus unseals automatically.
+
+
+== Migration from Shamir to auto-unseal
+
+You might wonder if you can migrate from Shamir to auto-unseal. The answer is yes, you can.
+
+If OpenBao was previously initialised with **Shamir** unseal keys and you want to switch to any auto-unseal backend, you can do the following:
+
+. Plan a short maintenance window. Raft HA will tolerate one node at a time.
+. Add the appropriate `seal "..."` block to the config and deploy (e.g. via Argo CD). 
++
+CAUTION: Do NOT re-run init.
++
+. Unseal the **leader** with the existing Shamir unseal keys.
+. Run **seal migration** on the leader:
++
+[source,bash]
+----
+bao operator unseal -migrate
+----
++
+. Restart the leader. It should auto-unseal via the new seal.
+. Update and restart standby nodes. They should auto-unseal as well.
+
+
+== Resources
+
+* link:https://openbao.org/docs/concepts/seal/[OpenBao seal concepts^]
+* link:https://openbao.org/docs/platform/k8s/[OpenBao on Kubernetes^]
+* link:https://openbao.org/docs/configuration/seal/awskms/[AWS KMS seal^]
+* link:https://openbao.org/docs/configuration/seal/azurekeyvault/[Azure Key Vault seal^]
+* link:https://openbao.org/docs/configuration/seal/gcpckms/[Google Cloud KMS seal^]
+* link:https://openbao.org/docs/configuration/seal/static/[Static seal^]
+* link:https://openbao.org/docs/configuration/seal/transit/[Transit seal^]
