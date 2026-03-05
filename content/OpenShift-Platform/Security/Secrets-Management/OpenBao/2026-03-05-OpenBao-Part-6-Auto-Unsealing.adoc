@@ -15,7 +15,7 @@ disableBreadcrumb: true
 
 authors: [Thomas Jungbauer]
 type: post
-draft: true
+draft: false
 categories:
    - OpenShift
    - Security
@@ -748,7 +748,7 @@ seal "transit" {
 }
 ----
 
-See the link:https://openbao.org/docs/configuration/seal/transit/[OpenBao transit seal] documentation for further details.
+See the link:https://openbao.org/docs/configuration/seal/transit/[OpenBao transit seal^] documentation for further details.
 
 ===== Dedicated unseal service (seal-only OpenBao)
 
