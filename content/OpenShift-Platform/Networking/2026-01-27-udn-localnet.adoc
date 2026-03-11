@@ -1,7 +1,7 @@
 ---
 title: "OpenShift User Defined Networking - UDN localnet"
 description: "OpenShift User Defined Networking - UDN localnet"
-date: "2026-01-27"
+date: "2026-03-05"
 doctype: book
 
 draft: true
@@ -12,7 +12,6 @@ show_featured_image_article: true
 disableBreadcrumb: false
 
 authors:
-  - Thomas Jungbauer
   - Toni Schmidbauer
 type: post
 categories:
@@ -31,11 +30,34 @@ aliases: [
 :icons: font
 :toc:
 
-localnet
+This blog post summerizes our learings around using User Defined
+Networking (UDN) with the localnet topology. The goal is to deploy a
+pod with a secondary network interface in a specific VLAN. The pod
+should be reachable from outside the cluster.
 
 <!--more-->
 
-namespace
+OVNKubernetes supports adding secondary networks (there could be more
+than one secondary network) to pods. This is also applicable to
+Virtual Machines hosted on OpenShift Virtualization (KubeVirt).
+
+There are three possible network topologies:
+
+- Layer 2: Basically a VLAN spanned over all nodes in the
+  cluster. This is per default not reachable from outside the
+  cluster. UDN BPG could be used to expose such a configuration.
+- Layer 3: A layer 3 IP subnet per node similar to the pod network, interconnected via
+  routers. Again not reachable from the outside, UDN BPG could be used
+  to announce this network to routes outside of OCP.
+- Localnet: A Layer 2 topology with a connection to a
+  physical network. In our case the Localnet layer 2 bridge is
+  connected to br-ex.
+
+== 10K view of OpenShift networking
+
+
+
+== Localnet topology configuration
 
 [source,yaml]
 ----------
@@ -149,7 +171,7 @@ metadata:
   name: network-pod
   namespace: testvms-udn
   annotations:
-    k8s.v1.cni.cncf.io/networks: testvms-udn/vlan-999 # <1>
+    k8s.v1.cni.cncf.io/networks: testvms-udn/vlan-999 <1>
 spec:
   securityContext:
     runAsNonRoot: true
@@ -165,7 +187,6 @@ spec:
 ----------
 <1> name of NAD
 
-
 - vlan id has to be in nad
 - vlan's must have same ip range in nads even if nad in different namespaces
 
@@ -174,3 +195,39 @@ was geht
 - cudn localnet geht nur als secondary
 
 - udn geht nur l2/l3 primary und secondary
+
+=== Diving into the configuration
+
+Let's see how OVN Kubernets configures our localnet topology. First we
+check the running pods in the _openshift-ovn-kubernets_ namesapce. We
+are interested in the _ovnkube-node_ pods.
+
+[source,bash]
+----------
+content/OpenShift-Platform/Networking on  master [!?] ➜  oc get pods -n openshift-ovn-kubernetes  -o wide
+NAME                                     READY   STATUS    RESTARTS   AGE   IP           NODE                  NOMINATED NODE   READINESS GATES
+ovnkube-control-plane-7c49bfd667-xzjc6   2/2     Running   18         43d   10.0.0.206   sno                   <none>           <none>
+ovnkube-node-lkssc                       8/8     Running   99         40d   10.0.0.207   wrk01.lan.stderr.at   <none>           <none>
+ovnkube-node-vcvdw <1>                   8/8     Running   72         43d   10.0.0.206   sno                   <none>           <none>
+----------
+<1> Let's examine the _ovnkube-node_ pod on the sno host
+
+Lets connect to one of the _ovnkube-node_ pods and examine the Open
+vSwitch configuration. The _ovnkube-node_ pod has multiple
+containers and we are only interested in the _ovn-controller_ container:
+
+[source,bash]
+----------
+$ oc rsh -c ovn-controller ovnkube-node-vcvdw
+sh-5.1# ovs-vsctl list-br <1>
+br-ex
+br-int
+ovs-bridge-storage0
+sh-5.1# ovs-vsctl list-ports br-ex <2>
+enp8s0
+patch-br-ex_cluster_udn_cluster.udn.tenant1_sno-to-br-int
+patch-br-ex_sno-to-br-int
+patch-cluster_udn_cudn.localnet_ovn_localnet_port-to-br-int
+----------
+<1> First we list the available bridges
+<2> Let's see which bridge ports are defined
