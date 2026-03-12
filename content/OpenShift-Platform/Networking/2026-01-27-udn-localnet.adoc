@@ -57,6 +57,23 @@ There are three possible network topologies:
 
 == Creating a localnet topology configuration
 
+
+We would like to explore two separate scenarios:
+
+1. A simple connection for VM's to the outside world. This connects a
+virtual machine to the same physical network as the node where it is
+running. The node is on an access port.
+
+2. A more involved configuration where the VM is located in a separate
+VLAN. Our OpenShift node has a trunk port configured and the virtual
+machine should be only reachable in a dedicated VLAN.
+
+For more information about VLANS see https://en.wikipedia.org/wiki/VLAN.
+
+Lets take a look at our current OVN configuration.
+
+=== Simple VM connectivity
+
 First let's create a namespace for testing out *localnet* configuration:
 
 [source,yaml]
@@ -66,22 +83,35 @@ kind: Namespace
 metadata:
   labels:
     environment: "udn-localnet"
-  name: testvms-udn
+  name: test-udn-localnet
 ----------
 
-We would like to explore two separate scenarios:
+Next we create our _ClusterUserDefinedNetwork_.
 
-1. A simple connection for VM's to the outside world. This connects a
-virutal machine to the same physcal network as the node where it is
-running. The node is on an access port.
+[source,yaml]
+----------
+apiVersion: k8s.ovn.org/v1
+kind: ClusterUserDefinedNetwork
+metadata:
+  name: cudn-localnet
+spec:
+  namespaceSelector:
+    matchExpressions:
+    - key: kubernetes.io/metadata.name
+      operator: In
+      values:
+      - test-udn-localnet <1>
+  network:
+    localnet:
+      ipam:
+        mode: Disabled
+      physicalNetworkName: localnet1
+      role: Secondary
+    topology: Localnet
+----------
+<1> This matches the namespaces we created above
 
-2. A more involved configuration where the VM is located in a separate
-VLAN. Our OpenShift node has a trunk port configured and should be
-only reachable in a dedicated VLAN.
 
-For more information about VLANS see https://en.wikipedia.org/wiki/VLAN.
-
-=== Simple VM connectivity
 
 === VM in a dedicated VLAN
 
