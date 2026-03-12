@@ -43,21 +43,21 @@ Virtual Machines hosted on OpenShift Virtualization (KubeVirt).
 
 There are three possible network topologies:
 
-- Layer 2: Basically a VLAN spanned over all nodes in the
-  cluster. This is per default not reachable from outside the
-  cluster. UDN BPG could be used to expose such a configuration.
-- Layer 3: A layer 3 IP subnet per node similar to the pod network, interconnected via
-  routers. Again not reachable from the outside, UDN BPG could be used
-  to announce this network to routes outside of OCP.
-- Localnet: A Layer 2 topology with a connection to a
-  physical network. In our case the Localnet layer 2 bridge is
-  connected to br-ex.
+- Layer 3: A layer 3 IP subnet per node similar to the pod network,
+  interconnected via OVN virtual routers and a OVN virtual switch per
+  node. The Layer 3 subnets are not reachable from the outside, UDN
+  BPG could be used to announce this network to routes outside of OCP.
+- Layer 2: Basically a VLAN spanned via a OVN virtual switch over all
+  nodes in the cluster. Again this is per default not reachable from
+  outside the cluster. UDN BPG could be used to expose such a
+  configuration.
+- Localnet: A Layer 2 topology with a connection to a physical
+  network. There is a patch port from the virtual switch to
+  br-ex. br-ex is a Open vSwitch bridge where the interface of a node is
 
-== 10K view of OpenShift networking
+== Creating a localnet topology configuration
 
-
-
-== Localnet topology configuration
+First let's create a namespace for testing out *localnet* configuration:
 
 [source,yaml]
 ----------
@@ -69,8 +69,21 @@ metadata:
   name: testvms-udn
 ----------
 
+We would like to explore two separate scenarios:
 
-bridge mapping
+1. A simple connection for VM's to the outside world. This connects a
+virutal machine to the same physcal network as the node where it is
+running. The node is on an access port.
+
+2. A more involved configuration where the VM is located in a separate
+VLAN. Our OpenShift node has a trunk port configured and should be
+only reachable in a dedicated VLAN.
+
+For more information about VLANS see https://en.wikipedia.org/wiki/VLAN.
+
+=== Simple VM connectivity
+
+=== VM in a dedicated VLAN
 
 [source,yaml]
 ----------
@@ -196,7 +209,7 @@ was geht
 
 - udn geht nur l2/l3 primary und secondary
 
-=== Diving into the configuration
+== Diving into the configuration
 
 Let's see how OVN Kubernets configures our localnet topology. First we
 check the running pods in the _openshift-ovn-kubernets_ namesapce. We
@@ -231,3 +244,5 @@ patch-cluster_udn_cudn.localnet_ovn_localnet_port-to-br-int
 ----------
 <1> First we list the available bridges
 <2> Let's see which bridge ports are defined
+
+== 10K view of OpenShift networking
