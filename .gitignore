@@ -14,3 +14,6 @@ pom.xml.asc
 /node_modules/
 /.idea/
 /blog-src.iml
+
+# Cursor (machine-local symlinks to skills/rules; run ai-library link-to-blog.sh after clone)
+.cursor/
