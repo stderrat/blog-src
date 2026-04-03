@@ -1,0 +1,243 @@
+---
+title: "Tuning OpenShift GitOps for performance at scale (draft)"
+description: "Performance optimizations for OpenShift GitOps on a hub cluster managing many spokes: reconcile tuning, sharding, processors, and how the ArgoCD CR maps to Argo CD settings."
+date: "2026-03-27"
+doctype: book
+weight: 99
+
+show_featured_image_summary: false
+show_featured_image_article: false
+disableBreadcrumb: true
+
+authors: [Thomas Jungbauer]
+draft: true
+type: post
+categories:
+   - GitOps
+   - OpenShift
+
+tags: ["Argo CD", "OpenShift GitOps", "OpenShift", "OCP", "GitOps", "Multi-cluster", "Hub and Spoke", "Kubernetes", "Helm", "Performance", "Reconcile", "Sharding"]
+
+aliases: []
+---
+
+:icons: font
+:toc:
+
+[NOTE]
+====
+**Draft** — validate keys against your installed OpenShift GitOps operator CRD and embedded Argo CD version before production use.
+====
+
+OpenShift GitOps is Argo CD under the hood, but you typically do not hand-edit upstream manifests. The **GitOps Operator** reconciles an **`ArgoCD` custom resource** into Deployments, StatefulSets, ConfigMaps, Routes, and RBAC. This article summarizes performance-oriented settings from official Argo CD documentation, community write-ups, and how to apply them on **OpenShift GitOps** when **one management cluster** runs GitOps and manages **many workload clusters**.
+
+<!--more-->
+
+== Why this matters
+
+Performance work is a mix of:
+
+* **First-class `ArgoCD` CR fields** (documented in Red Hat product docs),
+* **`spec.extraConfig`** (merges keys into `argocd-cm` for settings not exposed as CR fields),
+* **`spec.cmdParams`** (maps to `argocd-cmd-params-cm`),
+* **Component `env`** on `spec.controller`, `spec.repo`, `spec.server`, and so on,
+* **Capacity**: CPU/memory per component, replica counts, and **sharding** when controller memory and API load dominate.
+
+A hub that registers many remote clusters multiplies cluster secrets, watches, cache footprint, and API traffic—on the **management cluster** (where Argo CD runs) and on **each spoke** during sync and status collection.
+
+== Reference sources
+
+CAUTION: The following section consider OpenShift GitOps Operator, that is based on Argo CD, but is configured differently. Instead of using a ConfigMpa the Operator is using the ArgoCD custom resource to configure the Argo CD instance.
+
+=== Official reconcile optimization
+
+Per default, Argo CD Applications are refreshed every time a resource changes.https://argo-cd.readthedocs.io/en/stable/operator-manual/reconcile/[Argo CD: Reconcile optimization^] documents **ignore rules for resource updates**: Kubernetes controllers often update or patch a resource, causing changes in `status` or `metadata`, which can trigger unnecessary application reconciles. 
+
+Mitigations include:
+
+* `resource.ignoreResourceUpdatesEnabled` and `resource.customizations.ignoreResourceUpdates.*` on `argocd-cm` (JSON pointers / jq paths, per GroupKind or `all`),
+* `ignoreDifferences` behavior and `resource.compareoptions.ignoreDifferencesOnResourceUpdates`,
+* **Operational method**: raise application-controller log level to debug and search for `Requesting app refresh caused by object update` to find hot kinds; confirm ignores with `Ignoring change of object because none of the watched resource fields have changed`.
+
+IMPORTANT: Upstream states that `resource.ignoreResourceUpdatesEnabled` **defaults to `true`** in current stable docs. Some community articles describe turning it on from `false`—**verify on your Argo CD version**; you may already have it enabled and should focus on **targeted customizations** (which fields to ignore).
+
+=== Community: “Make ArgoCD Optimized and Blazing Fast”
+
+https://medium.com/@perezmark.tomcat/make-argocd-optimized-and-blazing-fast-a8024ce5fee3[Mark Perez (Medium, Dec 2025)^] is a practical checklist at very large scale (author cites 8000+ applications, multiple clusters, many repos). Themes that align with upstream:
+
+* **Repo server:** `ARGOCD_EXEC_TIMEOUT`, `ARGOCD_GIT_ATTEMPTS_COUNT`, Helm concurrency, **repo-server parallelism limit** (avoid unlimited concurrency leading to OOM).
+* **Controller:** replicas + **sharding**, higher Kubernetes client QPS/burst, status/operation processors, kubectl parallelism, repo-server timeout from controller, round-robin sharding (upstream labels some sharding algorithms **experimental**).
+* **argocd-cm:** `timeout.reconciliation`, `timeout.reconciliation.jitter`, `timeout.hard.reconciliation`; broad `ignoreResourceUpdates` for `/status` (trade-off: UI may lag until next refresh).
+* **Application annotation** `argocd.argoproj.io/manifest-generate-paths` for **monorepo cache efficiency**.
+* **Orphaned resources** tuning in `AppProject` to reduce noise.
+
+CAUTION: Values such as **600** status processors are **extreme** and need large controller pods, API headroom, and metrics. Upstream HA guidance suggests gentler starting points (e.g. on the order of **50 / 25** at roughly 1000 applications). Treat large numbers as a **ceiling example**, not a default.
+
+=== Official high availability and scaling
+
+https://argo-cd.readthedocs.io/en/stable/operator-manual/high_availability/[Argo CD: High availability^] complements the above: repo-server parallelism, disk/monorepo issues, processor counts, reconciliation interval + jitter, sharding methods and warnings, `ARGOCD_CLUSTER_CACHE_*` for huge clusters, `ARGOCD_APPLICATION_TREE_SHARD_SIZE`, `ARGOCD_GRPC_MAX_SIZE_MB` for very large app counts, and **webhook-driven refresh** to reduce blind polling.
+
+== OpenShift GitOps: where each setting lives
+
+[cols="1,1,2",options="header"]
+|===
+|Concern | Plain Argo CD (often) | OpenShift GitOps (typical)
+
+|Resource requests/limits
+|YAML manifests
+|`spec.controller.resources`, `spec.repo.resources`, `spec.server.resources`, etc. — see https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/1.19/html-single/managing_resource_use/[Managing resource use (OpenShift GitOps 1.19)^]
+
+|Reconciliation interval
+|`argocd-cm`
+|`spec.controller.appSync` *or* `spec.extraConfig` for `timeout.reconciliation` / jitter if you need exact upstream keys
+
+|Status / operation processors
+|`argocd-cmd-params-cm` or flags
+|`spec.controller.processors.status` and `spec.controller.processors.operation` — https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/1.19/html-single/argo_cd_instance/index/[Argo CD instance / controller properties^]
+
+|Sharding (many clusters)
+|StatefulSet replicas + env
+|`spec.controller.sharding.enabled`, `sharding.replicas`, `dynamicScalingEnabled`, `clustersPerShard`, `minShards`, `maxShards` (same doc)
+
+|Controller / repo env (QPS, replicas, timeouts, Helm flags)
+|Pod env
+|`spec.controller.env`, `spec.repo.env`
+
+|`argocd-cm`-only keys
+|Edit ConfigMap
+|`spec.extraConfig` (merges into `argocd-cm`; **overrides** conflicting CR-driven entries per operator — https://argocd-operator.readthedocs.io/en/stable/usage/extra-config/[Argo CD Operator: ExtraConfig^])
+
+|`argocd-cmd-params-cm` keys
+|Edit ConfigMap
+|`spec.cmdParams` on the `ArgoCD` CR
+|===
+
+**Operator Subscription** environment variables (for example `DISABLE_DEFAULT_ARGOCD_INSTANCE`, `CONTROLLER_CLUSTER_ROLE`) live on the **Subscription** or operator Deployment. They affect **how** the default instance is created and **RBAC**, not every performance knob.
+
+For production, confirm aggressive tuning (especially **experimental sharding** modes) against your **Red Hat support** scope and **OpenShift GitOps / embedded Argo CD version**.
+
+== Scenario: one management cluster, many managed clusters
+
+Bottlenecks usually appear in this order:
+
+. **Application controller** memory and CPU (watches + per-cluster cache + queue depth),
+. **Kubernetes API** on the management cluster and, during sync, on spokes,
+. **Repo server** (Git + Helm/Kustomize latency, concurrency, disk),
+. **Redis** and **server** (UI/API) at very high application counts.
+
+Sharding and processor tuning target (1) and (2). Repo-server tuning and monorepo annotations target (3).
+
+Scale tiers below are **approximate**; use controller memory, `argocd_app_reconcile`, API server 429/latency, and repo-server OOM/restarts as ground truth.
+
+== Tier A — Small (roughly < 100 applications, 1–3 clusters)
+
+* **Defaults** often suffice.
+* Set **realistic** resource requests/limits if the instance namespace uses **ResourceQuotas**; undersized repo-server or controller pods show up as restarts and flaky syncs.
+* Prefer **Git webhooks** for refresh when possible so you rely less on poll intervals alone.
+* Do **not** copy “8000 app” processor counts unless metrics justify it.
+
+== Tier B — Medium (roughly 100–500 applications, ~4–15 clusters)
+
+* Increase **`spec.server.replicas`** and **`spec.repo.replicas`** for availability and throughput — see “Enabling replicas for server and repo server” in the https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/1.19/html-single/argo_cd_instance/index/[Argo CD instance^] doc.
+* **Raise controller memory** before raising concurrency; hub multi-cluster setups often hit memory first.
+* **Moderate processors** via `spec.controller.processors.status` and `spec.controller.processors.operation` — step up gradually (for example toward the **tens**, not hundreds) while watching API latency and controller CPU.
+* **`spec.repo.env`:** consider `ARGOCD_EXEC_TIMEOUT` if Helm/Kustomize approaches timeouts; `ARGOCD_GIT_ATTEMPTS_COUNT` for flaky Git (see upstream HA repo-server section).
+* **`spec.cmdParams`:** set `reposerver.parallelism.limit` to a **finite** value (community examples often use roughly 20–100 depending on chart weight) to avoid OOM from unbounded parallel manifest generation.
+* **Reconcile jitter:** add `timeout.reconciliation.jitter` under `spec.extraConfig` to spread periodic work across time (upstream HA + cmd-params).
+
+== Tier C — Large (roughly 500–2000+ applications, 15+ clusters, or very chatty CRDs)
+
+* **Sharding:** enable `spec.controller.sharding` (`enabled`, `replicas`, optionally `dynamicScalingEnabled` with `minShards`, `maxShards`, `clustersPerShard`) — operator-native relief for memory and watch load.
+* Read upstream warnings on **`round-robin` vs `consistent-hashing` vs `legacy`**; treat non-legacy algorithms as **experimental** until validated on your version.
+* **`spec.controller.env`:** tune `ARGOCD_K8S_CLIENT_QPS` and `ARGOCD_K8S_CLIENT_BURST` **only** with API server monitoring.
+* **Reconcile optimization:** use `spec.extraConfig` for `resource.customizations.ignoreResourceUpdates.<group>_<Kind>` for high-churn types, guided by debug logs. Prefer **targeted** rules over ignoring all `/status` unless you accept delayed UI reflection of status-only changes.
+* **Monorepos:** use Application annotation `argocd.argoproj.io/manifest-generate-paths` for path-scoped cache invalidation.
+* **Very large UI payloads:** upstream notes `ARGOCD_GRPC_MAX_SIZE_MB` on the server for 3000+ applications — set via **`spec.server.env`**.
+
+== Tier D — Very large (thousands of applications, many clusters)
+
+* Everything in Tier C, plus:
+* **Multiple GitOps instances** (prod vs non-prod, or team-scoped) remain the **safest** blast-radius pattern; the Medium author recommends splitting when possible.
+* **Processor counts** in the **hundreds** only with **large controller pods**, **sharding**, and a **healthy API**; validate with Prometheus/Grafana.
+* **`ARGOCD_CLUSTER_CACHE_LIST_PAGE_BUFFER_SIZE`** (and related) if you hit etcd continue / list issues on enormous clusters.
+* **`ARGOCD_APPLICATION_TREE_SHARD_SIZE`** when application trees are huge (Redis traffic).
+
+== Example: `ArgoCD` CR fragments (illustrative)
+
+Adjust names, namespace, and values to your environment.
+
+.Processors, sharding, repo replicas
+[source,yaml]
+----
+apiVersion: argoproj.io/v1beta1
+kind: ArgoCD
+metadata:
+  name: openshift-gitops
+  namespace: openshift-gitops
+spec:
+  server:
+    replicas: 3
+  repo:
+    replicas: 3
+    env:
+      - name: ARGOCD_EXEC_TIMEOUT
+        value: "3m"
+      - name: ARGOCD_GIT_ATTEMPTS_COUNT
+        value: "3"
+  controller:
+    processors:
+      status: 50
+      operation: 25
+    sharding:
+      enabled: true
+      replicas: 3
+    resources:
+      limits:
+        memory: 8Gi
+        cpu: "4"
+      requests:
+        memory: 4Gi
+        cpu: "1"
+    env:
+      - name: ARGOCD_K8S_CLIENT_QPS
+        value: "100"
+      - name: ARGOCD_K8S_CLIENT_BURST
+        value: "200"
+----
+
+.`argocd-cm` keys via `extraConfig` (verify key names for your Argo CD version)
+[source,yaml]
+----
+spec:
+  extraConfig:
+    timeout.reconciliation: "5m"
+    timeout.reconciliation.jitter: "60s"
+    resource.customizations.ignoreResourceUpdates.autoscaling_HorizontalPodAutoscaler: |
+      jsonPointers:
+        - /status
+----
+
+.`argocd-cmd-params-cm` via `cmdParams`
+[source,yaml]
+----
+spec:
+  cmdParams:
+    reposerver.parallelism.limit: "50"
+    controller.repo.server.timeout.seconds: "180"
+    server.repo.server.timeout.seconds: "180"
+----
+
+== Operational discipline
+
+. Change **one** knob at a time; watch controller memory, reconcile duration, API **429s**, and repo-server restarts.
+. Match tuning to the **embedded Argo CD version** in your OpenShift GitOps release.
+. Prefer **webhooks** and **path-scoped monorepo annotations** before maximizing QPS/processors.
+
+== References
+
+* https://argo-cd.readthedocs.io/en/stable/operator-manual/reconcile/[Argo CD — Reconcile optimization^]
+* https://argo-cd.readthedocs.io/en/stable/operator-manual/high_availability/[Argo CD — High availability / scaling^]
+* https://medium.com/@perezmark.tomcat/make-argocd-optimized-and-blazing-fast-a8024ce5fee3[Mark Perez — Make ArgoCD Optimized and Blazing Fast (Medium)^]
+* https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/1.19/html-single/managing_resource_use/[Red Hat OpenShift GitOps 1.19 — Managing resource use^]
+* https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/1.19/html-single/argo_cd_instance/index/[Red Hat OpenShift GitOps 1.19 — Argo CD instance / CR properties^]
+* https://argocd-operator.readthedocs.io/en/stable/usage/extra-config/[Argo CD Operator — ExtraConfig^]

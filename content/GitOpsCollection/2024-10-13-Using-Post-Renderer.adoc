@@ -162,7 +162,7 @@ However, there are other ways to implement this. You could omit this part and de
 Now it is time to patch our repo server specification of the Argo CD custom resource.  
 The following should do it: 
  
-NOTE: As image for the sidecar container, I am using https://quay.io/repository/gnunn/tools[Gerald Nunn's^] tool image. You can use your own image, as long as Helm and Kustomize are available. 
+NOTE: As image for the sidecar container, I am using the custom built https://quay.io/repository/tjungbau/gitops-tools[GitOps Tools^] image. You can use your own image, as long as Helm and Kustomize are available. 
 
 [source,yaml]
 ---- 
@@ -183,7 +183,7 @@ spec:
         env: 
           - name: APP_ENV 
             value: prod 
-        image: quay.io/gnunn/tools:latest <3>
+        image: quay.io/repository/tjungbau/gitops-tools <3>
         imagePullPolicy: Always 
         securityContext: 
           runAsNonRoot: true 
@@ -283,6 +283,5 @@ This 2nd patch will completely remove the /spec/path from the Route object named
 
 == Further information: 
 * Example, which was the base of my patch: https://github.com/gitops-examples/argocd-operator-customization/tree/main/plugin-sidecar[Plugin Sidecar^]
-* G.Nunn's tools image (Thanks for everything):  https://quay.io/repository/gnunn/tools 
- 
-
+* G.Nunn's original tools image (Thanks for everything):  https://quay.io/repository/gnunn/tools 
+* My custom built tools image:  https://quay.io/repository/tjungbau/gitops-tools
