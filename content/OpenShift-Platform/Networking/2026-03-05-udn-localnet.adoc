@@ -31,7 +31,7 @@ aliases: [
 :toc:
 
 This blog post summerizes our learings around using User Defined
-Networking (UDN) with the localnet topology. The goal is to deploy a
+Networking (UDN) with the *localnet* topology. The goal is to deploy a
 pod with a secondary network interface in a specific VLAN. The pod
 should be reachable from outside the cluster.
 
@@ -47,22 +47,22 @@ There are three possible network topologies:
   interconnected via OVN virtual routers and a OVN virtual switch per
   node. The Layer 3 subnets are not reachable from the outside, UDN
   BPG could be used to announce this network to routes outside of OCP.
-- Layer 2: Basically a VLAN spanned via a OVN virtual switch over all
+- Layer 2: Basically a VLAN spanned via OVN virtual switches over all
   nodes in the cluster. Again this is per default not reachable from
   outside the cluster. UDN BPG could be used to expose such a
   configuration.
 - Localnet: A Layer 2 topology with a connection to a physical
   network. There is a patch port from the virtual switch to
-  br-ex. br-ex is a Open vSwitch bridge where the interface of a node is
+  br-ex. br-ex is a Open vSwitch bridge contain a public interface of
+  a node.
 
 == Creating a localnet topology configuration
-
 
 We would like to explore two separate scenarios:
 
 1. A simple connection for VM's to the outside world. This connects a
-virtual machine to the same physical network as the node where it is
-running. The node is on an access port.
+virtual machine to the same physical network as the OpenShift node where it is
+running. The OpenShift node is on an access port.
 
 2. A more involved configuration where the VM is located in a separate
 VLAN. Our OpenShift node has a trunk port configured and the virtual
@@ -110,8 +110,6 @@ spec:
     topology: Localnet
 ----------
 <1> This matches the namespaces we created above
-
-
 
 === VM in a dedicated VLAN
 
@@ -242,7 +240,7 @@ was geht
 == Diving into the configuration
 
 Let's see how OVN Kubernets configures our localnet topology. First we
-check the running pods in the _openshift-ovn-kubernets_ namesapce. We
+check the running pods in the _openshift-ovn-kubernets_ namespace. We
 are interested in the _ovnkube-node_ pods.
 
 [source,bash]
