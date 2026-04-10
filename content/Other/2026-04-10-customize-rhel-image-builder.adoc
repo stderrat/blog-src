@@ -1,0 +1,178 @@
+---
+title: "Creating customize RHEL 10 VM image with image-builder"
+description: "Creating customize RHEL 10 VM image with image-builder"
+date: "2026-04-10"
+doctype: book
+weight: 10
+
+draft: true
+
+featured_image: /other/images/homelab/homelab_logo.png
+show_featured_image_summary: true
+show_featured_image_article: true
+disableBreadcrumb: false
+
+authors: [Toni Schmidbauer]
+type: post
+categories:
+   - RHEL10
+   - image-builder
+   - Virtualization
+
+tags: ["Other", "Home Lab", "RHEL", "Image builder", "bootc"]
+
+aliases: [
+]
+---
+
+:imagesdir: /other/images/homelab/
+:icons: font
+:toc:
+
+In the blog post
+https://blog.stderr.at/other/2026-04-09-macos-rhel10-bootc/[Creating a
+RHEL 10 VM on macOS with bootc-image-builder] we described how to
+quickly create a bootc (https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html/using_image_mode_for_rhel_to_build_deploy_and_manage_operating_systems/introducing-image-mode-for-rhel[image mode]) based image macOS under. Now we would like to
+create a customized standard RHEL image.
+
+<!--more-->
+
+For this exercise we re-use an already provisioned RHEL 10.1 machine, the reasons for this are
+
+* We are going to use the _image-builder_ command instead of _bootc
+  image builder_. If there is a container image providing this
+  command, please let us know
+* We are going to install packages which requires a subscribed RHEL
+  machine. RHEL subscription up to 16 machines are free of charge. You
+  just need to register at the https://developers.redhat.com/[Red Hat developer^] site.
+
+First we need to install required tools onto our RHEL 10.1 host:
+
+[source,bash]
+----------
+$ sudo dnf install -y image-builder
+----------
+
+Next we create a blueprint file to customize the resulting qcow2
+image. We use the resulting image for a "services" machine, running
+Unifi OS, Kea for DHCP and ISC bind (dns server):
+
+[source,toml]
+----------
+name = "services-rhel10"
+description = "A VM running services"
+version = "0.1"
+
+[[packages]]
+name = "podman"
+version = "*" <1>
+
+[customizations]
+hostname = "services"
+
+[[customizations.filesystem]]
+mountpoint = "/"
+minsize = "50 GiB" <2>
+
+[customizations.kernel]
+append = "ip=10.0.0.144::10.0.0.1:255.255.255.0:services:ens3:none:10.0.0.255" <3>
+
+[[customizations.group]]
+name = "pinhead"
+gid = 1000
+
+[[customizations.user]]
+name = "pinhead"
+password = "<password hash>" <4>
+key = "<ssh public key>" <5>
+home = "/home/pinhead/"
+shell = "/usr/bin/bash"
+groups = ["users", "wheel"]
+uid = 1000
+gid = 1000
+
+[[customizations.sshkey]]
+user = "root"
+key = "<public key>" <6>
+----------
+<1> use the latest version of this package
+<2> resize the resulting image to 50GB
+<3> we configure a static ip address for this machine, our default interface is _ens3_
+<4> Enter the generated password hash here (see below)
+<5> SSH public key to access this account
+<6> SSH public key to access the root account
+
+To create password hash use:
+
+[source,bash]
+----------
+python3 -c 'import crypt,getpass;pw=getpass.getpass();print(crypt.crypt(pw) if (pw==getpass.getpass("Confirm: ")) else exit())'
+----------
+
+For a detailed list of all customizations supported by _image-builder_
+see the
+https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html/composing_a_customized_rhel_system_image/supported-image-customizations[image builder costmizations^]
+documentation.
+
+As mentioned in the
+https://blog.stderr.at/other/2026-04-09-macos-rhel10-bootc/[previous article^]
+image builder provides the option to configure the resulting
+image via kickstart. A builder for kickstart files is available here:
+
+https://access.redhat.com/labs/kickstartconfig/
+
+For a complete list of options see the https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html/automatically_installing_rhel/kickstart-commands-and-options-reference[kickstart documentation^].
+
+One important note from the documentation (quoted):
+
+NOTE: The following combined customizations are not supported: [customizations.user] and [customizations.installer.kickstart]. When you add a Kickstart, use a configuration file in the TOML format, because multi-line strings are prone to error.
+
+Now we are ready to run _image-builder_:
+
+[source,bash]
+----------
+image-builder build qcow2 --distro rhel-10.1 --arch x86_64 --blueprint services-blueprint.toml
+----------
+
+The command above failed for us with the following error message:
+
+[source,console]
+----------
+Failed to open file "/sys/fs/selinux/checkreqprot": Read-only file system
+imported gpg key
+Signature check failed on sha256:9d0a71d87912a815f837f8427438936d6e9842834cc1f1062b90b2a41fbde594, lookup package name in manifest.
+Traceback (most recent call last):
+  File "/run/osbuild/bin/org.osbuild.rpm", line 260, in <module>
+r = main(args["tree"], args["inputs"], args["options"])
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/run/osbuild/bin/org.osbuild.rpm", line 162, in main
+subprocess.run([
+  File "/usr/lib64/python3.12/subprocess.py", line 571, in run
+raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['rpmkeys', '--root', '/run/osbuild/tree', '--checksig', 'sha256:9d0a71d87912a815f837f8427438936d6e9842834cc1f1062b90b2a41fbde594']' returned non-zero exit status 1.
+Finished module org.osbuild.rpm
+Finished pipeline build
+manifest - failed
+Output:
+Failed
+----------
+
+According to https://access.redhat.com/solutions/7136467[this
+knowledge base article] this is a bug in the current (2026-04-10)
+version of image builder.
+
+You can downloaded an updated json file containing the missing RPM GPG
+keys from the article. Drop the _RHEL-10.1_ JSON file in a directory
+and run _image-builder_ again:
+
+[source,bash]
+----------
+image-builder --data-dir override/ <1> build qcow2 --distro rhel-10.1 --arch x86_64 --blueprint services-blueprint.toml
+----------
+<1> Use the _--data-dir_ option and specify the folder with the _RHEL-10.1.json_ file.
+
+You can find the resulting qcow image in the output directory under
+_rhel-10.1-qcow2-x86_64/rhel-10.1-qcow2-x86_64.qcow2_.
+
+A _Makefile_ to streamline image creation can be found
+https://codeberg.org/tosmi/playground/src/branch/master/rhel/image-builder/Makefile[here^].
