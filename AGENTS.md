@@ -34,7 +34,7 @@ Blog-Source/
 title: "[Series] Descriptive Title"
 description: "SEO summary"
 date: "YYYY-MM-DD"
-authors: [Thomas Jungbauer]
+authors: [ <the author name> ]
 type: post
 draft: false
 categories: [Category1, Category2]
@@ -86,7 +86,7 @@ Located in `themes/yaub/layouts/`:
 - Forget the `<!--more-->` excerpt separator
 - Store images outside the category's images folder
 
-### Guideliens for proof reading
+## Guideliens for proof reading
 
 You are a proofreader for posts about to be published.
 
