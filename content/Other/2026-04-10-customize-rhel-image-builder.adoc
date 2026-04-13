@@ -1,13 +1,13 @@
 ---
-title: "Creating customize RHEL 10 VM image with image-builder"
-description: "Creating customize RHEL 10 VM image with image-builder"
+title: "Creating a customized RHEL 10 VM image with image-builder"
+description: "Creating a customized RHEL 10 VM image with image-builder"
 date: "2026-04-10"
 doctype: book
 weight: 10
 
-draft: true
+draft: false
 
-featured_image: /other/images/homelab/homelab_logo.png
+featured_image: /other/images/homelab/cat_laboratory.png
 show_featured_image_summary: true
 show_featured_image_article: true
 disableBreadcrumb: false
@@ -32,7 +32,7 @@ aliases: [
 In the blog post
 https://blog.stderr.at/other/2026-04-09-macos-rhel10-bootc/[Creating a
 RHEL 10 VM on macOS with bootc-image-builder] we described how to
-quickly create a bootc (https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html/using_image_mode_for_rhel_to_build_deploy_and_manage_operating_systems/introducing-image-mode-for-rhel[image mode]) based image macOS under. Now we would like to
+quickly create a bootc (https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html/using_image_mode_for_rhel_to_build_deploy_and_manage_operating_systems/introducing-image-mode-for-rhel[image mode]) base image on macOS. Now we would like to
 create a customized standard RHEL image.
 
 <!--more-->
@@ -43,7 +43,7 @@ For this exercise we re-use an already provisioned RHEL 10.1 machine, the reason
   image builder_. If there is a container image providing this
   command, please let us know
 * We are going to install packages which requires a subscribed RHEL
-  machine. RHEL subscription up to 16 machines are free of charge. You
+  machine. A RHEL subscription for up to 16 machines is free of charge. You
   just need to register at the https://developers.redhat.com/[Red Hat developer^] site.
 
 First we need to install required tools onto our RHEL 10.1 host:
@@ -102,7 +102,7 @@ key = "<public key>" <6>
 <5> SSH public key to access this account
 <6> SSH public key to access the root account
 
-To create password hash use:
+To create a password hash use:
 
 [source,bash]
 ----------
@@ -111,7 +111,7 @@ python3 -c 'import crypt,getpass;pw=getpass.getpass();print(crypt.crypt(pw) if (
 
 For a detailed list of all customizations supported by _image-builder_
 see the
-https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html/composing_a_customized_rhel_system_image/supported-image-customizations[image builder costmizations^]
+https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html/composing_a_customized_rhel_system_image/supported-image-customizations[image builder customizations^]
 documentation.
 
 As mentioned in the
@@ -161,7 +161,7 @@ According to https://access.redhat.com/solutions/7136467[this
 knowledge base article] this is a bug in the current (2026-04-10)
 version of image builder.
 
-You can downloaded an updated json file containing the missing RPM GPG
+You can download an updated JSON file containing the missing RPM GPG
 keys from the article. Drop the _RHEL-10.1_ JSON file in a directory
 and run _image-builder_ again:
 
