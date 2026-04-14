@@ -1,12 +1,17 @@
----
-title: "Tuning OpenShift GitOps for performance at scale (draft)"
+--- 
+title: "[Ep.16] Tuning OpenShift GitOps for performance at scale"
 description: "Performance optimizations for OpenShift GitOps on a hub cluster managing many spokes: reconcile tuning, sharding, processors, and how the ArgoCD CR maps to Argo CD settings."
-date: "2026-03-27"
+date: "2026-04-14"
 doctype: book
-weight: 99
+weight: 100
 
-show_featured_image_summary: false
-show_featured_image_article: false
+series: "GitOps Episodes"
+series_part: 16
+
+featured_image: /gitopscollection/images/logos/ep-16-gitops.png
+show_featured_image_summary: true
+show_featured_image_article: true
+featured_image_position: 25% 35%
 disableBreadcrumb: true
 
 authors: [Thomas Jungbauer]
@@ -21,29 +26,923 @@ tags: ["Argo CD", "OpenShift GitOps", "OpenShift", "OCP", "GitOps", "Multi-clust
 aliases: []
 ---
 
+:imagesdir: /gitopscollection/images/
 :icons: font
 :toc:
 
-[NOTE]
-====
-**Draft** — validate keys against your installed OpenShift GitOps operator CRD and embedded Argo CD version before production use.
-====
+Argo CD is a powerhouse for GitOps. It is easy to get started with and helps you manage clusters and applications. As the number of clusters, applications, and repositories grows, performance can suffer: refreshes take longer, the UI may feel sluggish, and the experience turns frustrating. 
 
-OpenShift GitOps is Argo CD under the hood, but you typically do not hand-edit upstream manifests. The **GitOps Operator** reconciles an **`ArgoCD` custom resource** into Deployments, StatefulSets, ConfigMaps, Routes, and RBAC. This article summarizes performance-oriented settings from official Argo CD documentation, community write-ups, and how to apply them on **OpenShift GitOps** when **one management cluster** runs GitOps and manages **many workload clusters**.
+This article is about performance tuning: which options exist, which scenarios matter, and which settings might help in your environment.
 
 <!--more-->
 
-== Why this matters
+== Introduction
 
-Performance work is a mix of:
+GitOps has become a common way to manage configuration drift, and Argo CD is one of the most widely used tools for it. It keeps the desired state defined in Git aligned with what actually runs in the cluster. On Kubernetes you can use Argo CD to manage multiple clusters from a single management cluster (other topologies exist) and to synchronise multiple repositories. A typical pattern is two Argo CD instances: one for cluster configuration and one for application rollout (though many variants work). 
 
-* **First-class `ArgoCD` CR fields** (documented in Red Hat product docs),
-* **`spec.extraConfig`** (merges keys into `argocd-cm` for settings not exposed as CR fields),
-* **`spec.cmdParams`** (maps to `argocd-cmd-params-cm`),
-* **Component `env`** on `spec.controller`, `spec.repo`, `spec.server`, and so on,
-* **Capacity**: CPU/memory per component, replica counts, and **sharding** when controller memory and API load dominate.
+What holds across setups is that Argo CD tends to slow down as its configuration grows and as the repositories it syncs from get larger and busier. 
 
-A hub that registers many remote clusters multiplies cluster secrets, watches, cache footprint, and API traffic—on the **management cluster** (where Argo CD runs) and on **each spoke** during sync and status collection.
+For example, imagine you have a single repositories with thousands of commits. Argo CD synchronises per default the whole repositories including the history. This is one screw that can be tightened.
+
+NOTE: In this article we will performa the configuration for OpenShift-GitOps. The settings are done by configuring the ArgoCD custom resource. If you use plain Argo CD without the operator, you can achieve the same goal by configuring the Argo CD configuration (ConfigMap).
+
+== Argo CD Components
+
+Argo CD is made up of several cooperating components. In rough data-flow order, they are:
+
+* **Repo Server**: Connects to Git repositories, clones and syncs them, and generates manifests (for example with Helm or Kustomize). It uses **Redis** for caching.
+* **Redis**: Caches generated manifests and other data the other components reuse (default 24h).
+* **Server**: Exposes the API and UI; it reads from Redis to verify if it is still valid.
+* **ApplicationSet Controller**: Reconciles `ApplicationSet` resources and creates `Application` objects that the application controller picks up.
+* **Application Controller**: Reconciles desired state with live state in the cluster—creating, updating, and deleting resources as needed.
+
+NOTE: You may also see extra pods (for example Dex or a GitOps plugin). They are not central to the core sync path covered here; tuning them is mostly a matter of resources and replicas.
+
+== TL;DR An Overview 
+
+When starting with this article, I did not expect to fall into the rabbit hole. The article became bigger and bigger and I am pretty sure that there will be settings that I missed, even though I search the actual source code. 
+
+NOTE: If you find anything missing, please let me know. 
+
+The following overview table summarises the settings discussed in this article: **default** and **example recommended** values are indicative—always validate in your environment.
+
+// Five columns: four text cells, then one `a|` cell with YAML for **OpenShift GitOps** (`openshift-gitops` namespace).
+// Widths: narrow Default/Recommended; wide OpenShift YAML. Column 1 wrapping is styled in `static/css/settings-overview.css` (`custom_css` in site config).
+[width="100%",cols="22%,6%,6%,22%,44%",options="header",frame=all,grid=all,role=settings-overview]
+|===
+| Setting | Default | Recommended | Standalone Argo CD | OpenShift GitOps (ArgoCD CR)
+
+| <<setting-git-depth,Git shallow clone (depth)>>
+| Full history (no shallow clone)
+| 1
+| Repository Secret with stringData.depth / data.depth (base64).
+a|
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-repo
+  namespace: openshift-gitops
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  url: https://github.com/org/repo.git
+  depth: "1"
+  type: git
+type: Opaque
+----
+
+| <<setting-repo-parallelism-limit,`ARGOCD_REPO_SERVER_PARALLELISM_LIMIT`>>
+| `0` (unlimited)
+| `20` then tune (avoid OOM)
+| `argocd-cmd-params-cm` → `reposerver.parallelism.limit`, or env on `argocd-repo-server` Deployment.
+a|
+[source,yaml]
+----
+apiVersion: argoproj.io/v1alpha1
+kind: ArgoCD
+metadata:
+  name: openshift-gitops
+  namespace: openshift-gitops
+spec:
+  repo:
+    env:
+      - name: ARGOCD_REPO_SERVER_PARALLELISM_LIMIT
+        value: "20"
+----
+
+| <<setting-git-ls-remote-parallelism,`ARGOCD_GIT_LS_REMOTE_PARALLELISM_LIMIT`>>
+| `0` (unlimited)
+| `20` when Git rate limits bite
+| Env on `argocd-repo-server` Deployment (or `argocd-cmd-params-cm` if your version maps it).
+a|
+[source,yaml]
+----
+apiVersion: argoproj.io/v1alpha1
+kind: ArgoCD
+metadata:
+  name: openshift-gitops
+  namespace: openshift-gitops
+spec:
+  repo:
+    env:
+      - name: ARGOCD_GIT_LS_REMOTE_PARALLELISM_LIMIT
+        value: "20"
+----
+
+| <<setting-exec-timeout,`ARGOCD_EXEC_TIMEOUT`>>
+| `90s`
+| `180s` or higher for heavy Helm/Kustomize
+| Env on `argocd-repo-server` Deployment.
+a|
+[source,yaml]
+----
+spec:
+  repo:
+    env:
+      - name: ARGOCD_EXEC_TIMEOUT
+        value: 180s
+----
+
+| <<setting-exec-fatal-timeout,`ARGOCD_EXEC_FATAL_TIMEOUT`>>
+| `10s`
+| Leave default unless you change SIGTERM→SIGKILL grace
+| Env on `argocd-repo-server` Deployment.
+a|
+[source,yaml]
+----
+spec:
+  repo:
+    env:
+      - name: ARGOCD_EXEC_FATAL_TIMEOUT
+        value: 10s
+----
+
+| <<setting-git-attempts-count,`ARGOCD_GIT_ATTEMPTS_COUNT`>>
+| `1`
+| `3`–`5` on flaky networks
+| Env on `argocd-repo-server` Deployment.
+a|
+[source,yaml]
+----
+spec:
+  repo:
+    env:
+      - name: ARGOCD_GIT_ATTEMPTS_COUNT
+        value: "3"
+----
+
+| <<setting-repo-cache-expiration,`ARGOCD_REPO_CACHE_EXPIRATION`>>
+| `24h`
+| Often keep `24h`; shorten only with care
+| Env on `argocd-repo-server` Deployment.
+a|
+[source,yaml]
+----
+spec:
+  repo:
+    env:
+      - name: ARGOCD_REPO_CACHE_EXPIRATION
+        value: 24h
+----
+
+| <<setting-revision-cache-lock-timeout,`ARGOCD_REVISION_CACHE_LOCK_TIMEOUT`>>
+| `10s`
+| Raise if large charts hit lock timeouts (e.g. `30s`)
+| Env on `argocd-repo-server` Deployment.
+a|
+[source,yaml]
+----
+spec:
+  repo:
+    env:
+      - name: ARGOCD_REVISION_CACHE_LOCK_TIMEOUT
+        value: 30s
+----
+
+| <<setting-server-repo-timeout,`ARGOCD_SERVER_REPO_SERVER_TIMEOUT_SECONDS`>>
+| `60`
+| Align with repo render time (e.g. `180`)
+| Env on `argocd-server` Deployment.
+a|
+[source,yaml]
+----
+spec:
+  server:
+    env:
+      - name: ARGOCD_SERVER_REPO_SERVER_TIMEOUT_SECONDS
+        value: "180"
+----
+
+| <<setting-controller-sharding,Application controller sharding>>
+| Disabled / single replica
+| Enable for multi-cluster; algorithm + replicas
+| HA `StatefulSet`, `argocd-cmd-params-cm` `controller.sharding.algorithm`, `ARGOCD_CONTROLLER_REPLICAS` / `ARGOCD_CONTROLLER_SHARD` on pods.
+a|
+[source,yaml]
+----
+spec:
+  controller:
+    env:
+      - name: ARGOCD_CONTROLLER_SHARDING_ALGORITHM
+        value: round-robin
+    sharding:
+      enabled: true
+      replicas: 3
+      minShards: 2
+      maxShards: 5
+----
+
+| <<setting-timeout-reconciliation,`timeout.reconciliation`>>
+| `3m`
+| `600s`–`3600s` *with webhooks*
+| `argocd-cm` `data.timeout.reconciliation`.
+a|
+[source,yaml]
+----
+spec:
+  extraConfig:
+    timeout.reconciliation: 600s
+----
+
+| <<setting-status-processors,`controller.status.processors`>>
+| `20`
+| `50`–`100` at large scale
+| `argocd-cmd-params-cm` `controller.status.processors`.
+a|
+[source,yaml]
+----
+spec:
+  controller:
+    processors:
+      status: 50
+----
+
+| <<setting-operation-processors,`controller.operation.processors`>>
+| `10`
+| Raise when the sync queue backs up
+| `argocd-cmd-params-cm` `controller.operation.processors`.
+a|
+[source,yaml]
+----
+spec:
+  controller:
+    processors:
+      operation: 25
+----
+
+| <<setting-controller-repo-server-timeout,ARGOCD_APPLICATION_CONTROLLER_REPO_SERVER_TIMEOUT_SECONDS>> +
+`controller.repo.server.timeout.seconds`
+| `60`
+| `120`–`300` for slow manifest RPCs
+| `argocd-cmd-params-cm` `controller.repo.server.timeout.seconds` (or env `ARGOCD_APPLICATION_CONTROLLER_REPO_SERVER_TIMEOUT_SECONDS` on the controller).
+a|
+[source,yaml]
+----
+spec:
+  controller:
+    env:
+      - name: ARGOCD_APPLICATION_CONTROLLER_REPO_SERVER_TIMEOUT_SECONDS
+        value: "180"
+----
+
+| <<setting-kubectl-parallelism,ARGOCD_APPLICATION_CONTROLLER_KUBECTL_PARALLELISM_LIMIT>> +
+`controller.kubectl.parallelism.limit`
+| `20`
+| Match or slightly below operation processors (e.g. `50`)
+| `argocd-cmd-params-cm` `controller.kubectl.parallelism.limit`.
+a|
+[source,yaml]
+----
+spec:
+  controller:
+    env:
+      - name: ARGOCD_APPLICATION_CONTROLLER_KUBECTL_PARALLELISM_LIMIT
+        value: "50"
+----
+|===
+
+NOTE: **Standalone Argo CD** uses `argocd-cm`, `argocd-cmd-params-cm`, and environment variables on the upstream Deployments / StatefulSets. The **OpenShift GitOps** column shows `spec` fragments merged into the `ArgoCD` CR (`metadata.name` / `metadata.namespace` `openshift-gitops`); use the same `spec` under `metadata.name` / `namespace` `argocd` for a community **Argo CD Operator** install. Repository `depth` is always a `Secret`, not a field on `ArgoCD`.
+
+== Let's start tuning
+
+Before we discuss the obvious settings, like increasing replicas, resources, or configuring sharding, let's take a look at the often-overlooked settings.
+
+[[setting-git-depth]]
+=== Repo-Server: Git shallow cloning
+
+By default Argo CD will clone the whole repository including the history. Depending on the repository size this can take a long time. By limiting the commit history downloaded by the argocd-repo-server, you can drastically reduce fetch times, bandwidth, and resource consumption—especially for large monorepos.
+
+To configure Git shallow cloning, set the `depth` parameter to the number of commits you want to clone. For example, to clone only the latest commit, set the `depth` parameter to `1`. This setting applies at the repository level, so you must configure it in the Secret object for each repository.
+
+CAUTION: When you work with *public* repositories you might not have this Secret object. In that case you need to create it for the public repository.
+
+Here is an example of a Secret object for a **public repository**:
+
+[source,yaml]
+----
+kind: Secret
+apiVersion: v1
+metadata:
+  name: repo-2960947011
+  namespace: openshift-gitops
+  labels:
+    argocd.argoproj.io/secret-type: repository <1>
+  annotations:
+    managed-by: argocd.argoproj.io
+data:
+  depth: 1 <2>
+  type: Git
+  url: https://github.com/tjungbauer/openshift-clusterconfig-gitops <3>
+type: Opaque
+----
+<1> The label is used to identify the Secret object as a repository secret.
+<2> The depth parameter is the number of commits you want to clone.
+<3> The `url` field is the repository URL.
+
+In the logs of the repo server we can see the different calls to the Git repository:
+
+[source,log,role=nocopy]
+----
+# Without depth parameter
+time="2026-04-12T02:42:44Z" level=info msg="Initializing https://github.com/tjungbauer/openshift-clusterconfig-gitops to /tmp/_argocd-repo/991f2e97-c2ca-4fd0-8988-b9af2f1b228e"
+[...truncated...]
+time="2026-04-12T02:42:45Z" level=info msg=Trace args="[git fetch origin --tags --force --prune]" dir=/tmp/_argocd-repo/991f2e97-c2ca-4fd0-8988-b9af2f1b228e operation_name="exec git" time_ms=1011.528864 <1>
+
+# With depth parameter
+time="2026-04-12T02:45:23Z" level=info msg="Initializing https://github.com/tjungbauer/openshift-clusterconfig-gitops to /tmp/_argocd-repo/fcd62851-9f0f-4c0b-aa61-039327adc256"
+[...truncated...]
+time="2026-04-12T02:45:23Z" level=info msg=Trace args="[git fetch origin 0a2f72afe511023aa2a86560de24f6046644c286 --depth 1 --force --prune]" dir=/tmp/_argocd-repo/fcd62851-9f0f-4c0b-aa61-039327adc256 operation_name="exec git" time_ms=559.205253 <2>
+----
+<1> Without a `depth` value, the whole history of the repository is fetched, which takes almost twice as long.
+<2> With `depth` set, Git fetches only the requested shallow history.
+
+NOTE: Do not forget that the `depth` parameter must be added to the Secret. If you use a public repository you might need to create the Secret object manually.
+
+`References`: https://argo-cd.readthedocs.io/en/stable/operator-manual/high_availability/#shallow-clone[Argo CD: Shallow clone^]
+
+---
+
+// -------------------------------------------------------------------
+// REPO SERVER - Environment variables to boost performance
+// -------------------------------------------------------------------
+
+=== Repo-Server: Environment variables to boost performance
+
+The repo server container can be configured with environment variables to boost performance.
+When you use the OpenShift GitOps Operator, set these variables in the `spec.repo.env` section of the `ArgoCD` custom resource, for example:
+
+[source,yaml]
+----
+apiVersion: argoproj.io/v1alpha1
+kind: ArgoCD
+metadata:
+  name: openshift-gitops
+  namespace: openshift-gitops
+spec:
+[...truncated...]
+  repo:
+    env:
+      - name: ENV_NAME
+        value: "VALUE"
+----
+
+If you prefer to use a ConfigMap (or Secret) instead, you can do so by setting a reference:
+
+[source,yaml]
+----
+    env:
+      - valueFrom:
+          configMapKeyRef:
+            name: my-configmap
+            key: my-key
+            optional: true
+----
+
+The variables are passed as a simple list to the container. 
+
+WARNING: If you do not use the operator you can set these values in the repo server deployment or the Argo CD ConfigMap.
+
+
+The following environment variables are available:
+
+// -------------------------------------------------------------------
+// REPO SERVER - ARGOCD_REPO_SERVER_PARALLELISM_LIMIT
+// -------------------------------------------------------------------
+
+[[setting-repo-parallelism-limit]]
+==== ARGOCD_REPO_SERVER_PARALLELISM_LIMIT (Default: 0)
+This variable defines the **maximum number of parallel fetches** of the Git repository. The most common issue arises when the repo server crashes with **OOM** errors. By default this variable is set to `0`, which means no limit.
+
+**Problem**
+
+Imagine you have a single repository with 500 applications. If you push new code to the repo, Argo CD detects the change and tries to generate the manifests for all applications at once. That can mean a large number of `helm template` or `kustomize build` commands running concurrently, which results in:
+
+* High CPU spikes
+* Very high memory use, leading to `OOMKilled` containers and possibly a crash loop for the repo server
+
+*Solution*
+
+When you set a value greater than `0` (for example, `20`), you configure a strict worker pool (a semaphore).
+
+If 500 requests arrive, the repo server only processes 20 at a time. The remaining 480 requests wait in a queue until a worker is free.
+
+* Disadvantage: Applications might take a few extra seconds to sync during large bursts of activity.
+* Advantage: Your `argocd-repo-server` stays stable, remains online, and avoids repeated OOM kills.
+
+NOTE: There is no one-size-fits-all value here. The best approach is to start with a modest number such as `20` and monitor the behaviour of the repo server. 
+
+---
+
+// -------------------------------------------------------------------
+// REPO SERVER - ARGOCD_GIT_LS_REMOTE_PARALLELISM_LIMIT
+// -------------------------------------------------------------------
+
+[[setting-git-ls-remote-parallelism]]
+==== ARGOCD_GIT_LS_REMOTE_PARALLELISM_LIMIT (Default: 0)
+
+While the previous setting protects your Kubernetes cluster, this setting **protects your Git service** from being overwhelmed by too many concurrent requests. Argo CD periodically runs `git ls-remote` to check for new commits.
+
+**Problem**
+
+Imagine that we still have 500 applications pointing to a single repository and branch (for example, `main`). When reconciliation runs, Argo CD runs `git ls-remote` for each of the 500 applications at the same time to check for new commits. If your Git provider enforces a strict rate limit, this might lead to:
+
+* Request throttling by the Git provider
+* Your repository or organisation being completely blocked by the Git provider
+* Applications left in an `Unknown` state in Argo CD
+
+*Solution*
+
+Setting this value adds a second limit. When you set a value greater than `0` (for example, `20`), the repo server opens at most 20 concurrent connections to the Git provider. The remaining requests wait in a queue until a connection is free.
+
+* Disadvantage: Slower reconciliation for applications that are not yet synced.
+* Advantage: You are less likely to hit rate limits on your Git provider.
+
+CAUTION: Do not set the value too low. For example, a value of `2` might cause timeouts in the application controller if requests wait too long in the queue.
+
+---
+
+// -------------------------------------------------------------------
+// REPO SERVER - ARGOCD_EXEC_TIMEOUT
+// -------------------------------------------------------------------
+
+[[setting-exec-timeout]]
+==== ARGOCD_EXEC_TIMEOUT (Default: 90s)
+
+Sets the **maximum time for child processes** (Helm, Kustomize, additional plugins, etc.). The repo server uses these tools to generate the final Kubernetes manifests for your applications. When the value is too low, it might lead to timeouts for slow charts. 
+
+**Problem**
+
+Imagine you are deploying applications that rely on very large or complex Helm charts and Kustomize overlays. Because these charts take longer to render, the child process might need more than the default 90 seconds to complete.
+If the timeout expires before rendering finishes, you may see:
+
+* Timeouts in the application controller for slow charts.
+* Applications failing to sync and throwing rendering errors.
+* Frustration when heavy but valid configurations break simply because they need more time to render.
+
+**Solution**
+
+By adjusting this value (for example, configuring it to 180s) you give the repo server more time to finish rendering complex manifests. It tells Argo CD to wait longer before killing the child process.
+
+* Disadvantage: A higher timeout means a genuinely hung process holds resources longer before Argo CD finally terminates it.
+* Advantage: Complex, large, or slow-rendering charts have enough time to generate manifests successfully.
+
+CAUTION: Do not set the value too high. An excessively high timeout stops Argo CD from failing fast under severe load or when a rendering process hangs.
+
+---
+
+// -------------------------------------------------------------------
+// REPO SERVER - ARGOCD_EXEC_FATAL_TIMEOUT
+// -------------------------------------------------------------------
+
+[[setting-exec-fatal-timeout]]
+==== ARGOCD_EXEC_FATAL_TIMEOUT (Default: 10s)
+
+This setting complements `ARGOCD_EXEC_TIMEOUT`. It is used to **forcibly terminate a child process** (such as Helm, Kustomize, plugins, or Git) if it cannot exit gracefully.
+When execution exceeds `ARGOCD_EXEC_TIMEOUT`, Argo CD sends `SIGTERM`. If the process still has not exited when the fatal timeout elapses, Argo CD sends `SIGKILL`.
+
+**Problem**
+
+Imagine a scenario where a manifest generation tool or a custom plugin gets completely stuck in an unresponsive state.
+When the standard `ARGOCD_EXEC_TIMEOUT` is reached, Argo CD asks the process to stop gracefully. If the child process ignores that request or is fully deadlocked, you may see:
+
+* Zombie processes consuming memory and CPU on the repo server.
+* The repo server eventually running out of resources.
+* Subsequent application syncs failing or hanging indefinitely because the underlying tools are locked up.
+
+**Solution**
+
+Setting this value adds a strict fallback limit. When configured (for example, setting it to 120s if your regular timeout is 90s), it tells Argo CD to intervene and mercilessly terminate the process if it hasn't exited by this hard deadline.
+
+* Disadvantage: Force-killing a process prevents it from cleaning up after itself.
+* Advantage: It guarantees that a hung process will not permanently lock up the repo server's compute resources.
+
+CAUTION: I personally would **not set this value** if it is not absolutely necessary. The default 10 seconds should be enough for most cases.
+
+---
+
+// -------------------------------------------------------------------
+// REPO SERVER - ARGOCD_GIT_ATTEMPTS_COUNT
+// -------------------------------------------------------------------
+
+[[setting-git-attempts-count]]
+==== ARGOCD_GIT_ATTEMPTS_COUNT (Default: 1)
+
+This variable sets the **maximum number of retry attempts** for failed Git repository requests. When Argo CD interacts with your Git provider, network hiccups, temporary outages, or rate limiting and throttling by the provider can cause a Git request to fail unexpectedly.
+
+**Problem**
+
+For example, if multiple concurrent requests hit the provider, the provider might randomly reset the connection (often seen as a connection reset by peer or ssh: handshake failed error in the logs). With the default setting of 1 attempt, Argo CD will immediately fail the sync or reconciliation process when this happens, turning your application status Unknown or throwing a sync error.
+
+**Solution**
+
+Increasing this value (for example, to `3`, `5`, or even `10` in heavily throttled environments) configures Argo CD to retry the failed Git operation automatically before surfacing a hard error.
+
+* Disadvantage: If your Git provider is genuinely down (for example, a major GitHub outage) or your credentials have expired, the repo server wastes time retrying an operation that cannot succeed.
+* Advantage: It improves resilience against flaky network paths, temporary DNS issues, and provider rate limiting.
+
+CAUTION: Avoid setting this to an unrealistically high value (such as `50`) unless you are addressing a specific, known throttling problem. A very high retry count combined with backoff can leave the repo server tied up on a bad repository for minutes, and you will still hit `ARGOCD_EXEC_TIMEOUT` in the end. In practice, values between `3` and `5` are a good balance for stability.
+
+---
+
+
+// -------------------------------------------------------------------
+// REPO SERVER - Additional environment variables
+// -------------------------------------------------------------------
+
+=== Repo-Server: Caching optimizations
+
+The following additional environment variables are focused on caching optimizations.
+
+// -------------------------------------------------------------------
+// REPO SERVER - ARGOCD_REPO_CACHE_EXPIRATION
+// -------------------------------------------------------------------
+
+[[setting-repo-cache-expiration]]
+==== ARGOCD_REPO_CACHE_EXPIRATION (Default: 24h)
+
+This setting **controls the time-to-live (TTL) for cached repository states** and generated manifests in the repo server (stored in Redis). When that TTL expires, the cache is invalidated and the repo server downloads the repository and generates the manifests again.
+
+NOTE: For most environments, the default of `24h` is a good balance between performance and freshness. You can still trigger a manual refresh when you need newer content.
+
+**Problem**
+
+When the repo server downloads a Git repository and generates Kubernetes manifests, doing so is computationally expensive.
+
+If the repo server has already downloaded a repository and the remote Git branch has not received any new commits, there is no need to re-download and re-render the same YAML. However, if you use floating tags (such as `latest` or `main`) or rely on remote Helm repositories where a chart can change without a version bump, an overly long cache TTL would stop Argo CD from seeing updates promptly.
+
+**Solution**
+
+This value sets how long the repo server trusts its cached data before it forces a fresh download and re-renders manifests to confirm nothing changed upstream.
+
+* Disadvantage: If set too high (for example, `48h`), developers who use mutable image tags or update remote Helm charts without bumping versions will find that Argo CD does not pick up their changes quickly enough.
+* Advantage: Keeps the repo server fast and efficient by serving pre-rendered manifests from Redis for most sync operations.
+
+CAUTION: **Do not lower** this value (for example, to `5m`) only to pick up floating tags sooner. Doing so forces the repo server to discard its cache and re-render manifests from scratch far more often, which severely degrades performance.
+
+---
+
+// -------------------------------------------------------------------
+// REPO SERVER - ARGOCD_REVISION_CACHE_LOCK_TIMEOUT
+// -------------------------------------------------------------------
+
+[[setting-revision-cache-lock-timeout]]
+==== ARGOCD_REVISION_CACHE_LOCK_TIMEOUT (Default: 10s)
+
+This variable sets the TTL used to deduplicate concurrent work on the same revision (`0` disables deduplication). It reduces duplicate manifest generation when many applications refresh at once.
+
+**Problem**
+
+Imagine you have 100 applications pointing to the same Git repository and commit. When a webhook fires, all 100 applications try to sync at once. To save CPU, Argo CD generates the manifests for that commit once, caches the result in Redis, and serves it to every application. The first worker locks the cache key while it renders; everyone else waits.
+
+If rendering takes a long time (for example, a very large Helm chart) and exceeds the default lock timeout, waiting workers assume the first attempt failed and all start rendering the same commit themselves, causing a sharp CPU spike. That pattern is often called a **cache stampede**.
+
+**Solution**
+
+Increasing this lock timeout gives the first worker longer to finish rendering and populate the cache. Other workers stay in the queue instead of duplicating the work.
+
+* Disadvantage: If the first worker hangs or exits without releasing the lock, the others remain blocked until this longer timeout elapses.
+* Advantage: Reduces cache stampedes where many workers render the same Git commit unnecessarily, which protects the repo server from sudden CPU spikes during mass reconciliations.
+
+CAUTION: As with `ARGOCD_EXEC_TIMEOUT`, tune this value based on how long your slowest Helm chart or Kustomize overlay actually takes to render. The default of `10s` is adequate for many environments; large charts or complex overlays may need a higher value.
+
+
+
+// -------------------------------------------------------------------
+// SERVER - ARGOCD_SERVER_REPO_SERVER_TIMEOUT_SECONDS
+// -------------------------------------------------------------------
+
+[[setting-server-repo-timeout]]
+==== ARGOCD_SERVER_REPO_SERVER_TIMEOUT_SECONDS (Default: 60)
+
+This variable sets the maximum time the Argo CD API server waits for a response from the repo server.
+
+**Problem**
+
+When you open the Argo CD Web UI or click on an application, the API Server has to make an internal gRPC call to the Repo Server and say, "Hey, please render these manifests and send them back to me so I can show them to the user."
+
+If you have very large Helm charts or complex Kustomize builds, the repo server might take a long time to render them.
+However, this API server timeout defaults to 60 seconds, so the UI can give up, drop the connection, and show a red **context deadline exceeded** error even though the repo server is still rendering in the background.
+
+**Solution**
+
+By increasing this value you tell the API Server to be more patient. It will keep the loading spinner going until the repo server finally finishes rendering and returns the data.
+
+* Disadvantage: If the repo server genuinely hangs or crashes, users will sit staring at a spinning wheel in the UI for a much longer time before finally receiving an error message.
+* Advantage: Eliminates false-positive UI and CLI errors when viewing complex applications, ensuring users can actually see the manifests and diffs for heavy deployments.
+
+CAUTION: Align this timeout with `ARGOCD_EXEC_TIMEOUT` on the repo server. If the repo server may spend 180 seconds rendering a chart but the API server gives up after 60 seconds, the UI will keep failing for slow applications.
+
+---
+
+// -------------------------------------------------------------------
+// CONTROLLER - Application controller: Sharding (horizontal scaling)
+// -------------------------------------------------------------------
+
+[[setting-controller-sharding]]
+=== Application controller: Sharding (horizontal scaling)
+
+When you investigate performance issues, **sharding** is often one of the first topics you meet. Sharding scales the application controller horizontally by distributing work across multiple controller replicas automatically.
+
+When a single application controller reconciles too many applications across too many clusters, it becomes the bottleneck: high CPU and memory use, long reconcile queues, Kubernetes API throttling, and pressure on the repo server.
+Sharding splits that work across **multiple controller replicas**. Each replica has a **shard index** and reconciles only **applications whose destination clusters map to that shard**.
+
+NOTE: Implicitly, this means that sharding only makes sense if you have more than one cluster in your environment.
+
+==== How it works (conceptually)
+
+* You run **N** application-controller replicas (typically a StatefulSet so each pod has a stable identity).
+* Argo CD assigns every registered cluster (including the in-cluster deployment) to **exactly one shard** using a **distribution function**. The controller for shard K ignores clusters that are not mapped to K.
+* Applications are processed by the shard that owns their **destination cluster**. 
+
+==== Distribution algorithms
+
+The following algorithms are supported. Configure them with the `ARGOCD_CONTROLLER_SHARDING_ALGORITHM` environment variable when you use the OpenShift GitOps Operator, or with `controller.sharding.algorithm` in `argocd-cmd-params-cm`:
+
+* **`legacy`** — stable hash from cluster ID; simple, but shards can be unbalanced (some busier than others). Kept for compatibility.
+* **`round-robin`** — tends to spread clusters more evenly across shards; often a better default when you scale out.
+* **`consistent-hashing`** — can improve balance further in some large, multi-cluster setups; cluster placement can reshuffle when the number of shards changes.
+
+NOTE: The OpenShift GitOps documentation does not explicitly mention `consistent-hashing`, which often indicates limited or unsupported use on that distribution. If you set `ARGOCD_CONTROLLER_SHARDING_ALGORITHM` under `spec.controller.env`, Argo CD still reads whatever value you supply—verify against your operator version before relying on it in production.
+
+==== Why it improves performance
+
+* Parallelism across nodes: More controller pods mean more CPU and memory headroom in aggregate.
+* Smaller per-shard work: Each replica handles fewer clusters and fewer applications.
+* Better fit for hub-and-spoke: On a management cluster with many spoke clusters, sharding is the usual way to scale past what one controller can sustain.
+
+==== Trade-offs
+
+* Operational complexity: More pods to monitor; you must ensure every shard stays healthy.
+* Not a substitute for repo-server tuning: If manifest generation or Git is the bottleneck, sharding the controller alone will not fix it.
+
+==== Configure Sharding
+
+===== OpenShift GitOps (Argo CD custom resource)
+
+The OpenShift GitOps Operator lets you configure sharding in the Argo CD custom resource.
+
+The following snippet shows a typical sharding configuration, including the algorithm.
+
+[source,yaml]
+----
+apiVersion: argoproj.io/v1alpha1
+kind: ArgoCD
+metadata:
+  name: openshift-gitops
+  namespace: openshift-gitops
+spec:
+  controller:
+    env:
+      - name: ARGOCD_CONTROLLER_SHARDING_ALGORITHM
+        value: round-robin <1>
+    sharding:
+      enabled: true <2>
+      replicas: 3 <3>
+      minShards: 2 <4>
+      maxShards: 5 <5>
+----
+<1> The algorithm to use for sharding
+<2> Sharding must be enabled explicitly.
+<3> Number of application-controller replicas (shards)
+<4> Minimum number of shards
+<5> Maximum number of shards
+
+NOTE: Sharding applies to the **application controller** only. The **repo server**, **Redis**, and **Argo CD server** scale on their own and are sized separately.
+
+---
+
+===== Standalone Argo CD
+
+* Install the high-availability layout so the application controller is a StatefulSet (not a single-replica Deployment).
+* Set **replicas** on that StatefulSet to the number of shards you want - each replica is one shard.
+* Configure **`controller.sharding.algorithm`** in **`argocd-cmd-params-cm`** (for example `round-robin`).
+* Ensure each pod receives **`ARGOCD_CONTROLLER_REPLICAS`** (total shard count) and **`ARGOCD_CONTROLLER_SHARD`** (this pod's index). 
+
+---
+
+
+
+
+// -------------------------------------------------------------------
+// CONTROLLER - Performance tuning
+// -------------------------------------------------------------------
+
+=== Controller: Performance tuning (ConfigMap)
+
+The controller container can also be configured with environment variables. However, you configure it slightly differently from the repo server. The configuration comes from a ConfigMap: either you edit that ConfigMap directly, or, if you use the OpenShift GitOps Operator, you set `spec.extraConfig`. Those values eventually become environment variables in the controller container.
+
+When you use the OpenShift GitOps Operator with the Argo CD custom resource, set `spec.extraConfig`. For example:
+
+[source,yaml]
+----
+spec:
+  extraConfig: <1>
+    timeout.reconciliation: 180s
+----
+<1> Special extraConfig key with an example setting
+
+The operator will automatically merge the `spec.extraConfig` with the `argocd-cm` ConfigMap.
+
+If you do not use the Operator, set the parameter directly in the ConfigMap.
+
+[source,yaml]
+----
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: argocd-cm <1>
+  namespace: openshift-gitops
+data:
+[...truncated...]
+  timeout.reconciliation: 180s <2>
+----
+<1> Special ConfigMap name for the Argo CD configuration
+<2> Special timeout.reconciliation key with an example setting
+
+WARNING: Several ConfigMaps are involved in controller configuration. The `argocd-cm` ConfigMap is the main ConfigMap for the Argo CD instance. The `argocd-cmd-params-cm` ConfigMap supplies controller command-line parameters. Each subsection below states which ConfigMap applies. When you use the Operator, map these keys through `spec.extraConfig` where noted.
+
+// -------------------------------------------------------------------
+// CONTROLLER - timeout.reconciliation
+// -------------------------------------------------------------------
+
+[[setting-timeout-reconciliation]]
+==== timeout.reconciliation (Default: 3m)
+
+ConfigMap: **argocd-cm**
+
+With this setting you control the **default polling interval** for Argo CD. It defines how often Argo CD wakes up to compare the desired state in Git with the live state in your Kubernetes cluster.
+
+**Problem**
+
+If you do not have Git webhooks configured, Argo CD relies on a pull-based mechanism. By default, every three minutes the application controller connects to the repo server to check Git for new commits. In a cluster with thousands of applications, polling every three minutes creates a sustained, heavy baseline load on both the application controller (CPU and memory) and the repo server (network and Git API traffic), even when nothing has changed in your repositories.
+
+**Solution**
+
+By increasing this value (for example, `600s` for 10 minutes, or even `3600s` for one hour), you reduce that background load and CPU overhead on the controller and repo server.
+
+NOTE: **In combination with Git webhooks**, this setting is one of the most important performance tweaks you can apply.
+
+* Disadvantage: If you do not use Git webhooks, new commits are detected and applied more slowly (by up to the reconciliation interval).
+* Advantage: A large reduction in baseline CPU, memory, and network usage—a crucial performance tweak for large clusters.
+
+CAUTION: Only increase this value if you have **Git webhooks** configured so Argo CD is notified as soon as changes are pushed. With webhooks in place, the controller does not need to poll as aggressively, so longer reconciliation intervals are usually safe.
+
+---
+
+
+=== Controller: Performance tuning (Command line parameters)
+
+For a while I was unsure where to place the following settings, because the Operator configures them differently from a plain install. I ended up giving command-line parameters their own subsection.
+
+If you are *not* using the Operator, configure these values in the `argocd-cmd-params-cm` ConfigMap. That part is straightforward.
+
+If you use the Operator, set them under `spec.controller.processors`.
+
+[source,yaml]
+----
+spec:
+  controller:
+    processors: <1>
+      status: 20
+      operation: 10
+----
+<1> Special processors key with the default settings
+
+If these settings are not set, the controller will use the default values. This differs from the section above, where such parameters were set at `spec.extraConfig`.
+The reason is, that the Operator sets these parameters directly as a switch in the execution command of the container and does not read it from the ConfigMap. 
+
+I am sure there is a design decision behind this ... but I am not sure what it is.
+
+// -------------------------------------------------------------------
+// CONTROLLER - controller.status.processors
+// -------------------------------------------------------------------
+
+[[setting-status-processors]]
+==== controller.status.processors (Default: 20)
+
+ConfigMap: **argocd-cmd-params-cm** (if not using the Operator)
+
+This setting controls the **number of concurrent status processors**—that is, how many applications the controller can compare at once.
+
+**Problem**
+
+If you have 500 applications, a default of 20 processors means the controller evaluates only 20 at a time. During a mass reconciliation (for example, a webhook firing for a monorepo), the remaining 480 applications wait in the reconciliation queue.
+You will notice drift detection becoming very slow.
+
+**Solution**
+
+Increase this value (for example, to `50` or `100` when you run more than 1,000 applications) so the controller can drain the queue faster, especially if refreshes in the UI feel slow.
+
+* Disadvantage: Higher CPU and memory use on the application controller Pod.
+* Advantage: Argo CD detects drift and refreshes status in the UI much faster in large environments.
+
+---
+
+// -------------------------------------------------------------------
+// CONTROLLER - controller.operation.processors
+// -------------------------------------------------------------------
+
+[[setting-operation-processors]]
+==== controller.operation.processors (Default: 10)
+
+ConfigMap: **argocd-cmd-params-cm** (if not using the Operator)
+
+While status processors compare desired and live state, this setting controls the **number of concurrent operation processors** for actual sync runs.
+
+**Problem**
+
+If you trigger a mass sync of 100 applications at once but only 10 operation processors are configured, Argo CD runs 10 syncs, waits for them to finish, starts the next 10, and so on.
+Applications stay in `Waiting` or `Pending` in the UI until their turn starts.
+
+**Solution**
+
+Increase this value when many applications sync or run operations at the same time and the operation queue backs up (pending syncs, slow operation phase). Monitor controller CPU and memory—you need headroom for the extra parallelism.
+
+* Disadvantage: Higher CPU and memory use on the application controller Pod.
+* Advantage: Argo CD can apply manifests to the Kubernetes API for many applications at the same time.
+
+NOTE: This is independent of status processors: you might have heavy refresh traffic (status) and lighter sync traffic (operations), or the opposite—tune each side to match your workload.
+
+---
+
+// -------------------------------------------------------------------
+// CONTROLLER - controller.repo.server.timeout.seconds
+// -------------------------------------------------------------------
+
+[[setting-controller-repo-server-timeout]]
+==== ARGOCD_APPLICATION_CONTROLLER_REPO_SERVER_TIMEOUT_SECONDS - controller.repo.server.timeout.seconds (Default: 60)
+
+ConfigMap: **argocd-cmd-params-cm** (if not using the Operator)
+ArgoCD: spec.controller.env (if not using the openshift-gitops Operator)
+
+This sets **how long the application controller waits** for the repo server to finish generating manifests before it stops and returns a **context deadline exceeded** error.
+
+WARNING: Do not put this key in `spec.extraConfig`. On OpenShift GitOps, set it under `spec.controller.env` in the Argo CD custom resource.
+
+**Problem**
+
+Heavy charts, large repositories, slow Git, or a busy repo server may need more than 60 seconds for a single `GenerateManifests` (or similar) RPC. If the deadline is too short, applications show comparison failures even when the repo server would eventually succeed.
+If you raised `ARGOCD_EXEC_TIMEOUT` on the repo server so a chart can render for 180 seconds, but leave this controller deadline at 60 seconds, the controller cancels the request while the repo server is still working, and the sync fails.
+
+**Solution**
+
+Raise the value (for example to **`180`**) so legitimately slow manifest generation can finish. Size it so the controller allows at least as long as the **worst-case repo-server work** you expect for one RPC.
+
+* Disadvantage: A hung repo server holds work longer before the client fails.
+* Advantage: Fewer false failures from an overly aggressive deadline; large environments often use **120–300** seconds or more.
+
+NOTE: This controls only the **controller → repo-server** gRPC client. It does **not** replace **`ARGOCD_EXEC_TIMEOUT`** (child processes on the repo server) or **`ARGOCD_REPO_SERVER_PARALLELISM_LIMIT`** (concurrent manifest work).
+
+---
+
+// -------------------------------------------------------------------
+// CONTROLLER - controller.kubectl.parallelism.limit
+// -------------------------------------------------------------------
+
+[[setting-kubectl-parallelism]]
+==== ARGOCD_APPLICATION_CONTROLLER_KUBECTL_PARALLELISM_LIMIT - controller.kubectl.parallelism.limit (Default: 20)
+
+ConfigMap: **argocd-cmd-params-cm** (if not using the Operator)
+ArgoCD: spec.controller.env (if not using the openshift-gitops Operator)
+
+This setting controls the **maximum number of concurrent `kubectl` child processes** the application controller may spawn at once.
+
+**Problem**
+
+If you raise `controller.operation.processors` (for example to `50` to run 50 syncs at once), you can hit a hidden bottleneck. This `kubectl` limit defaults to `20`, so the extra operation processors wait for a free slot.
+Without any limit, running dozens of concurrent `kubectl` processes could spike memory and CPU and risk OOM-killing the controller Pod.
+
+If you increase `controller.operation.processors` to speed up mass syncs, raise this limit to match or sit slightly below that value (for example set it to `50`). That lets the controller run sync commands in parallel without stalling on the process limit.
+Raise the limit in steps (for example `50`, or `100` at very large scale). After each change, watch the Kubernetes API server (request rate and latency), etcd, and application-controller CPU and memory.
+
+* Disadvantage: More overlapping `kubectl` work increases API traffic and process pressure. On a stressed control plane that can make things worse.
+* Advantage: Less time waiting for a free `kubectl` slot when the cluster can absorb the extra concurrency.
+
+CAUTION: Do not set this far above `controller.operation.processors`; extra headroom does not increase throughput and only wastes memory. The two settings are meant to move together.
+
+---
+
+// -------------------------------------------------------------------
+// SUMMARY
+// -------------------------------------------------------------------
+
+== Summary
+
+OpenShift GitOps performance is rarely fixed by a single knob. The repo server, application controller, API server, Redis, and your Git provider all interact: a slow manifest render stresses the repo server; an aggressive client timeout fails the UI even when rendering would succeed; unbounded parallelism can OOM the repo server; tight kubectl concurrency can leave sync operations queued on an otherwise healthy controller.
+
+A practical approach is to work in order of leverage: reduce unnecessary Git and render work (for example shallow clones, cache TTLs, and webhooks so you are not polling blindly), then align related timeouts (ARGOCD_EXEC_TIMEOUT, controller and API server deadlines to the repo server), then bound concurrency (repo-server parallelism, Git ls-remote limits, status and operation processors, kubectl parallelism) before you scale out with sharding and replicas.
+
+On OpenShift GitOps, the same upstream settings appear in different places spec.repo.env, spec.controller.env, spec.extraConfig, spec.controller.processors, and spec.controller.sharding so always map each variable to the right field in the Argo CD custom resource (or the equivalent ConfigMaps in a plain install).
+
+Finally, treat tuning as evidence-led: change one major setting at a time, watch controller and repo-server memory, reconcile duration, API rates, and Git rate limits. What works for a small instance will not automatically transfer to thousands of applications or many managed clusters.
+
+---
+
+// -------------------------------------------------------------------
+// REFERENCES
+// -------------------------------------------------------------------
 
 == Reference sources
 
@@ -61,183 +960,12 @@ Mitigations include:
 
 IMPORTANT: Upstream states that `resource.ignoreResourceUpdatesEnabled` **defaults to `true`** in current stable docs. Some community articles describe turning it on from `false`—**verify on your Argo CD version**; you may already have it enabled and should focus on **targeted customizations** (which fields to ignore).
 
-=== Community: “Make ArgoCD Optimized and Blazing Fast”
 
-https://medium.com/@perezmark.tomcat/make-argocd-optimized-and-blazing-fast-a8024ce5fee3[Mark Perez (Medium, Dec 2025)^] is a practical checklist at very large scale (author cites 8000+ applications, multiple clusters, many repos). Themes that align with upstream:
-
-* **Repo server:** `ARGOCD_EXEC_TIMEOUT`, `ARGOCD_GIT_ATTEMPTS_COUNT`, Helm concurrency, **repo-server parallelism limit** (avoid unlimited concurrency leading to OOM).
-* **Controller:** replicas + **sharding**, higher Kubernetes client QPS/burst, status/operation processors, kubectl parallelism, repo-server timeout from controller, round-robin sharding (upstream labels some sharding algorithms **experimental**).
-* **argocd-cm:** `timeout.reconciliation`, `timeout.reconciliation.jitter`, `timeout.hard.reconciliation`; broad `ignoreResourceUpdates` for `/status` (trade-off: UI may lag until next refresh).
-* **Application annotation** `argocd.argoproj.io/manifest-generate-paths` for **monorepo cache efficiency**.
-* **Orphaned resources** tuning in `AppProject` to reduce noise.
-
-CAUTION: Values such as **600** status processors are **extreme** and need large controller pods, API headroom, and metrics. Upstream HA guidance suggests gentler starting points (e.g. on the order of **50 / 25** at roughly 1000 applications). Treat large numbers as a **ceiling example**, not a default.
-
-=== Official high availability and scaling
-
-https://argo-cd.readthedocs.io/en/stable/operator-manual/high_availability/[Argo CD: High availability^] complements the above: repo-server parallelism, disk/monorepo issues, processor counts, reconciliation interval + jitter, sharding methods and warnings, `ARGOCD_CLUSTER_CACHE_*` for huge clusters, `ARGOCD_APPLICATION_TREE_SHARD_SIZE`, `ARGOCD_GRPC_MAX_SIZE_MB` for very large app counts, and **webhook-driven refresh** to reduce blind polling.
-
-== OpenShift GitOps: where each setting lives
-
-[cols="1,1,2",options="header"]
-|===
-|Concern | Plain Argo CD (often) | OpenShift GitOps (typical)
-
-|Resource requests/limits
-|YAML manifests
-|`spec.controller.resources`, `spec.repo.resources`, `spec.server.resources`, etc. — see https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/1.19/html-single/managing_resource_use/[Managing resource use (OpenShift GitOps 1.19)^]
-
-|Reconciliation interval
-|`argocd-cm`
-|`spec.controller.appSync` *or* `spec.extraConfig` for `timeout.reconciliation` / jitter if you need exact upstream keys
-
-|Status / operation processors
-|`argocd-cmd-params-cm` or flags
-|`spec.controller.processors.status` and `spec.controller.processors.operation` — https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/1.19/html-single/argo_cd_instance/index/[Argo CD instance / controller properties^]
-
-|Sharding (many clusters)
-|StatefulSet replicas + env
-|`spec.controller.sharding.enabled`, `sharding.replicas`, `dynamicScalingEnabled`, `clustersPerShard`, `minShards`, `maxShards` (same doc)
-
-|Controller / repo env (QPS, replicas, timeouts, Helm flags)
-|Pod env
-|`spec.controller.env`, `spec.repo.env`
-
-|`argocd-cm`-only keys
-|Edit ConfigMap
-|`spec.extraConfig` (merges into `argocd-cm`; **overrides** conflicting CR-driven entries per operator — https://argocd-operator.readthedocs.io/en/stable/usage/extra-config/[Argo CD Operator: ExtraConfig^])
-
-|`argocd-cmd-params-cm` keys
-|Edit ConfigMap
-|`spec.cmdParams` on the `ArgoCD` CR
-|===
-
-**Operator Subscription** environment variables (for example `DISABLE_DEFAULT_ARGOCD_INSTANCE`, `CONTROLLER_CLUSTER_ROLE`) live on the **Subscription** or operator Deployment. They affect **how** the default instance is created and **RBAC**, not every performance knob.
-
-For production, confirm aggressive tuning (especially **experimental sharding** modes) against your **Red Hat support** scope and **OpenShift GitOps / embedded Argo CD version**.
-
-== Scenario: one management cluster, many managed clusters
-
-Bottlenecks usually appear in this order:
-
-. **Application controller** memory and CPU (watches + per-cluster cache + queue depth),
-. **Kubernetes API** on the management cluster and, during sync, on spokes,
-. **Repo server** (Git + Helm/Kustomize latency, concurrency, disk),
-. **Redis** and **server** (UI/API) at very high application counts.
-
-Sharding and processor tuning target (1) and (2). Repo-server tuning and monorepo annotations target (3).
-
-Scale tiers below are **approximate**; use controller memory, `argocd_app_reconcile`, API server 429/latency, and repo-server OOM/restarts as ground truth.
-
-== Tier A — Small (roughly < 100 applications, 1–3 clusters)
-
-* **Defaults** often suffice.
-* Set **realistic** resource requests/limits if the instance namespace uses **ResourceQuotas**; undersized repo-server or controller pods show up as restarts and flaky syncs.
-* Prefer **Git webhooks** for refresh when possible so you rely less on poll intervals alone.
-* Do **not** copy “8000 app” processor counts unless metrics justify it.
-
-== Tier B — Medium (roughly 100–500 applications, ~4–15 clusters)
-
-* Increase **`spec.server.replicas`** and **`spec.repo.replicas`** for availability and throughput — see “Enabling replicas for server and repo server” in the https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/1.19/html-single/argo_cd_instance/index/[Argo CD instance^] doc.
-* **Raise controller memory** before raising concurrency; hub multi-cluster setups often hit memory first.
-* **Moderate processors** via `spec.controller.processors.status` and `spec.controller.processors.operation` — step up gradually (for example toward the **tens**, not hundreds) while watching API latency and controller CPU.
-* **`spec.repo.env`:** consider `ARGOCD_EXEC_TIMEOUT` if Helm/Kustomize approaches timeouts; `ARGOCD_GIT_ATTEMPTS_COUNT` for flaky Git (see upstream HA repo-server section).
-* **`spec.cmdParams`:** set `reposerver.parallelism.limit` to a **finite** value (community examples often use roughly 20–100 depending on chart weight) to avoid OOM from unbounded parallel manifest generation.
-* **Reconcile jitter:** add `timeout.reconciliation.jitter` under `spec.extraConfig` to spread periodic work across time (upstream HA + cmd-params).
-
-== Tier C — Large (roughly 500–2000+ applications, 15+ clusters, or very chatty CRDs)
-
-* **Sharding:** enable `spec.controller.sharding` (`enabled`, `replicas`, optionally `dynamicScalingEnabled` with `minShards`, `maxShards`, `clustersPerShard`) — operator-native relief for memory and watch load.
-* Read upstream warnings on **`round-robin` vs `consistent-hashing` vs `legacy`**; treat non-legacy algorithms as **experimental** until validated on your version.
-* **`spec.controller.env`:** tune `ARGOCD_K8S_CLIENT_QPS` and `ARGOCD_K8S_CLIENT_BURST` **only** with API server monitoring.
-* **Reconcile optimization:** use `spec.extraConfig` for `resource.customizations.ignoreResourceUpdates.<group>_<Kind>` for high-churn types, guided by debug logs. Prefer **targeted** rules over ignoring all `/status` unless you accept delayed UI reflection of status-only changes.
-* **Monorepos:** use Application annotation `argocd.argoproj.io/manifest-generate-paths` for path-scoped cache invalidation.
-* **Very large UI payloads:** upstream notes `ARGOCD_GRPC_MAX_SIZE_MB` on the server for 3000+ applications — set via **`spec.server.env`**.
-
-== Tier D — Very large (thousands of applications, many clusters)
-
-* Everything in Tier C, plus:
-* **Multiple GitOps instances** (prod vs non-prod, or team-scoped) remain the **safest** blast-radius pattern; the Medium author recommends splitting when possible.
-* **Processor counts** in the **hundreds** only with **large controller pods**, **sharding**, and a **healthy API**; validate with Prometheus/Grafana.
-* **`ARGOCD_CLUSTER_CACHE_LIST_PAGE_BUFFER_SIZE`** (and related) if you hit etcd continue / list issues on enormous clusters.
-* **`ARGOCD_APPLICATION_TREE_SHARD_SIZE`** when application trees are huge (Redis traffic).
-
-== Example: `ArgoCD` CR fragments (illustrative)
-
-Adjust names, namespace, and values to your environment.
-
-.Processors, sharding, repo replicas
-[source,yaml]
-----
-apiVersion: argoproj.io/v1beta1
-kind: ArgoCD
-metadata:
-  name: openshift-gitops
-  namespace: openshift-gitops
-spec:
-  server:
-    replicas: 3
-  repo:
-    replicas: 3
-    env:
-      - name: ARGOCD_EXEC_TIMEOUT
-        value: "3m"
-      - name: ARGOCD_GIT_ATTEMPTS_COUNT
-        value: "3"
-  controller:
-    processors:
-      status: 50
-      operation: 25
-    sharding:
-      enabled: true
-      replicas: 3
-    resources:
-      limits:
-        memory: 8Gi
-        cpu: "4"
-      requests:
-        memory: 4Gi
-        cpu: "1"
-    env:
-      - name: ARGOCD_K8S_CLIENT_QPS
-        value: "100"
-      - name: ARGOCD_K8S_CLIENT_BURST
-        value: "200"
-----
-
-.`argocd-cm` keys via `extraConfig` (verify key names for your Argo CD version)
-[source,yaml]
-----
-spec:
-  extraConfig:
-    timeout.reconciliation: "5m"
-    timeout.reconciliation.jitter: "60s"
-    resource.customizations.ignoreResourceUpdates.autoscaling_HorizontalPodAutoscaler: |
-      jsonPointers:
-        - /status
-----
-
-.`argocd-cmd-params-cm` via `cmdParams`
-[source,yaml]
-----
-spec:
-  cmdParams:
-    reposerver.parallelism.limit: "50"
-    controller.repo.server.timeout.seconds: "180"
-    server.repo.server.timeout.seconds: "180"
-----
-
-== Operational discipline
-
-. Change **one** knob at a time; watch controller memory, reconcile duration, API **429s**, and repo-server restarts.
-. Match tuning to the **embedded Argo CD version** in your OpenShift GitOps release.
-. Prefer **webhooks** and **path-scoped monorepo annotations** before maximizing QPS/processors.
 
 == References
 
 * https://argo-cd.readthedocs.io/en/stable/operator-manual/reconcile/[Argo CD — Reconcile optimization^]
 * https://argo-cd.readthedocs.io/en/stable/operator-manual/high_availability/[Argo CD — High availability / scaling^]
-* https://medium.com/@perezmark.tomcat/make-argocd-optimized-and-blazing-fast-a8024ce5fee3[Mark Perez — Make ArgoCD Optimized and Blazing Fast (Medium)^]
-* https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/1.19/html-single/managing_resource_use/[Red Hat OpenShift GitOps 1.19 — Managing resource use^]
-* https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/1.19/html-single/argo_cd_instance/index/[Red Hat OpenShift GitOps 1.19 — Argo CD instance / CR properties^]
+* https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/1.20/html-single/managing_resource_use/[Red Hat OpenShift GitOps 1.20 — Managing resource use^]
+* https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/1.20/html-single/argo_cd_instance/index/[Red Hat OpenShift GitOps 1.20 — Argo CD instance / CR properties^]
 * https://argocd-operator.readthedocs.io/en/stable/usage/extra-config/[Argo CD Operator — ExtraConfig^]
