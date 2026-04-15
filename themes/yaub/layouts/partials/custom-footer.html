@@ -28,6 +28,11 @@
         // Skip mermaid diagrams - they get converted to SVG visualizations
         if (language && language.toLowerCase() !== 'mermaid') {
             const pre = codeBlock.parentElement;
+            // AsciiDoc: [source,lang,role=nolangbadge] → div.listingblock.nolangbadge (same idea as role=nocopy)
+            const listingblock = pre && pre.closest ? pre.closest('.listingblock') : null;
+            if (listingblock && listingblock.classList.contains('nolangbadge')) {
+                return;
+            }
             if (pre && pre.tagName === 'PRE' && !pre.parentElement.classList.contains('code-block-wrapper')) {
                 // Create wrapper div
                 const wrapper = document.createElement('div');
