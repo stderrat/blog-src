@@ -1,6 +1,6 @@
 --- 
 title: "[Ep.16] Tuning OpenShift GitOps for performance at scale"
-description: "Performance optimizations for OpenShift GitOps on a hub cluster managing many spokes: reconcile tuning, sharding, processors, and how the ArgoCD CR maps to Argo CD settings."
+description: "Performance tuning for OpenShift GitOps at scale: application controller (reconcile interval and jitter, processors, sharding, kubectl limits, Kubernetes client QPS/burst), repo server (Git, cache, parallelism, timeouts), and how the ArgoCD custom resource maps to upstream Argo CD settings—including cmd-params and extraConfig."
 date: "2026-04-15"
 doctype: book
 weight: 100
@@ -21,7 +21,7 @@ categories:
    - GitOps
    - OpenShift
 
-tags: ["Argo CD", "OpenShift GitOps", "OpenShift", "OCP", "GitOps", "Multi-cluster", "Hub and Spoke", "Kubernetes", "Helm", "Performance", "Reconcile", "Sharding"]
+tags: ["Argo CD", "Argo CD Operator", "OpenShift GitOps", "OpenShift", "GitOps", "Multi-cluster", "Hub and Spoke", "Kubernetes", "Helm", "Kustomize", "Git", "Performance", "Reconcile", "Sharding"]
 
 aliases: []
 ---
