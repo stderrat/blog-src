@@ -347,7 +347,7 @@ metadata:
     argocd.argoproj.io/secret-type: repository <1>
   annotations:
     managed-by: argocd.argoproj.io
-data:
+stringData:
   depth: 1 <2>
   type: Git
   url: https://github.com/tjungbauer/openshift-clusterconfig-gitops <3>
