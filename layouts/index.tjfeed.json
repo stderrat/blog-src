@@ -10,6 +10,11 @@
 {{- $match = first $limit $match -}}
 {{- $out := slice -}}
 {{- range $match -}}
-  {{- $out = $out | append (dict "title" .Title "url" .Permalink "date" (.Date.Format "2006-01-02")) -}}
+  {{- $img := partial "func/GetFeaturedImage.html" . -}}
+  {{- $item := dict "title" .Title "url" .Permalink "date" (.Date.Format "2006-01-02") -}}
+  {{- with $img -}}
+    {{- $item = merge $item (dict "image" ((trim . "/") | absURL)) -}}
+  {{- end -}}
+  {{- $out = $out | append $item -}}
 {{- end -}}
 {{- $out | jsonify -}}
