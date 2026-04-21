@@ -12,7 +12,7 @@
 
 <div class="article-cards-grid">
   <section class="article-cards-container">
-    {{ $paginator := .Paginate .Pages 10 }}
+    {{ $paginator := .Paginate (.Pages.ByDate.Reverse) 10 }}
     {{ range $paginator.Pages }}
       <div class="article-card summary-gradient relative ba b--moon-gray nested-copy-line-height weight-5">
         <div class="mb2 pa3 pa4-l gray">

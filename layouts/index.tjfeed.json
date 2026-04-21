@@ -1,0 +1,15 @@
+{{- /* Slim JSON feed for jungbauer.stderr.at: recent posts by Thomas Jungbauer (front matter authors:). */ -}}
+{{- $author := "Thomas Jungbauer" -}}
+{{- $limit := 8 -}}
+{{- $match := slice -}}
+{{- range site.RegularPages.ByDate.Reverse -}}
+  {{- if and .Params.authors (in .Params.authors $author) -}}
+    {{- $match = $match | append . -}}
+  {{- end -}}
+{{- end -}}
+{{- $match = first $limit $match -}}
+{{- $out := slice -}}
+{{- range $match -}}
+  {{- $out = $out | append (dict "title" .Title "url" .Permalink "date" (.Date.Format "2006-01-02")) -}}
+{{- end -}}
+{{- $out | jsonify -}}

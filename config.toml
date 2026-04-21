@@ -13,8 +13,15 @@ filename = 'sitemap.xml'
 priority = 0.5
 
 # For search functionality
+[outputFormats]
+  [outputFormats.TJFeed]
+    mediaType = "application/json"
+    baseName = "tj-posts"
+    isPlainText = true
+    notAlternate = true
+
 [outputs]
-home = [ "HTML", "RSS", "JSON"]
+home = [ "HTML", "RSS", "JSON", "TJFeed"]
 
 [permalinks]
     posts = "/:sections/:year/:month/:slug/"
