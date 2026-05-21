@@ -1,0 +1,177 @@
+---
+title: "Using a local Renovate bot to manage collection dependencies"
+description: "How to use a local renovate bot to automatically updating collections dependencies."
+date: "2026-05-19"
+doctype: book
+weight: 10
+
+draft: true
+
+featured_image: /ansible/images/cats_onboarding.webp
+show_featured_image_summary: true
+show_featured_image_article: true
+disableBreadcrumb: false
+
+authors: [Toni Schmidbauer]
+type: post
+categories:
+   - Ansible
+   - "Ansible Automation Platform"
+   - Renovate
+   - Collections
+   - Dependencies
+
+tags: ["Ansible", "Ansible Automation Platform", "Renovate", "Collections", "Dependencies"]
+
+aliases: [
+]
+---
+
+:imagesdir: /ansible/images/onboarding
+:icons: font
+:toc:
+
+We wanted to use https://github.com/renovatebot/renovate[renovate] bot
+to automatically update collection dependencies for one of your
+Ansible playbook repositories. This blog post describes the basics of
+renovate, how we configured it and how we acutally run renovate
+locally.
+
+<!--more-->
+
+== Understanding renovate
+
+As this our first try of using renovate for dependency updates, we
+struggled to understand how renovate works and how it is configured.
+
+Renovate is a bot that is able to scan multiple repositories for
+dependencies and create pull/merge requests with updated dependencies.
+
+Configuration is split between a configuration for the running
+bot and a local configuration per repository.
+
+So you basically have
+
+- One or more global configuration files that configures the bot
+  (_config.js_) written in JavaScript or TypeScript
+
+- One configuration file per repository (renovate.json) writting in
+  JSON that contains local configuration options just for this
+  repository.
+
+Renovate is very flixible on how to structure the configuration. For
+more information see
+https://docs.renovatebot.com/config-overview/[config-overview] in the
+docs.
+
+Renovate also support multiple platform like GitHub, Gitlab or
+Forgejo. For a complete list see
+https://docs.renovatebot.com/modules/platform/[renovate platforms].
+
+The idea is that you run the bot once, it scans all configured
+repositories and creates pull requests in every repository with
+dependency updates.
+
+If you projects are hosted on GitHub and you would like to use GitHub
+Actions for running renovate the straight forward solution is to
+follow https://github.com/marketplace/renovate[Mend Renovate on GitHub
+Marketplace].
+
+But we wanted more control and tried to
+
+- run renovate on a local machine. This should be migrated to a Job Template or
+  Kubernetes CronJob later (might be worth another post)
+- use a private Automation Hub for hosting dependencies. So renovate
+  should query collections on our Private Automation Hub for
+  dependency updates
+- credentials should be made available via environment variables to the bot
+
+
+== Configuring and running renovate
+
+As a first test we created a local bot configuration file _config.js_
+in our home directory. The GIT repository we used for testing is
+https://github.com/tosmi-ansible/aap-setup.
+
+The first thing to be aware of is that the renovate bot *always*
+searches the repository configuration file (_renovate.json_) in the
+*upstream* repo. Changes to local files are ignored. You must push
+your renovate config to the remote repository.
+
+It is helpful to run renovate with debugging enabled, this dumps the
+configuration currenlty used to STDOUT.
+
+For example we had the following _renovate.json_ config for testing:
+
+[source,json]
+----------
+{
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "extends": [
+        "config:best-practices"
+    ],
+    "timezone": "Europe/London",
+    "schedule": [
+        "at any time"
+    ],
+    "packageRules": [
+        {
+            "matchDatasources": ["galaxy-collection"]
+        },
+        {
+            "matchDatasources": ["github-tags"],
+            "enabled": "false"
+        }
+    ],
+    "hostRules": [
+        {
+            "matchHost": "aap.apps.hub.aws.tntinfra.net",
+            "token": "Token <the token>",
+            "authType": "Token-Only"
+        }
+    ]
+}
+----------
+
+But running renovate with _LOG_LEVEL=debug_ set in the environment
+revealed the follwing settings:
+
+[source,json]
+----------
+DEBUG: Repository config (repository=tosmi-ansible/aap-setup)
+       "fileName": "renovate.json",
+       "config": {
+         "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+         "extends": ["config:recommended"]
+       }
+----------
+
+The configuration above is the configuration available in the remote
+GIT repository.
+
+NOTE: Renovate does not use a local _renovate.json_ repository
+config. It always pulls the configurtion from the remote repository.
+
+XXX --platform=local?
+
+Furthermore renovate heavily relys on local caching. We wanted to test
+if renovate is using hour hub token for connecting to hub, but we
+could not see any log entry in the AAP HUB container.
+
+Renovate creates it's cache files in a directory called _baseDir_. You
+can specify the location (and later wipe the cache) with the
+_--base-dir_ option.
+
+As we are using a self signed certificate in hour AAP Hub test
+installation we had to specify _NODE_TLS_REJECT_UNAUTHORIZED=0_ to
+disable TLS verification.
+
+So to run and test renovate locally we used the following command line:
+
+[source,bash]
+----------
+NODE_TLS_REJECT_UNAUTHORIZED=0 LOG_LEVEL=debug RENOVATE_CONFIG_FILE=~/config.js renovate --platform=github --repository-cache=disabled --base-dir=/tmp/cache
+----------
+
+
+- renovate will search for a org/.github repo for if renovate config
