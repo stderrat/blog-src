@@ -1,7 +1,7 @@
 ---
 title: "Using a local Renovate bot to manage collection dependencies"
 description: "How to use a local renovate bot to automatically update collections dependencies."
-date: "2026-05-19"
+date: "2026-05-26"
 doctype: book
 weight: 10
 
