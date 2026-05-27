@@ -287,6 +287,10 @@ module.exports = {
 <3> We use the secret as our token for authenticating to AAP Hub
 <4> The _authType_ setting is a little bit special, see the following section
 
+For GitHub authentiation renovate expects a GitHub token in the
+environment variable
+https://docs.renovatebot.com/self-hosted-configuration/#token[RENOVATE_TOKEN].
+
 A few words about the _authType_ setting. AAP Hub requires the
 following authorization header in the HTTP request for authentication:
 
@@ -337,6 +341,16 @@ _renovate.json_ file and still use _secrets.AAP_HUB_TOKEN_, but as
 this is going to be our global configuration for Ansible code base
 covering multiple repositories our current idea is to store the
 authentication in the global configuration.
+
+To set the required environment variables containing our secrets we
+execute
+
+[source,bash]
+----------
+$ export AAP_HUB_TOKEN=$(pass show other/ansible/aws-aap-tokens | awk '/hub/ {print $2}') <1>
+$ export RENOVATE_TOKEN=$(pass show other/github/tosmi-rw-token | awk '/token/ {print $2}')
+----------
+<1> We use the https://www.passwordstore.org/[pass utility] for secret management.
 
 == Integration with GitHub
 
