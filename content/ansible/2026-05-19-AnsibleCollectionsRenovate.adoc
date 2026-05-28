@@ -465,3 +465,8 @@ To convince Renovate to create a new pull request just rename the
 closed pull request on GitHub. We just added the prefix
 "RENAMED". After renaming the pull request, renovate will happily
 create a new one.
+
+NOTE: We also had issues with new dependencies in
+_requirements.yaml_. Wiping the renovate cache (_/tmp/renovate_cache_)
+in our case fixed this and renovate created new pull requests for the
+added dependencies.
