@@ -287,7 +287,7 @@ module.exports = {
 <3> We use the secret as our token for authenticating to AAP Hub
 <4> The _authType_ setting is a little bit special, see the following section
 
-For GitHub authentiation renovate expects a GitHub token in the
+For GitHub authentication renovate expects a GitHub token in the
 environment variable
 https://docs.renovatebot.com/self-hosted-configuration/#token[RENOVATE_TOKEN].
 
@@ -466,7 +466,60 @@ closed pull request on GitHub. We just added the prefix
 "RENAMED". After renaming the pull request, renovate will happily
 create a new one.
 
-NOTE: We also had issues with new dependencies in
-_requirements.yaml_. Wiping the renovate cache (_/tmp/renovate_cache_)
-in our case fixed this and renovate created new pull requests for the
-added dependencies.
+== Tips and tricks
+
+This section list various things we learning while running renovate locally
+
+=== Renovate does not honor new dependencies in _requirements.yaml_
+
+We had an issues with new dependencies in _requirements.yaml_. Wiping
+the renovate cache (_/tmp/renovate_cache_) in our case fixed this and
+renovate created new pull requests for the added dependencies.
+
+=== Renovate does not open new PR (pull requests) for updated dependencies
+
+We double checked AAP and our renovate configuration and there was
+clearly a newer version of a collection but renovate just did not open
+a new PR.
+
+Running renovate with _LOG_LEVEL=debug_ revealed the following message
+(we tried to update the redhat.openshift_virtualization collection):
+
+[source,terminal]
+----------
+         {
+           "branchName": "renovate/redhat.openshift_virtualization-2.x",
+           "prNo": null,
+           "prTitle": "Update dependency redhat.openshift_virtualization to v2.2.4",
+           "result": "branch-limit-reached", <1>
+----------
+<1> renovate does not open a new branch because of "branch-limit-reached"
+
+We check our upstream repository on GitHub and there was just the main
+branch, hm...
+
+Looking further up in the log we found:
+
+[source,terminal]
+----------
+DEBUG: prHourlyLimit of the upgrades present in this branch (repository=tosmi-ansible/aap-setup, branch=renovate/infra.aap_utilities-3.x)
+       "limits": [{"depName": "infra.aap_utilities", "prHourlyLimit": 2}]
+DEBUG: Calculated lowest prHourlyLimit among the upgrades present in this branch is 2. (repository=tosmi-ansible/aap-setup, branch=renovate/infra.aap_utilities-3.x)
+DEBUG: Hourly PRs limit reached (repository=tosmi-ansible/aap-setup, branch=renovate/infra.aap_utilities-3.x) <1>
+       "hourlyPrCount": 2,
+       "hourlyPrLimit": 2
+DEBUG: Reached branch limit - skipping branch creation (repository=tosmi-ansible/aap-setup, branch=renovate/infra.aap_utilities-3.x)
+----------
+<1> There is a hourly branch limit of two in place
+
+As we just ran renovate to update another dependency, we seem to be
+hitting this hourly limit. The
+https://docs.renovatebot.com/configuration-options/#prhourlylimit[docs]
+mention a default of 2.
+
+The solution was to run renovate with the option _--pr-hourly-limit=0_:
+
+[source,terminal]
+----------
+NODE_TLS_REJECT_UNAUTHORIZED=0 renovate --platform=github --base-dir=/tmp/renovate-cache --pr-hourly-limit=0
+----------
