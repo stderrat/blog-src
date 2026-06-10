@@ -20,6 +20,7 @@ tags: ["OCP", "OKD", "Day-2", "OpenShift", "RBAC", "Console", "Security", "Plugi
 
 aliases: [
    "/openshift/security/rbac/rbac-overview-console-plugin/",
+   "/openshift/security/RBAC/rbac-overview-console-plugin/",
 ]
 ---
 
