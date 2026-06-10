@@ -4,7 +4,7 @@ description: "Install and use the RBAC Overview dynamic console plugin to inspec
 date: "2026-06-10"
 doctype: book
 
-featured_image: /openshift-platform/security/rbac/images/logo_rbac-overview.png
+featured_image: /openshift-platform/security/RBAC/images/logo_rbac-overview.png
 show_featured_image_summary: true
 show_featured_image_article: true
 
@@ -24,7 +24,7 @@ aliases: [
 ]
 ---
 
-:imagesdir: /openshift-platform/security/rbac/images/
+:imagesdir: /openshift-platform/security/RBAC/images/
 :icons: font
 :toc:
 
