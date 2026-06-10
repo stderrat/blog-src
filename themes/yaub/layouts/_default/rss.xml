@@ -28,7 +28,7 @@
     <link>{{ .Permalink }}</link>
     <description>{{ with .Site.Params.description }}{{ . }}{{ else }}Recent content {{ if ne .Title .Site.Title }}{{ with .Title }}in {{ . }} {{ end }}{{ end }}on {{ .Site.Title }}{{ end }}</description>
     <generator>Hugo -- gohugo.io</generator>
-    <language>{{ site.Language.LanguageCode }}</language>{{ with $rssEmail }}
+    <language>{{ site.Language.Locale }}</language>{{ with $rssEmail }}
     <managingEditor>{{ . }}{{ with $rssName }} ({{ . }}){{ end }}</managingEditor>
     <webMaster>{{ . }}{{ with $rssName }} ({{ . }}){{ end }}</webMaster>{{ end }}{{ with .Site.Copyright }}
     <copyright>{{.}}</copyright>{{ end }}{{ if not .Date.IsZero }}
