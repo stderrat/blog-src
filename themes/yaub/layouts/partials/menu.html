@@ -159,7 +159,7 @@
         {{if .Params.divider_before}}divider-before{{end}}
         ">
       {{ $numberOfPages := (add (len ( where .Pages "Params.hidden" "ne" true )) (len ( where .Sections "Params.hidden" "ne" true ))) }}
-      <a href="{{.RelPermalink}}" class="{{ if ne $numberOfPages 0 }}has-children{{ end }}">
+      <a href="{{ with .Params.external_url }}{{ . }}{{ else }}{{ .RelPermalink }}{{ end }}" class="{{ if ne $numberOfPages 0 }}has-children{{ end }}"{{ with .Params.external_url }} target="_blank" rel="noopener noreferrer"{{ end }}>
           <span class="menu-title">{{safeHTML .Params.Pre}}{{or .Params.menuTitle .LinkTitle .Title}}{{safeHTML .Params.Post}}</span>
           {{ if ne $numberOfPages 0 }}
           <i class="fas fa-chevron-right menu-chevron"></i>
@@ -211,7 +211,7 @@
   {{else}}
     {{ if not .Params.Hidden }}
       <li data-nav-id="{{.RelPermalink}}" title="{{.Title}}" class="dd-item {{if eq .File.UniqueID $currentFileUniqueID}}active{{end}}">
-        <a href="{{ .RelPermalink}}">
+        <a href="{{ with .Params.external_url }}{{ . }}{{ else }}{{ .RelPermalink }}{{ end }}"{{ with .Params.external_url }} target="_blank" rel="noopener noreferrer"{{ end }}>
         {{safeHTML .Params.Pre}}{{or .Params.menuTitle .LinkTitle .Title}}{{safeHTML .Params.Post}}
         </a>
     </li>

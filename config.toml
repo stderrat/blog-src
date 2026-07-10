@@ -1,5 +1,5 @@
 baseURL = "https://blog.stderr.at/"
-languageCode = "en-us"
+locale = "en-us"
 title = "TechBlog about OpenShift/Ansible/Satellite and much more"
 theme = ["yaub"]
 enableGitInfo = true
@@ -102,7 +102,7 @@ home = [ "HTML", "RSS", "JSON", "TJFeed"]
   lang = "en"
 
 [[menu.shortcuts]]
-name = '<svg stroke="currentColor" fill="#d2d2d2" stroke-width="0" version="1.1" viewBox="0 0 17 17" class="relative z-20 h-6 w-6" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><g></g><path d="M16.499 1.843l-1.403-1.403c-0.566-0.566-1.555-0.566-2.122 0l-7.536 7.536-1.722 5.287 5.249-1.765 7.534-7.534c0.283-0.283 0.439-0.66 0.439-1.061s-0.156-0.777-0.439-1.060zM5.584 10.758l0.638-1.957 1.92 1.919-1.942 0.653-0.616-0.615zM6.832 7.996l3.986-3.986 2.11 2.11-3.986 3.986-2.11-2.11zM11.525 3.303l0.729-0.729 2.11 2.11-0.729 0.729-2.11-2.11zM15.792 3.257l-0.72 0.721-2.11-2.11 0.72-0.721c0.19-0.189 0.519-0.189 0.707 0l1.403 1.403c0.094 0.095 0.146 0.22 0.146 0.354s-0.052 0.258-0.146 0.353zM15 7.5h1v9.5h-16v-15h7.5v1h-6.5v13h14v-8.5z"></path></svg> About Us'
+name = '<svg stroke="currentColor" fill="#d2d2d2" stroke-width="0" version="1.1" viewBox="0 0 17 17" class="relative z-20 h-6 w-6" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><g></g><path d="M16.499 1.843l-1.403-1.403c-0.566-0.566-1.555-0.566-2.122 0l-7.536 7.536-1.722 5.287 5.249-1.765 7.534-7.534c0.283-0.283 0.439-0.66 0.439-1.061s-0.156-0.777-0.439-1.060zM5.584 10.758l0.638-1.957 1.92 1.919-1.942 0.653-0.616-0.615zM6.832 7.996l3.986-3.986 2.11 2.11-3.986 3.986-2.11-2.11zM11.525 3.303l0.729-0.729 2.11 2.11-0.729 0.729-2.11-2.11zM15.792 3.257l-0.72 0.721-2.11-2.11 0.72-0.721c0.19-0.189 0.519-0.189 0.707 0l1.403 1.403c0.094 0.095 0.146 0.22 0.146 0.354s-0.052 0.258-0.146 0.353zM15 7.5h1v9.5h-16v-15h7.5v1h-6.5v13h14v-8.5z"></path></svg> About'
 url = "/authors"
 post = "<i class='fa fa-chevron-down padding-left-25rem''></i>"
 weight = 1
@@ -177,7 +177,7 @@ parent = "browse"
 
 # GitOps & Helm Charts dropdown
 [[menu.shortcuts]]
-name = "<i class='fas fa-layer-group padding-right-25rem'></i> GitOps & Helm Charts"
+name = "<i class='fas fa-layer-group padding-right-25rem'></i> GitOps & Helm"
 url = "#"
 post = "<i class='fa fa-chevron-down padding-left-25rem''></i>"
 weight = 10
@@ -212,6 +212,13 @@ parent = "gitops-helm"
   [menu.shortcuts.params]
     class = "left"
 
+[[menu.shortcuts]]
+name = "<i class='fas fa-clipboard-check padding-right-25rem'></i> Test Cases"
+url = "https://tests.stdin.at/"
+weight = 11
+  [menu.shortcuts.params]
+    class = "left"
+
 #[[menu.shortcuts]]
 #  name = "<i class='fab fa-redhat padding-right-25rem'></i> Red Hat"
 #  url = "https://www.redhat.com"
@@ -224,6 +231,9 @@ staticDir = ['themes/hugo-theme-learn/static', 'static']
 
 # Syntax highlighting configuration
 [markup]
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = true
   [markup.highlight]
     codeFences = true
     guessSyntax = true
@@ -242,7 +252,8 @@ staticDir = ['themes/hugo-theme-learn/static', 'static']
     [markup.asciidocExt.attributes]
       source-highlighter = "highlightjs"
 
-# we need to allow asciidoc
+# Hugo 0.162+ denies text/html in content/ by default (CVE-2026-50133).
+# Homepage uses Markdown; only opt in here if you add trusted .html content files.
 [security]
   enableInlineShortcodes = false
   [security.exec]

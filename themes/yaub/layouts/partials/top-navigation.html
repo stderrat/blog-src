@@ -19,7 +19,7 @@
 
     <div class="absolute submenu-div">
       {{ range sort .Children "Weight" }}
-        <a href="{{ .URL }}" class="submenu-style submenu-link display-block">{{ if .Pre }}<i class='{{ .Pre }}'></i>{{ end }}{{ safeHTML .Name }}</a>
+        <a href="{{ if hasPrefix .URL "http" }}{{ .URL }}{{ else }}{{ .URL | absLangURL }}{{ end }}" class="submenu-style submenu-link display-block"{{ if hasPrefix .URL "http" }} target="_blank" rel="noopener noreferrer"{{ end }}>{{ if .Pre }}<i class='{{ .Pre }}'></i>{{ end }}{{ safeHTML .Name }}</a>
       {{ end }}
     </div>
   </div>
@@ -28,7 +28,7 @@
 {{else}}
 
                       <li class="list-horizontal {{ .Params.class }} padding-left-15 padding-right-15">
-                          {{.Pre}}<a class="padding-topnav" href="{{.URL | absLangURL }}">{{safeHTML .Name}}</a>{{.Post}}
+                          {{.Pre}}<a class="padding-topnav" href="{{ if hasPrefix .URL "http" }}{{ .URL }}{{ else }}{{ .URL | absLangURL }}{{ end }}"{{ if hasPrefix .URL "http" }} target="_blank" rel="noopener noreferrer"{{ end }}>{{safeHTML .Name}}</a>{{.Post}}
                       </li>
 
 {{end}}
