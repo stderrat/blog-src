@@ -1,12 +1,12 @@
 --- 
-title: "The Guide to OpenBao - High Availability and Production Best Practices - Part 10"
+title: "The Guide to OpenBao - High Availability and Production Best Practices - Part 11"
 description: "Production hardening for OpenBao including auto-unseal, disaster recovery, backup strategies, monitoring, and performance tuning"
 date: "2026-04-19"
 doctype: book
 weight: 91
 
 series: "The Guide to OpenBao"
-series_part: 10
+series_part: 11
 
 featured_image: /openshift-platform/security/secrets-management/openbao/images/Logo_OpenBao.png
 show_featured_image_summary: true
@@ -25,6 +25,7 @@ tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "
 
 aliases: [ 
 	 "/openshift/security/openbao/2026-02-15-openbao-ha-production/",
+	 "/openshift-platform/security/secrets-management/openbao/2026-04-19-openbao-part-10-ha-and-production/",
 ]
 ---
 
@@ -708,7 +709,7 @@ bao status
 
 == What is Coming Next?
 
-In Part 11, we will cover day-to-day operations and troubleshooting:
+In Part 12, we will cover day-to-day operations and troubleshooting:
 
 * Common issues and solutions
 * Log analysis

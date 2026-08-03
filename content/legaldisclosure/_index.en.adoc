@@ -11,10 +11,27 @@ pre: "<i class='fas fa-balance-scale'></i> "
 
 
 == Legal Disclosure
-Information in accordance with Section 5 TMG
 
-Toni Schmidbauer & Thomas Jungbauer +
-1200 Vienna, Austria
+Information pursuant to https://www.ris.bka.gv.at/GeltendeFassung.wxe?Abfrage=Bundesnormen&Gesetzesnummer=20001703[§ 5 of the Austrian E-Commerce Act (ECG)^] and https://www.ris.bka.gv.at/GeltendeFassung.wxe?Abfrage=Bundesnormen&Gesetzesnummer=10000719[§§ 24 and 25 of the Austrian Media Act (MedienG)^].
+
+=== Provider and media disclosure
+
+*Media owner (Medieninhaber) and publisher (Herausgeber):* +
+Toni Schmidbauer & Thomas Jungbauer
+
+*Address:* +
+1010 Vienna, Austria
+
+*Website:* +
+https://blog.stderr.at/
+
+*Purpose of the medium:* +
+Independent technical publication on OpenShift, Kubernetes, GitOps, automation, security, and related platform engineering topics.
+
+*Editorial line (grundlegende Richtung):* +
+The blog publishes technical articles, tutorials, and operational experience for an international engineering audience. It is editorially independent and not affiliated with any political party.
+
+Company register number, VAT identification number (UID), and membership of a professional chamber do not apply.
 
 === Contact Information
 Toni Schmidbauer:
@@ -28,36 +45,62 @@ Thomas Jungbauer: https://jungbauer.stderr.at
 Internet address: https://blog.stderr.at/
 
 === Disclaimer
-Accountability for content +
-The contents of our pages have been created with the utmost care. However, we cannot guarantee the contents' accuracy, completeness or topicality. According to statutory provisions, we are furthermore responsible for our own content on these web pages. In this matter, please note that we are not obliged to monitor the transmitted or saved information of third parties, or investigate circumstances pointing to illegal activity. Our obligations to remove or block the use of information under generally applicable laws remain unaffected by this as per §§ 8 to 10 of the Telemedia Act (TMG).
 
-Accountability for links +
-Responsibility for the content of external links (to web pages of third parties) lies solely with the operators of the linked pages. No violations were evident to us at the time of linking. Should any legal infringement become known to us, we will remove the respective link immediately.
+*Accountability for content* +
+The contents of these pages have been created with care. We do not warrant that the content is accurate, complete, or up to date. We are responsible for our own content on these pages under applicable Austrian and European Union law. We are not obliged to monitor information transmitted or stored by third parties, or to investigate circumstances that merely indicate unlawful activity. Statutory obligations to remove or disable access to information remain unaffected, in particular under the Austrian E-Commerce Act (ECG) and, where applicable, the EU Digital Services Act (Regulation (EU) 2022/2065).
 
-Copyright +
-Our web pages and their contents are subject to German copyright law. Unless expressly permitted by law, every form of utilizing, reproducing or processing works subject to copyright protection on our web pages requires the prior consent of the respective owner of the rights. Individual reproductions of a work are only allowed for private use. The materials from these pages are copyrighted and any unauthorized use may violate copyright laws.
+*Accountability for links* +
+Responsibility for the content of external links rests with the operators of the linked pages. No infringement was apparent to us at the time of linking. If we become aware of a legal infringement, we will remove the link concerned without undue delay.
+
+=== Copyright
+
+Unless otherwise stated, the content of this website is protected by Austrian copyright law (Urheberrechtsgesetz, UrhG) and related rights. Reproduction, distribution, or other use beyond what is permitted by statute requires the prior consent of the respective rights holder. Statutory exceptions, including those for private use where applicable, remain unaffected.
+
+Article logo and featured images (mainly showing cats) used on this website are AI-generated, unless a specific image is labelled otherwise.
 
 === Comments (GitHub Discussions)
 
-This website uses https://giscus.app[Giscus] for comments, which is powered by GitHub Discussions. When you choose to load the comments section:
+This website uses https://giscus.app[Giscus^] for comments, which is powered by GitHub Discussions. When you choose to load the comments section:
 
-* Comments are loaded only after you explicitly click "Load Comments"
-* You will need to authenticate with your GitHub account to participate
-* Your comment, username, and profile picture will be stored in this website's GitHub repository as part of GitHub Discussions
-* GitHub's Privacy Policy applies to your data when using this feature
+* Comments are loaded only after you explicitly click *Load Comments*
+* You must authenticate with your GitHub account to participate
+* Your comment, username, and profile picture are stored in this website's GitHub repository as part of GitHub Discussions
+* GitHub's privacy statement applies to the processing performed by GitHub when you use this feature
 
-We do not process or store your personal data from comments on our own servers. All comment data is managed by GitHub Inc. (Microsoft Corporation).
+Comment content and related profile data are hosted by GitHub Inc. (Microsoft Corporation). Loading the comments widget and authenticating with GitHub may involve a transfer of personal data to the United States. GitHub provides information on its transfers and safeguards in its https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement[Privacy Statement^].
 
-*Important:* By participating in discussions, you agree to GitHub's https://docs.github.com/en/site-policy/github-terms/github-terms-of-service[Terms of Service] and https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement[Privacy Statement].
+*Important:* By participating in discussions, you agree to GitHub's https://docs.github.com/en/site-policy/github-terms/github-terms-of-service[Terms of Service^] and https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement[Privacy Statement^].
 
-=== Data Processing
+=== Privacy notice
 
-This website does not use cookies for tracking purposes. The following external services may set cookies when you interact with them:
+This section provides information pursuant to Articles 13 and 14 of the General Data Protection Regulation (GDPR / DSGVO) and the Austrian Data Protection Act (DSG). Cookie and end-device storage rules under https://www.ris.bka.gv.at/GeltendeFassung.wxe?Abfrage=Bundesnormen&Gesetzesnummer=20011678[§ 165 (3) of the Telecommunications Act 2021 (TKG 2021)^] are addressed where relevant.
 
-* *GitHub (Giscus Comments):* Functional cookies for authentication when you choose to load and participate in comments
-* *Syntax Highlighting:* Code highlighting is performed locally in your browser
+==== Controllers
 
-No analytics or tracking services are used on this website.
+The joint controllers for this website are:
 
-[.small]
-Quelle: http://translate-24h.de 
+Toni Schmidbauer & Thomas Jungbauer +
+1010 Vienna, Austria
+
+Contact details are set out under *Contact Information* above.
+
+==== Hosting and server logs
+
+This website is published as a static site via GitHub Pages. When you visit the site, the hosting provider may process technical data that is typically required to deliver the pages, such as IP address, date and time of the request, requested URL, referrer URL, and browser or device information. Processing is based on Article 6(1)(f) GDPR (legitimate interest in operating and securing the website). Retention of server logs is determined by the hosting provider's practices.
+
+==== Cookies and local storage
+
+This website does not use analytics or advertising cookies, and no analytics or tracking services are operated by us.
+
+* *GitHub (Giscus comments):* If you choose to load and use comments, GitHub may set functional cookies or comparable storage that is necessary to provide the requested authentication and commenting service. Storage or access for that purpose takes place only after your explicit action (*Load Comments*), consistent with § 165 (3) TKG 2021 for a service expressly requested by you.
+* *Syntax highlighting:* Code highlighting is performed locally in your browser and does not require third-party tracking cookies.
+
+==== Comments and third-party processing
+
+If you use comments, GitHub processes the personal data described under *Comments (GitHub Discussions)*, including transfers outside the EEA as stated there. The legal basis for initiating that processing through this website is your consent / request for the service (Article 6(1)(a) GDPR and, where applicable, Article 6(1)(b) GDPR), exercised by loading comments and authenticating with GitHub.
+
+==== Your rights
+
+Under the GDPR you may have the right to access, rectification, erasure, restriction of processing, data portability, and objection, as well as the right to withdraw consent where processing is based on consent, without affecting the lawfulness of processing before withdrawal.
+
+You also have the right to lodge a complaint with a supervisory authority. For Austria, the competent authority is the https://www.dsb.gv.at/[Austrian Data Protection Authority (Datenschutzbehörde)^].
