@@ -1,0 +1,503 @@
+--- 
+title: "[Ep.18] Argo CD Agent - migrating without a big bang using the hybrid architecture"
+description: "How to run the Argo CD Agent principal next to an existing Argo CD instance and migrate applications one by one, using the hybrid architecture introduced as Technology Preview in OpenShift GitOps 1.21"
+date: "2026-09-08"
+doctype: book
+weight: 100
+
+series: "GitOps Episodes"
+series_part: 18
+
+featured_image: /gitopscollection/images/logos/ep-18-gitops.png
+show_featured_image_summary: true
+show_featured_image_article: true
+featured_image_position: 25% 35%
+disableBreadcrumb: true
+
+authors: [Thomas Jungbauer]
+draft: true
+type: post
+categories:
+   - GitOps
+   - OpenShift
+
+tags: ["Argo CD", "Argo CD Agent", "OpenShift GitOps", "OpenShift", "OCP", "GitOps", "Multi-cluster", "Hub and Spoke", "Migration", "Hybrid"]
+keywords: "Argo CD,Argo CD Agent,Hybrid Architecture,OpenShift GitOps,OpenShift,OCP,GitOps,Multi-cluster,Hub and Spoke,skip-reconcile,label selector,destination-based mapping"
+
+aliases: []
+---
+
+:imagesdir: /gitopscollection/images/
+:icons: font
+:toc:
+
+
+<!--more-->
+
+
+In link:/gitopscollection/2026-01-14-argocd-agent[Ep.15] I installed the Argo CD Agent from scratch and showed how the hub and spoke architecture combines the single pane of glass of a centralised deployment with the scalability of a decentralised one. Everything in that article worked, but it came with one condition that made it hard to sell to an existing customer. On the hub cluster the Argo CD application controller had to be disabled, which meant a separate Argo CD instance in a separate namespace, and it meant that all applications had to move at once.
+
+That is the wrong shape for a migration. Nobody with 40 clusters and several hundred applications wants an all-or-nothing cut-over on a Saturday night.
+
+OpenShift GitOps 1.21 introduces the hybrid architecture as a Technology Preview. The Argo CD application controller and the Argo CD Agent principal can now run in the same Argo CD instance. Traditional applications keep being reconciled by the hub's application controller in the push model, while migrated applications are handled by the principal and the agent in the pull model. Both kinds share the same UI and API, and you migrate one application at a time.
+
+This article explains how the two systems are kept apart, sets the whole thing up step by step, and then migrates a single application, including how to move it back.
+
+CAUTION: The hybrid architecture is a Technology Preview feature in OpenShift GitOps 1.21. Technology Preview features are not supported with Red Hat production service level agreements and are not recommended for production use. Use it to prepare and validate your migration.
+
+== Why the two systems used to conflict
+
+The reason for the old restriction becomes clear once you look at what both components do. The application controller on the hub and the principal both watch `Application` resources, and both consider themselves responsible for reconciling them. Two controllers and one resource means a fight, not a deployment.
+
+The hybrid architecture solves this with isolation mechanisms on both sides. It is a combination of a label selector and an annotation, and understanding the four mechanisms is the whole trick. Let us go through them before touching a cluster.
+
+=== Mechanism 1: the label selector, required
+
+The principal and the agent are both configured with a Kubernetes label selector. They only list, watch and process resources, meaning `Application`, `AppProject` and repository secrets, that carry the matching label. Anything without the label is invisible to them, so the existing application controller keeps processing those resources without interference.
+
+I use `argocd-agent=true` throughout this article. Any valid label selector works, as long as it is identical on the principal and on the agent.
+
+=== Mechanism 2: the skip-reconcile annotation, required
+
+The label selector keeps the principal away from traditional applications. The annotation does the opposite and keeps the hub's application controller away from agent applications.
+
+When you create an agent with `argocd-agentctl agent create`, the resulting cluster secret gets the annotation `argocd.argoproj.io/skip-reconcile: "true"`. This tells the application controller on the hub to skip reconciliation for all applications targeting that cluster. A migrated application points at the agent cluster, so from that moment the hub controller leaves it alone.
+
+IMPORTANT: This annotation only exists in Argo CD 3.4 and later, which is what OpenShift GitOps 1.21 ships. On an older version the hub's controller still tries to reconcile applications targeting agent clusters, which produces exactly the conflict the hybrid architecture is supposed to avoid. That is why the feature requires 1.21.
+
+One detail makes the coexistence practical: the agent cluster secret and the traditional cluster secret can describe the same physical spoke cluster, because they have different names and point to different endpoints. The traditional secret points at the spoke's API server, the agent secret at the principal's resource proxy.
+
+=== Mechanism 3: the agent-side label selector, required
+
+The agent on the spoke also gets a label selector. It filters at the Kubernetes API level on the spoke, so pre-existing applications on the spoke that do not carry the label are invisible to the agent. Set it to the same value as on the principal.
+
+=== Mechanism 4: ignore-unmanaged-apps, recommended
+
+The agent can be told to skip any application that lacks the `argocd.argoproj.io/source-uid` annotation, which the agent sets itself when it creates an application locally on the spoke. This protects you from an application that happens to carry the agent label but was never created by the agent. Enable it whenever the spoke already runs applications of its own.
+
+== The resulting architecture
+
+On the hub cluster, all existing Argo CD components keep running: server, application controller, repository server and Redis. The principal is installed alongside them, together with its Redis proxy. The Argo CD server talks to the Redis proxy instead of Redis directly. The proxy routes agent-related keys, such as resource trees and managed resources, to the correct agent through the principal, and forwards everything else to the local Redis. That is what makes the UI show a resource tree for an application reconciled a thousand kilometres away.
+
+On the spoke cluster you run the agent plus a local application controller, repository server and Redis. The agent opens an outbound gRPC connection to the principal, so the hub never connects into the spoke for agent applications.
+
+Traditional applications still travel the old way. The hub's application controller connects directly to the spoke's API server using the classic cluster secret.
+
+NOTE: This article assumes the agent runs in managed mode with destination-based mapping. Managed mode means the hub is the source of truth for the application specification, which is what you want when migrating from a centralised setup. See link:/gitopscollection/2026-01-14-argocd-agent[Ep.15] for the difference between managed and autonomous mode.
+
+=== Why destination-based mapping matters here
+
+Without destination-based mapping, the principal decides which agent an application belongs to by looking at the namespace the application lives in on the hub. That forces you to move every application into an agent-specific namespace during the migration, which touches RBAC, AppProjects and possibly your App-of-Apps structure.
+
+With destination-based mapping enabled, routing is based on `spec.destination.name`. Applications stay where they are and the migration of a single application comes down to two small changes. For a hybrid setup this is not optional in practice.
+
+== A word about the setup
+
+I use two clusters:
+
+* *Hub cluster*: an existing OpenShift cluster with the default cluster-scoped `openshift-gitops` instance, managing applications on the spoke through a classic cluster secret.
+* *Spoke cluster*: an OpenShift cluster with the OpenShift GitOps Operator installed.
+
+In addition to what link:/gitopscollection/2026-01-14-argocd-agent[Ep.15] already covered, you need:
+
+* OpenShift GitOps 1.21 with Argo CD 3.4 on the hub. This is a hard requirement because of the `skip-reconcile` annotation.
+* If your applications live outside the `openshift-gitops` namespace, the applications in any namespace feature has to be configured, which means `spec.sourceNamespaces` on the Argo CD custom resource lists those namespaces. The examples below keep the applications in `openshift-gitops`.
+* The `argocd-agentctl` CLI, downloaded from the Red Hat Content Gateway.
+* The `helm` CLI, version 3.8.0 or later, if you install the agent with the Helm chart instead of the Operator.
+* Spoke clusters have to be able to open outbound connections to the hub.
+
+Check the operator version first, because everything below depends on it:
+
+[source,bash]
+----
+oc get csv -n openshift-gitops-operator | grep gitops
+----
+
+The Argo CD version has to be 3.4 or later:
+
+[source,bash]
+----
+oc get deployment openshift-gitops-server -n openshift-gitops \
+  -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
+----
+
+== Step 1: Enable the principal in the existing Argo CD instance
+
+This is the step that changed. In Ep.15 the Argo CD custom resource had `controller.enabled: false`. Now the controller stays enabled and the principal joins it.
+
+.Enabling the principal next to the existing controller
+[source,yaml]
+----
+apiVersion: argoproj.io/v1beta1
+kind: ArgoCD
+metadata:
+  name: openshift-gitops
+  namespace: openshift-gitops
+spec:
+  controller:
+    enabled: true # <1>
+  argoCDAgent:
+    principal:
+      enabled: true # <2>
+      auth: "mtls:CN=([^,]+)" # <3>
+      logLevel: "info"
+      labelSelector: "argocd-agent=true" # <4>
+      destinationBasedMapping: true # <5>
+      namespace:
+        allowedNamespaces: # <6>
+          - "*"
+      tls:
+        insecureGenerate: false # <7>
+      jwt:
+        insecureGenerate: false
+      server:
+        route:
+          enabled: true # <8>
+----
+<1> The application controller stays enabled. In earlier releases this had to be `false`, and that is the change the whole article is about.
+<2> Enable the principal component in this instance.
+<3> Authentication method for the principal. The agent authenticates with mTLS and the common name of the certificate identifies the agent.
+<4> The principal only sees resources carrying this label. Everything else stays the exclusive business of the application controller.
+<5> Route applications to agents based on `spec.destination.name` instead of the namespace.
+<6> Namespaces the principal is allowed to work in.
+<7> Do not let the component generate its own certificates. We create them ourselves, as in Ep.15.
+<8> Create a route so agents can reach the principal.
+
+The principal pod starts and then fails until the required secrets exist, exactly as described in Ep.15. That is expected. The PKI setup, meaning the certificate authority, the principal TLS certificate, the resource proxy certificate and the JWT signing key, is unchanged. Rather than repeating it, follow the section *Create Required Secrets* in link:/gitopscollection/2026-01-14-argocd-agent[Ep.15].
+
+Once the secrets are in place, both the application controller and the principal should be running:
+
+[source,bash]
+----
+oc get pods -n openshift-gitops | grep -E "application-controller|principal"
+----
+
+=== What the Operator does for you
+
+The upstream documentation contains a step in which you patch `argocd-cmd-params-cm` so that the Argo CD server talks to the Redis proxy instead of Redis, followed by a restart of the server. On OpenShift you do not need this. When the principal is enabled, the Operator points the Argo CD server and the repository server at the principal's Redis proxy service itself.
+
+You can verify that rather than trust it. The service exists:
+
+[source,bash]
+----
+oc get svc -n openshift-gitops | grep redisproxy
+----
+
+.Example output
+[source,text]
+----
+openshift-gitops-agent-principal-redisproxy   ClusterIP   ...   6379/TCP
+----
+
+And the server is pointed at it:
+
+[source,bash]
+----
+oc get cm argocd-cmd-params-cm -n openshift-gitops \
+  -o jsonpath='{.data.redis\.server}{"\n"}'
+----
+
+TIP: If the UI later shows agent applications without a resource tree, the Redis proxy path is the first thing to check. For traditional applications the proxy is transparent, and their data continues to flow to the local Redis.
+
+== Step 2: Create the agent on the hub
+
+Now register an agent. This happens on the hub, because the resulting cluster secret is a hub object. Determine the resource proxy address first:
+
+[source,bash]
+----
+oc get svc -n openshift-gitops | grep resource-proxy
+----
+
+Then create the agent:
+
+[source,bash]
+----
+argocd-agentctl agent create agent-spoke-1 \
+  --principal-context <hub_context> \
+  --principal-namespace openshift-gitops \
+  --resource-proxy-server <resource_proxy_service>:9090
+----
+
+This creates a cluster secret named `cluster-agent-spoke-1` containing the TLS client credentials for the agent, with its `server` URL pointing at the principal's resource proxy, and with the annotation that makes the hybrid setup safe. Verify the annotation, because everything depends on it:
+
+[source,bash]
+----
+oc get secret cluster-agent-spoke-1 -n openshift-gitops \
+  -o jsonpath='{.metadata.annotations.argocd\.argoproj\.io/skip-reconcile}{"\n"}'
+----
+
+.Expected output
+[source,text]
+----
+true
+----
+
+CAUTION: If you create cluster secrets by other means, manually or through GitOps, the annotation is not added for you. Add it explicitly. A missing `skip-reconcile` is the most likely cause of two controllers fighting over one application.
+
+The counterpart matters just as much. Traditional cluster secrets must not carry this annotation, otherwise the hub's application controller stops reconciling the applications that have not been migrated yet. Check all of them at once:
+
+[source,bash]
+----
+oc get secrets -n openshift-gitops -l argocd.argoproj.io/secret-type=cluster \
+  -o custom-columns='NAME:.metadata.name,SKIP:.metadata.annotations.argocd\.argoproj\.io/skip-reconcile'
+----
+
+Only the agent cluster secrets should show `true`.
+
+== Step 3: Install the agent on the spoke
+
+On the spoke cluster, create the Argo CD instance that runs the agent. The server component is disabled, because the UI lives on the hub:
+
+.Argo CD instance on the spoke
+[source,yaml]
+----
+apiVersion: argoproj.io/v1beta1
+kind: ArgoCD
+metadata:
+  name: openshift-gitops
+  namespace: openshift-gitops
+spec:
+  server:
+    enabled: false # <1>
+  argoCDAgent:
+    agent:
+      enabled: true
+      creds: "mtls:any"
+      logLevel: "info"
+      labelSelector: "argocd-agent=true" # <2>
+      allowedNamespaces:
+        - "*"
+      destinationBasedMapping:
+        enabled: true # <3>
+        createNamespace: true # <4>
+      client: # <5>
+        mode: managed
+        principalServerAddress: "<principal_route_dns>"
+        principalServerPort: "443"
+        keepAliveInterval: 50s
+      redis:
+        serverAddress: "openshift-gitops-redis:6379" # <6>
+      tls:
+        insecure: false
+        rootCASecretName: argocd-agent-ca
+        secretName: argocd-agent-client-tls
+      env:
+        - name: ARGOCD_AGENT_IGNORE_UNMANAGED_APPS # <7>
+          value: "true"
+----
+<1> No Argo CD server on the spoke. All user interaction happens through the hub UI.
+<2> Has to be identical to the `labelSelector` on the principal.
+<3> Destination-based mapping on the agent side as well.
+<4> Lets the agent create target namespaces on the spoke.
+<5> The connection settings live under `client`, including the mode. Putting `mode` one level higher is rejected by the custom resource.
+<6> The local Redis service of this Argo CD instance. Adjust the name if your instance is not called `openshift-gitops`.
+<7> The safety net from mechanism 4. Leave it out if the spoke has no applications of its own.
+
+== Step 4: Verify connectivity
+
+Before touching an application, confirm that the two components found each other. On the hub:
+
+[source,bash]
+----
+oc logs -n openshift-gitops deployment/openshift-gitops-agent-principal \
+  | grep "An agent connected to the subscription stream"
+----
+
+On the spoke:
+
+[source,bash]
+----
+oc logs -n openshift-gitops deployment/openshift-gitops-agent-agent \
+  | grep "Starting to receive events from event stream"
+----
+
+TIP: If the deployment names differ in your environment, find them with `oc get deployment -n openshift-gitops | grep agent`. The Operator derives the names from the Argo CD instance name.
+
+The `argocd-agentctl` CLI also has a validation command that checks several of these preconditions, including whether all agent cluster secrets carry the `skip-reconcile` annotation:
+
+[source,bash]
+----
+argocd-agentctl validate \
+  --principal-context <hub_context> \
+  --principal-namespace openshift-gitops
+----
+
+Now the most important check of the whole exercise. The existing applications have to be completely unaffected by everything you just did:
+
+[source,bash]
+----
+oc get applications -n openshift-gitops
+----
+
+Every application should still be `Synced` and `Healthy`, and the principal log should show no activity for them, because none of them carries the label yet.
+
+== Migrating an application
+
+Migration means moving the responsibility for an application from the hub's application controller, which pushes, to the spoke's local application controller, which pulls through the agent. Do this one application at a time and validate each one before continuing.
+
+=== Step 1: Prepare the AppProject
+
+An application cannot move before its `AppProject` has moved, because the project authorises the destination. Add the agent name to the destinations of the project and give the project the shared label, so that the principal picks it up and distributes it to the agent:
+
+.AppProject prepared for the agent
+[source,yaml]
+----
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: my-project
+  namespace: openshift-gitops
+  labels:
+    argocd-agent: "true" # <1>
+spec:
+  destinations:
+    - namespace: '*'
+      name: agent-spoke-1 # <2>
+  sourceRepos:
+    - '*'
+----
+<1> Matches the label selector of the principal.
+<2> Has to match the agent name. This is what destination-based mapping resolves against.
++
+If you use applications in any namespace, keep your existing `sourceNamespaces` entries in this project as they are.
+
+NOTE: In earlier versions the agent name had to appear in `destinations[].name` and in `sourceNamespaces`. Since 1.21 the principal checks only `destinations[].name` when destination-based mapping is enabled, which makes this consistent with how applications are routed.
+
+=== Step 2: Prepare the repository secrets
+
+If the application pulls from a private repository, the repository secret has to reach the spoke as well. Only project-scoped repository secrets are distributed to agents, so the secret needs a `project` field, and then the label:
+
+.Project-scoped repository secret
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-private-repo
+  namespace: openshift-gitops
+  labels:
+    argocd.argoproj.io/secret-type: repository
+type: Opaque
+stringData:
+  type: git
+  url: https://github.com/mycompany/backend-services.git
+  project: my-project # <1>
+----
+<1> Associates the secret with the AppProject above. Without it, the secret is not distributed.
+
+[source,bash]
+----
+oc label secret my-private-repo -n openshift-gitops argocd-agent=true
+----
+
+=== Step 3: Migrate the application
+
+Two changes, and that is all:
+
+.Point the destination at the agent cluster
+[source,bash]
+----
+oc patch application my-app -n openshift-gitops --type merge \
+  -p '{"spec":{"destination":{"name":"agent-spoke-1"}}}'
+----
+
+.Add the label so the principal picks it up
+[source,bash]
+----
+oc label application my-app -n openshift-gitops argocd-agent=true
+----
+
+As soon as the destination points at the agent cluster secret, the `skip-reconcile` annotation on that secret stops the hub's application controller from touching the application. As soon as the label is added, the principal syncs the application to the agent, and the spoke's local application controller reconciles it and deploys the resources.
+
+NOTE: Make both changes together. An application that points at the agent cluster but does not carry the label is reconciled by nobody, because the hub controller skips it and the principal cannot see it. That state is harmless but confusing.
+
+IMPORTANT: The `Application` manifest may still contain `spec.destination.server`. The `server` and `name` fields are mutually exclusive, so remove `server` when you set `name`. If both are present, the sync fails with a validation error.
+
+If your applications are managed in Git, and they should be, make these two changes in Git instead of with `oc patch`. The commands above are for a first experiment.
+
+=== Step 4: Verify
+
+[source,bash]
+----
+oc get application my-app -n openshift-gitops \
+  -o jsonpath='{.status.sync.status}{" / "}{.status.health.status}{"\n"}'
+----
+
+Check three things: the application is `Synced` and `Healthy`, the resource tree loads in the UI, which proves the Redis proxy path works, and the pod logs are accessible through the UI, which proves the resource proxy path works.
+
+On the spoke you should now see the application locally:
+
+[source,bash]
+----
+oc get applications -A --context <spoke_context>
+----
+
+=== Rolling back
+
+To move an application back, reverse the two changes: remove the label and set the destination back to the original cluster. The principal loses sight of the application, the hub controller stops skipping it, and the push model takes over again.
+
+[source,bash]
+----
+oc label application my-app -n openshift-gitops argocd-agent-
+oc patch application my-app -n openshift-gitops --type merge \
+  -p '{"spec":{"destination":{"name":"<original_cluster_name>"}}}'
+----
+
+CAUTION: Try this on a test application before you rely on it in a maintenance window. Removing a label and changing a destination are cheap operations, but the workloads on the spoke are afterwards reconciled by a different controller, and you want to have watched that transition once.
+
+== How the UI behaves
+
+For your users nothing changes. Traditional applications and agent applications appear in the same Argo CD UI and are operated in the same way. That property is what makes the hybrid architecture attractive, because you can migrate the backend of your GitOps setup without retraining anybody.
+
+== Other topologies this unlocks
+
+The migration path is the headline, but two other patterns benefit as well.
+
+*Managing the hub itself.* Previously, managing the control plane cluster with Argo CD while running the agent required either a separate standalone Argo CD instance or an agent in a different namespace. Now the hub has its own application controller again and can simply manage itself.
+
+*App-of-Apps in managed mode.* For the same reason, a parent App-of-Apps application can target the hub cluster directly, while its labelled children are routed to the agents through `spec.destination.name`. If you followed link:/gitopscollection/2024-04-02-configure_app_of_apps[Ep.4], this is the piece that was awkward before.
+
+*Two instances collapsing into one.* Many customers run two Argo CD instances, one for cluster configuration and one for applications, purely to separate the roles. With the agent architecture that separation happens naturally. Cluster configuration stays with the hub instance and application delivery moves to the agents on the spokes.
+
+*ApplicationSets keep working.* The ApplicationSet controller stays on the hub, and the generated `Application` resources follow the normal migration flow with a label and a destination change. The `ApplicationSet` resource itself is not synced to agents, only the applications it generates. Cluster generators, Git generators and the rest continue to work.
+
+== Validation checklist
+
+Before you call the setup done, walk through this list. Every item has cost me time at least once.
+
+Infrastructure::
+* The principal is running and its log shows the configured label selector.
+* The agent is connected, visible in the principal log.
+* The Redis proxy service exists and has endpoints.
+* Every agent cluster secret carries `argocd.argoproj.io/skip-reconcile: "true"`.
+* No traditional cluster secret carries that annotation.
+
+Traditional applications::
+* Applications without the label still sync normally.
+* The principal log shows no activity for unlabelled applications.
+* The resource tree loads in the UI.
+
+Agent applications::
+* Labelled applications are picked up by the principal.
+* They are synced to the spoke and report `Synced` and `Healthy`.
+* The resource tree loads and pod logs are accessible in the UI.
+* The hub's application controller does not reconcile them.
+
+Coexistence::
+* Both kinds of application can be synced at the same time without interference.
+* Changing a traditional application has no effect on agent applications, and the other way round.
+
+== Limitations
+
+* The hybrid architecture is a Technology Preview in OpenShift GitOps 1.21.
+* It requires Argo CD 3.4 or later because of the `skip-reconcile` annotation. There is no workaround on older versions, since the hub controller would keep reconciling agent applications.
+* The `ApplicationSet` resource is never distributed to agents, only generated applications are.
+* Certificate management for the principal and the agents is still yours to handle, as described in Ep.15.
+
+== Summary
+
+The Argo CD Agent has been generally available since OpenShift GitOps 1.19, but adopting it meant a separate Argo CD instance and a migration without an intermediate state. The hybrid architecture in 1.21 removes that obstacle. The application controller and the principal run side by side in the same instance, kept apart by a label selector on one side and the `skip-reconcile` annotation on the other.
+
+What this gives you is a path rather than a new capability. You can install the principal into your existing hub, prove that nothing changed for the applications you already run, migrate one unimportant application, look at it for a week, and continue at whatever pace your change management allows. For anybody with a large centralised Argo CD instance, that is the difference between an interesting architecture and one you can plan for.
+
+Since this is a Technology Preview, my recommendation is to use it now to design and rehearse the migration, and to keep the production cut-over for the moment it goes generally available.

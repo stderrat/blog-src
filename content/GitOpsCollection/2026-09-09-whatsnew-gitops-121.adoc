@@ -1,0 +1,420 @@
+--- 
+title: "What's new in OpenShift GitOps, 1.21 Edition"
+description: "An overview of what changed in Red Hat OpenShift GitOps 1.21 - new features, breaking changes, deprecations, and what it means for the setups described in the GitOps Episodes series"
+date: "2026-09-09"
+doctype: book
+weight: 100
+
+series: "GitOps Episodes"
+series_part: 19
+
+featured_image: /gitopscollection/images/logos/ep-19-gitops.png
+show_featured_image_summary: true
+show_featured_image_article: true
+featured_image_position: 25% 35%
+disableBreadcrumb: true
+
+authors: [Thomas Jungbauer]
+draft: true
+type: post
+categories:
+   - GitOps
+   - OpenShift
+
+tags: ["Argo CD", "OpenShift GitOps", "OpenShift", "OCP", "GitOps", "Release Notes", "Sharding", "Argo CD Agent", "Argo CD Image Updater", "ApplicationSet"]
+keywords: "OpenShift GitOps 1.21,Argo CD 3.4,release notes,Image Updater,Argo CD CLI,Argo CD Agent,hybrid architecture,sharding,dynamic scaling,tokenRef,ApplicationSet,webhook secrets"
+
+aliases: []
+---
+
+:imagesdir: /gitopscollection/images/
+:icons: font
+:toc:
+
+<!--more-->
+
+Red Hat OpenShift GitOps 1.21 is one of those releases where the headline features are easy to summarise, while the parts that will cost you time are in the sections most of us scroll past: breaking changes and deprecated features. Two of them touch configurations I have described in this series, and one deprecation led to a customer asking me whether sharding had been removed.
+
+It has not. The details are further down.
+
+This article covers what changed, what it means in practice, and which of my own setups need a second look.
+
+== Versions first
+
+The component matrix answers half the questions that come up in a review:
+
+[cols="1,1,1,1,1,1,1,1,1"]
+|===
+|GitOps |Argo CD |Argo CD CLI |Helm |Kustomize |Argo Rollouts |Dex |Argo CD Agent |Image Updater
+
+|1.21.0
+|3.4.3 GA
+|3.4.3 GA
+|3.19.4
+|5.8.1
+|1.9.0
+|2.45.0
+|0.9.0 GA
+|1.2.1 GA
+
+|1.20.0
+|3.3.2 GA
+|3.3.2 TP
+|3.19.4
+|5.8.1
+|1.8.4
+|2.43.1
+|0.7.0 GA
+|1.1.2 TP
+
+|1.19.0
+|3.1.9 GA
+|3.1.9 TP
+|3.18.4
+|5.7.0
+|1.8.3
+|2.43.0
+|0.5.3 GA
+|1.0.4 TP
+|===
+
+GitOps 1.21.0 is available on OpenShift Container Platform 4.14 and 4.16 to 4.22.
+
+NOTE: The z-stream releases narrowed that range. 1.21.1 to 1.21.4 are available on OpenShift Container Platform 4.18 to 4.22. If you run an older OpenShift version, check which z-stream you are entitled to before planning the upgrade.
+
+The step from Argo CD 3.3 to 3.4 matters most, because several new Operator capabilities exist only because Argo CD 3.4 provides the mechanism underneath.
+
+== The three headline features
+
+=== Argo CD Image Updater is generally available
+
+The Image Updater was a Technology Preview since 1.18 and is now GA. It updates container images automatically for workloads managed by Argo CD. You declare which applications and images to track in an `ImageUpdater` custom resource, and the result is written back either through the Argo CD API or into Git. Kustomize and Helm applications are supported.
+
+This closes the gap between CI and CD that I previously bridged with a Tekton task in link:/securesupplychain/2023-06-23-securesupplychain-step8[Step 8 of the Secure Supply Chain series]. It has its own article, including a small test image you can build yourself: link:/gitopscollection/2026-09-06-argocd-image-updater[Ep.17].
+
+Two related changes matter even if you already used the Technology Preview:
+
+* The Image Updater now defaults to namespace-scoped operation. It previously required cluster-wide RBAC. Now it watches only the namespace it is installed in, with namespace-scoped `Role` and `RoleBinding` manifests, and you widen that scope explicitly.
+* A pull request workflow was added for the Git write-back method, so image updates can target protected branches through a review instead of a direct push.
+
+=== The Argo CD CLI is generally available
+
+The `argocd` CLI has been a Technology Preview since 1.12 and is now GA, which means a supported binary from Red Hat instead of the upstream release. The `openshift-gitops-argocd-cli` RPM for RHEL 8 and 9 was deprecated back in 1.19. If your pipelines still install the CLI from that RPM, move them to the Content Gateway download.
+
+=== The Argo CD Agent gains a hybrid architecture, Technology Preview
+
+This is the change I find most useful for existing customers. Until now, running the Argo CD Agent principal meant the application controller on the hub had to be disabled, which forced a separate Argo CD instance and an all-or-nothing migration. In 1.21 both can run in the same instance. Traditional applications stay with the hub's application controller, agent applications are pulled by the agents, and both appear in the same UI. Isolation is enforced by label selectors and the `argocd.argoproj.io/skip-reconcile` annotation.
+
+I have written this one up in detail as well: link:/gitopscollection/2026-09-06-argocd-agent-hybrid-architecture[Ep.18].
+
+The agent received a few other improvements in this release: `ServiceMonitor` resources for the principal and agent components, so metrics land in the Console dashboards, optional end-to-end TLS for Redis traffic, and repository credential sync scoped by `AppProject`.
+
+== Smaller features that solve real annoyances
+
+=== Declarative management of Git webhook secrets
+
+Until now, webhook secrets for Git providers had to end up in the Operator-managed `argocd-secret`, which meant either editing an Operator-managed resource by hand or using the External Secrets Operator to inject values into it. In 1.21 the Argo CD custom resource gained a `spec.webhookSecrets` field that references standalone Kubernetes secrets:
+
+.Declarative webhook secret
+[source,yaml]
+----
+apiVersion: argoproj.io/v1beta1
+kind: ArgoCD
+metadata:
+  name: openshift-gitops
+  namespace: openshift-gitops
+spec:
+  webhookSecrets:
+    github:
+      webhookSecretRef:
+        name: github-secret # <1>
+        key: token # <2>
+----
+<1> A normal secret in the same namespace, which can be produced by the External Secrets Operator, by Sealed Secrets, or by whatever you already use.
+<2> The key inside that secret holding the shared webhook secret.
+
+GitHub, GitLab, Bitbucket Cloud, Bitbucket Server, Gogs and Azure DevOps are supported. Existing manual configurations keep working, so this is backward compatible.
+
+This removes one of the last steps in an otherwise declarative setup that required editing a resource by hand.
+
+=== Web terminal from the Argo CD UI
+
+The web-based terminal can now be enabled through the Operator:
+
+[source,yaml]
+----
+apiVersion: argoproj.io/v1beta1
+kind: ArgoCD
+metadata:
+  name: openshift-gitops
+  namespace: openshift-gitops
+spec:
+  webTerminalEnabled: true
+----
+
+CAUTION: In 1.21.0 the terminal tab appears but does not accept input, because the `openshift-gitops-argocd-server` service account lacks permission to create `pods/exec`. The documented workaround is a `ClusterRole` and `ClusterRoleBinding` granting that permission. The missing permissions were fixed in 1.21.1, so upgrading is the better option. Consider what the feature grants before you enable it, because it lets Argo CD users open a shell in any pod the Argo CD server can reach.
+
+=== GitOps Console plugin resource pages, Technology Preview
+
+The Console plugin moved from Developer Preview to Technology Preview. It offers list and detail pages for `Application`, `ApplicationSet`, `AppProject` and `Rollout` resources, filters for health and sync status, ApplicationSet views including progressive sync steps, and links between the OpenShift Console and the Argo CD UI. It requires OpenShift Container Platform 4.19 or later.
+
+=== What Argo CD 3.4 brings along
+
+A few upstream changes you will notice in daily use:
+
+* Glob patterns are allowed for `valueFiles`, for example `/env/*.yaml`, which helps when the override file names are not known in advance.
+* Additional filters in the UI, including filtering by annotation and a button to clear all filters.
+* The `argocd.argoproj.io/skip-reconcile` annotation on cluster secrets, which is the foundation of the agent hybrid architecture.
+* A new `argocd account session-token` command that prints the current session token for use in scripts.
+
+== Breaking changes
+
+=== ApplicationSet tokenRef strict mode is on by default
+
+If `.spec.applicationSet.sourceNamespaces` on your Argo CD custom resource contains at least one cluster namespace, the Operator now enables `tokenRef` strict mode. Secrets referenced by the SCM Provider and Pull Request generators through `tokenRef` have to carry this label:
+
+[source,yaml]
+----
+metadata:
+  labels:
+    argocd.argoproj.io/secret-type: scm-creds
+----
+
+Label those secrets before upgrading:
+
+[source,bash]
+----
+oc label secret <secret_name> -n <namespace> \
+  argocd.argoproj.io/secret-type=scm-creds
+----
+
+There is a switch to turn strict mode off, `applicationsetcontroller.enable.tokenref.strict.mode: "false"` under `spec.cmdParams`, but it is explicitly not recommended for production. Treat it as a bridge.
+
+TIP: This affects only the SCM Provider and Pull Request generators. If your ApplicationSets use Git, List, Cluster or Matrix generators without an SCM token, nothing changes for you.
+
+=== The ImageUpdater spec.namespace field was removed
+
+Any `ImageUpdater` custom resource that still contains `spec.namespace` fails validation. The controller derives the namespace to search from `metadata.namespace` of the resource itself, which also means the resource has to live in the same namespace as the applications it manages. If you experimented with the Technology Preview, this is a two-line fix, but it is a hard failure rather than a warning.
+
+== Deprecations, including the sharding question
+
+=== Dynamic shard scaling is deprecated, sharding is not
+
+Let me be precise about what is deprecated and what is not.
+
+Still there is sharding of the application controller. You still run multiple controller replicas, every registered cluster is still assigned to exactly one shard, and the distribution algorithm is still configurable. The product documentation still has a chapter about sharding clusters across application controller replicas, and sharding is still the standard answer when one controller can no longer keep up with a fleet of clusters.
+
+Deprecated is the dynamic shard scaling feature, including the field `.spec.controller.sharding.dynamicScalingEnabled`. That is the mechanism that scaled the number of shards up and down automatically between `minShards` and `maxShards` based on `clustersPerShard`. It never left Technology Preview, since the tracker lists it as TP since 1.10 with no GA release, and it is now on its way out.
+
+The practical consequence is that you size your shards statically:
+
+.Static sharding
+[source,yaml]
+----
+apiVersion: argoproj.io/v1beta1
+kind: ArgoCD
+metadata:
+  name: openshift-gitops
+  namespace: openshift-gitops
+spec:
+  controller:
+    sharding:
+      enabled: true # <1>
+      replicas: 3 # <2>
+      algorithm: round-robin # <3>
+----
+<1> Sharding has to be enabled explicitly.
+<2> The number of application controller replicas, which is the number of shards.
+<3> The distribution algorithm. The custom resource validates this field against `legacy`, `round-robin` and `consistent-hashing`.
+
+WARNING: `minShards`, `maxShards` and `clustersPerShard` only take effect together with dynamic scaling. If your Argo CD custom resource carries them, they are either doing nothing or they depend on a deprecated feature.
+
+Check what your clusters actually have configured:
+
+[source,bash]
+----
+oc get argocd -A \
+  -o jsonpath='{range .items[*]}{.metadata.namespace}{"/"}{.metadata.name}{"\t"}{.spec.controller.sharding}{"\n"}{end}'
+----
+
+Note that the `round-robin` algorithm itself is still listed as a Technology Preview in the tracker, even though the field exists in the custom resource and validates. If you need a supported statement for a customer, check with support rather than assuming.
+
+=== The logformat field becomes logFormat
+
+The `applicationSet` and `notifications` components used a lowercase `logformat` field, while `server`, `repo-server` and `application-controller` used camelCase `logFormat`. That inconsistency is being cleaned up, so use `logFormat` everywhere. The lowercase variant still works for backward compatibility and might be removed in a future release.
+
+[source,bash]
+----
+oc get argocd -A -o yaml | grep -n "logformat"
+----
+
+=== kube-rbac-proxy is no longer used
+
+The Operator uses the `WithAuthenticationAndAuthorization` function from `controller-runtime` instead of the deprecated `kube-rbac-proxy` image, so the Operator deployment runs one container instead of two. There is nothing to do, but do not be surprised by the changed pod. This change also caused a metrics scraping regression in 1.21.0 that produced `targetDown` alerts, fixed in 1.21.1.
+
+=== Keycloak-based authentication, a reminder
+
+Not new in 1.21, but it keeps coming up. Since GitOps 1.18 there is no support for Keycloak-based authentication in the Operator. The alternatives are Dex, or a self-managed Red Hat Build of Keycloak instance that Argo CD uses through OIDC.
+
+== Known issues worth knowing before you upgrade
+
+*Kustomize 5.8.x namespace propagation.* The bundled Kustomize 5.8.0 and 5.8.1 contain an upstream issue that prevents namespace propagation for Helm-generated resources. If your applications rely on Kustomize to set `metadata.namespace` for resources generated from a Helm chart, those resources come out without a namespace and the sync fails with an `InvalidSpecError`. The documented workaround is to provide Kustomize v5.7.1 to the repo server through init containers and volumes, register it in the Argo CD custom resource, and select it per application:
+
+.Registering an additional Kustomize version
+[source,yaml]
+----
+spec:
+  kustomizeVersions:
+    - version: v5.7.1
+      path: /custom-tools/kustomize_5_7_1 # <1>
+----
+<1> The path where the binary is available inside the repo server pod. You place it there with `spec.repo.initContainers`, `spec.repo.volumes` and `spec.repo.volumeMounts`.
+
+Applications then select it with `kustomize.version: v5.7.1` in their source. This is relevant if you combine Helm and Kustomize, for example with the link:/gitopscollection/2024-10-13-using-post-renderer[post-renderer pattern from Ep.12].
+
+*Redis HA replication failure.* In 1.21.0 the Redis configuration switched from `requirepass` to ACL file-based authentication, but the new template was missing the `masterauth` directive. With `ha.enabled: true` this breaks replication and, with it, the Argo CD UI. Instances with `ha.enabled: false` are unaffected. Fixed in 1.21.1.
+
+*Image Updater goroutine leak.* With the Git write-back method under heavy load, the controller could leak goroutines until Git operations failed. Fixed in 1.21.1. On 1.21.0 the mitigations are a longer `IMAGE_UPDATER_INTERVAL`, a periodic restart of the deployment, or higher pod PID limits.
+
+The pattern is obvious. Do not deploy 1.21.0. Three of the four issues above are fixed in z-streams, and at the time of writing 1.21.4 is the current one.
+
+== A short upgrade checklist
+
+Before you press the button on a cluster that matters:
+
+. Label any `tokenRef` secrets used by SCM Provider or Pull Request generators with `argocd.argoproj.io/secret-type: scm-creds`.
+. Remove `spec.namespace` from any `ImageUpdater` custom resource.
+. Check your Argo CD custom resources for `dynamicScalingEnabled`, `minShards`, `maxShards` and `clustersPerShard`, and convert to a static shard count.
+. Replace the lowercase `logformat` field with `logFormat`.
+. If you use Helm charts rendered through Kustomize, test the namespace propagation issue on a non-production cluster first.
+. If you run Redis in HA mode, go to 1.21.1 or later.
+. Check the `argocd.argoproj.io/tracking-id` and `argocd.argoproj.io/installation-id` annotations on Operator-managed RoleBindings and ClusterRoleBindings. The Operator no longer copies annotations from the Argo CD custom resource, but existing resources that already carry them have to have the annotations removed, or the resources deleted so the Operator recreates them. Otherwise a central Argo CD instance may claim and prune them.
+. Pick your z-stream deliberately and confirm it supports your OpenShift version.
+
+== Summary
+
+OpenShift GitOps 1.21 is a substantial release. Two features graduate to GA, the Image Updater and the CLI, one Technology Preview finally makes the Argo CD Agent adoptable for existing installations, and a handful of smaller changes remove manual steps that never belonged in a declarative setup.
+
+The changes that will actually cost you time are the small ones: a label on an SCM secret, a field that no longer validates, and a sharding configuration that depends on a deprecated feature. None of them is difficult, but all of them are easy to miss, which is why they are worth a checklist.
+
+And sharding has not gone anywhere. Only the automatic scaling of it has.
+
+////
+=============================================================================
+REVIEW LIST - NOT PART OF THE PUBLISHED ARTICLE
+Changes to consider in existing articles after OpenShift GitOps 1.21.
+Everything below is a suggestion, please verify in your own environment
+before editing. Remove this block before publishing.
+=============================================================================
+
+[Ep.16] Tuning OpenShift GitOps for performance at scale
+  (2026-03-27-openshift-gitops-performance-tuning)
+  1. Sharding section: the example configuration uses
+       spec.controller.sharding:
+         enabled / replicas / minShards / maxShards
+     minShards and maxShards only take effect together with dynamic shard
+     scaling, which is DEPRECATED in 1.21
+     (.spec.controller.sharding.dynamicScalingEnabled). Suggest replacing the
+     snippet with a static configuration (enabled + replicas + algorithm) and
+     adding a note that dynamic scaling is deprecated and never left
+     Technology Preview.
+  2. Same section: the article says the OpenShift GitOps documentation does
+     not mention consistent-hashing and recommends setting
+     ARGOCD_CONTROLLER_SHARDING_ALGORITHM through spec.controller.env. The
+     ArgoCD CR does have a dedicated field
+     spec.controller.sharding.algorithm, validated against
+     legacy | round-robin | consistent-hashing (verified in the
+     argocd-operator API types). Suggest presenting the field as the primary
+     way and the env var as the fallback. Note that round-robin and dynamic
+     scaling are both still listed as TP in the 1.21 Technology Preview
+     tracker, which is relevant for customer conversations.
+  3. The snippet uses apiVersion argoproj.io/v1alpha1 for the ArgoCD CR.
+     v1beta1 is the current version - worth aligning across the series.
+  4. Consider adding the Argo CD Agent (Ep.15) and the hybrid architecture
+     (Ep.18) to the scaling options. For very large fleets, moving
+     reconciliation to the spokes is an alternative to sharding the hub.
+  5. Versions: 1.21 ships Argo CD 3.4.3, Helm 3.19.4, Kustomize 5.8.1.
+
+[Ep.15] OpenShift GitOps - Argo CD Agent (2026-01-14-argocd-agent)
+  1. Limitations -> "Separate Argo CD Instance Required": lifted with the
+     hybrid architecture in 1.21 (Technology Preview). Add a note and a link
+     to Ep.18.
+  2. The Argo CD CR example uses controller.enabled: false. Add a sentence
+     that this is required for the classic agent setup but no longer for the
+     hybrid one.
+  3. Possible addendum for 1.21:
+       - ServiceMonitor resources for principal and agent components
+       - optional end-to-end TLS for Redis traffic
+         (principal.redis.tls.enabled / agent.redis.tls.enabled,
+          both default false)
+       - repository credential sync to agents, scoped by AppProject
+  4. Fixed in 1.21: with destination-based mapping the principal now checks
+     only .spec.destinations[].name of the AppProject for routing. Previously
+     the agent name had to match destinations[].name AND sourceNamespaces.
+     If the article states the old requirement, adjust it.
+  5. Check where the article puts the agent "mode" field. In the CR it lives
+     under spec.argoCDAgent.agent.client.mode (AgentClientSpec), not directly
+     under agent. I got this wrong in a first draft of Ep.18, so it is worth
+     double-checking in Ep.15 as well.
+  6. Check whether the article still recommends the argocd CLI RPM. The CLI
+     is GA in 1.21 and comes from the Red Hat Content Gateway; the RPM was
+     deprecated in 1.19.
+
+[Ep.12] Using Kustomize Post-Renderer (2024-10-13-using-post-renderer)
+  1. Add a warning: with GitOps 1.21 (Kustomize 5.8.0 / 5.8.1) there is a
+     known upstream issue where namespace propagation does not work for
+     Helm-generated resources, which makes the sync fail with
+     InvalidSpecError. The workaround is to supply Kustomize v5.7.1 to the
+     repo server and select it per application via kustomize.version.
+     This article renders Helm and post-processes with Kustomize, so readers
+     on 1.21 may hit exactly this. Please reproduce it against your own
+     example first, since it depends on whether the namespace is set through
+     Kustomize.
+
+[Ep.13] ApplicationSet with Matrix Generator
+  (2025-04-17-applicationset-defining-namespaces)
+  1. Only if an example uses the SCM Provider or Pull Request generator:
+     tokenRef strict mode is enabled by default in 1.21 when
+     .spec.applicationSet.sourceNamespaces contains a cluster namespace.
+     Referenced secrets need the label
+     argocd.argoproj.io/secret-type: scm-creds.
+     If the article only uses Git/List/Cluster/Matrix generators, no change
+     is needed.
+  2. "ApplicationSet Progressive Rollout Strategy" was renamed to
+     "ApplicationSet Progressive Sync Strategy" (functionality unchanged).
+     Worth a search across the series for the old name.
+
+[Ep.3] Setup OpenShift GitOps / Argo CD (2024-02-02-setup-argocd)
+  1. Check the ArgoCD CR example for the lowercase logformat field
+     (applicationSet / notifications), which should become logFormat.
+  2. If spec.sso.provider: keycloak appears anywhere: Keycloak-based
+     authentication has not been supported since 1.18. Alternatives are Dex
+     or a self-managed RHBK instance through OIDC.
+  3. Consider adding spec.webhookSecrets (new in 1.21) as the declarative way
+     to configure Git webhook secrets instead of editing argocd-secret.
+
+[Ep.9] Multiple Sources for Applications
+  (2024-06-02-multisources-for-application-in-argocd)
+  1. If the article labels multiple sources as Technology Preview: it has
+     been GA since GitOps 1.15.
+
+Secure Supply Chain, Step 8 - Updating Kubernetes Manifests
+  (2023-06-23-securesupplychain-step8)
+  1. Add a cross-reference to Ep.17. The Argo CD Image Updater is now the
+     productised alternative to the Tekton task that patches the manifests.
+     Do not remove the Tekton approach, it is still valid and gives the
+     pipeline full control, but readers should know the option exists.
+
+General / series-wide
+  1. Any article naming a GitOps or Argo CD version: 1.21 means Argo CD
+     3.4.3; OCP 4.14 and 4.16-4.22 for 1.21.0, OCP 4.18-4.22 for the
+     z-streams.
+  2. Any article recommending the upstream argocd CLI download or the
+     openshift-gitops-argocd-cli RPM should point at the Content Gateway.
+  3. Annotation-based resource tracking has been the default since 1.19
+     (Argo CD 3.0 behaviour). If any article explains label-based tracking as
+     the default, it needs a correction.
+  4. ArgoCD CR apiVersion: several older articles use argoproj.io/v1alpha1.
+     v1beta1 is current and all new snippets use it.
+=============================================================================
+////
