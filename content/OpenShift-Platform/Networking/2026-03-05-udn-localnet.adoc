@@ -249,7 +249,7 @@ content/OpenShift-Platform/Networking on  master [!?] ➜  oc get pods -n ope
 NAME                                     READY   STATUS    RESTARTS   AGE   IP           NODE                  NOMINATED NODE   READINESS GATES
 ovnkube-control-plane-7c49bfd667-xzjc6   2/2     Running   18         43d   10.0.0.206   sno                   <none>           <none>
 ovnkube-node-lkssc                       8/8     Running   99         40d   10.0.0.207   wrk01.lan.stderr.at   <none>           <none>
-ovnkube-node-vcvdw <1>                   8/8     Running   72         43d   10.0.0.206   sno                   <none>           <none>
+ovnkube-node-vcvdw                      8/8     Running   72         43d   10.0.0.206   sno                   <none>           <none> <1>
 ----------
 <1> Let's examine the _ovnkube-node_ pod on the sno host
 
