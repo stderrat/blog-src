@@ -1,7 +1,7 @@
 --- 
 title: "[Ep.17] Closing the gap between CI and CD with the Argo CD Image Updater"
 description: "A step-by-step walkthrough of the Argo CD Image Updater, which became generally available with OpenShift GitOps 1.21, including a small test image you can build yourself"
-date: "2026-09-06"
+date: "2026-09-15"
 doctype: book
 weight: 100
 
