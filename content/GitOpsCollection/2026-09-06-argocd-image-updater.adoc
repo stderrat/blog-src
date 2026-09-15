@@ -15,7 +15,7 @@ featured_image_position: 25% 35%
 disableBreadcrumb: true
 
 authors: [Thomas Jungbauer]
-draft: true
+draft: false
 type: post
 categories:
    - GitOps
@@ -45,28 +45,42 @@ I tried to create a full walkthrough with this article. We will build a tiny con
 
 The **Image Updater** is a controller running next to Argo CD. It runs a reconciliation loop that watches the Argo CD applications you selected and queries the container registries for newer tags of the images you configured. When it finds a version that satisfies your constraints, it instructs Argo CD to use the new image.
 
-Two properties are worth internalising before you start, because they explain almost every surprise later on.
+There are two properties that should be considered before we start. 
 
-. The Image Updater does not deploy anything. It only changes the desired state, *either* the `Application` resource or a file in Git. Whether that change is rolled out depends on the sync policy of your application. With an automated sync policy the new image goes live. Without it, the application turns `OutOfSync` and waits for a human.
-. The Image Updater needs a parameterised manifest. It supports Kustomize and Helm applications. Plain YAML with a hard-coded image in a `Deployment` is not supported, because there is no parameter for the controller to *override*.
+. The Image Updater does not deploy anything. It only changes the desired state, *either* the *Application* resource or a file in Git. Whether that change is rolled out depends on the sync policy of your application. With an automated sync policy the new image goes live. Without it, the application turns *OutOfSync* and waits for manual input.
+. The Image Updater needs **a parameterised manifest**, such as Kustomize or Helm. Plain YAML with a hard-coded image in a Deployment is not supported, because there is no parameter for the controller to *override*.
 
-The supported registries include Docker Hub, Red Hat Quay, GitHub Container Registry, GitLab Container Registry, Google Container Registry, Azure Container Registry, JFrog Artifactory and anything else that implements the Docker Registry v2 API.
+The supported registries that can be observed for changes, include Docker Hub, Red Hat Quay, GitHub Container Registry, GitLab Container Registry, Google Container Registry, Azure Container Registry, JFrog Artifactory and anything else that implements the Docker Registry v2 API.
+
+
+== Why not just use a pipeline task?
+
+A pipeline task that patches a tag and pushes the change works. I used it myself and it is fine for a single pipeline. But as the number of applications and environments grows, the approach has a few rough edges:
+
+* *The CI pipeline needs write access to the configuration repository.* That is a privilege most pipelines should not have. A compromised build could push any image tag it wants. With the Image Updater, only the controller writes to the configuration repository and the CI pipeline only needs push access to the registry.
+* *Every pipeline has to carry the same glue code.* Cloning a second repository, running `kustomize edit set image` or `yq`, committing and pushing: that logic lives in every pipeline, often copy-pasted, and it drifts over time. The Image Updater replaces all of it with a single custom resource.
+* *The pipeline only runs when you trigger it.* If somebody pushes an image outside of the pipeline, nothing happens. The Image Updater polls the registry independently, so it catches every new tag that matches the constraint, no matter who pushed it.
+* *Version constraints are built in.* A pipeline task blindly writes the tag it just built. The Image Updater evaluates semantic version ranges, tag filters and ignore lists before it acts. You define what is acceptable once and the controller enforces it.
+* *Pull request support comes for free.* Opening a pull request from a pipeline task means scripting the GitHub or GitLab API. The Image Updater has it built in.
+
+In short: the pipeline task is imperative glue that couples CI to the configuration repository. The Image Updater is a declarative controller that removes that coupling.
+
 
 == A word about the setup
 
-Everything below was done on a single OpenShift cluster with the default `openshift-gitops` Argo CD instance. You need:
+Everything below was done on a single OpenShift cluster with the default *openshift-gitops* Argo CD instance. You need:
 
 * OpenShift Container Platform with the Red Hat OpenShift GitOps Operator 1.21 or later. The `ImageUpdater` custom resource does not exist in earlier versions.
-* `cluster-admin` privileges, or at least permission to modify the `ArgoCD` custom resource.
-* A Git repository for the configuration. I use `https://github.com/mycompany/my-app-config.git` in this article. Replace it with your own.
+* *cluster-admin* privileges, or at least permission to modify the *ArgoCD* custom resource.
+* A Git repository for the configuration. I use https://github.com/tjungbauer/argocd-image-updater-demo.git in this article. Replace it with your own.
 * A registry account you can push to. I use Quay.io, because you can create a public repository in a few clicks and push a new tag whenever you want to trigger an update.
-* `podman` (or `docker`) on your workstation.
+* *podman* (or *docker*) on your workstation.
 
-CAUTION: Do not run OpenShift GitOps 1.21.0. Several issues relevant to this article, including a goroutine leak in the Image Updater, were fixed in 1.21.1. Check your version with `oc get csv -n openshift-gitops-operator | grep gitops`.
+CAUTION: Do not run OpenShift GitOps 1.21.0. Several issues relevant to this article, including a goroutine leak in the Image Updater, were fixed in 1.21.1. Check your version with *oc get csv -n openshift-gitops-operator | grep gitops*.
 
 == Building a test image
 
-To see an update happen you need an image whose tags you control. The following image is about as small as it gets: BusyBox with its built-in HTTP server, serving a single page that displays its own version.
+The first thing we need to see an update happen is an image whose tags we can control. This can be any image. I have created a simple image for testing purposes: BusyBox with its built-in HTTP server, serving a single page that displays its own version.
 
 .Containerfile
 [source,dockerfile]
@@ -88,15 +102,15 @@ ENTRYPOINT ["/bin/busybox", "httpd", "-f", "-v", "-p", "8080", "-h", "/www"] # <
 ----
 <1> The version is baked in at build time so that you can see in the browser which image is running.
 <2> The files must be readable by any user ID. OpenShift runs the container with a random UID from the namespace range, not with the UID from the image.
-<3> A non-root user. OpenShift would enforce this anyway through the `restricted-v2` security context constraint, but declaring it makes the image usable elsewhere as well.
-<4> BusyBox `httpd` in foreground mode on port 8080. Ports below 1024 would require root privileges, which you do not get.
+<3> A non-root user. OpenShift would enforce this anyway through the restricted-v2 security context constraint, but declaring it makes the image usable elsewhere as well.
+<4> BusyBox httpd in foreground mode on port 8080. Ports below 1024 would require root privileges, which you do not get.
 
-Build and push the first version. Replace `<your_quay_account>` with your own namespace:
+Build and push the first version. Replace *<tjungbau>* with your own namespace. (If you use a different registry, replace the registry name accordingly):
 
 [source,bash]
 ----
-podman build --build-arg APP_VERSION=1.0.0 -t quay.io/<your_quay_account>/simple-app:1.0.0 .
-podman push quay.io/<your_quay_account>/simple-app:1.0.0
+podman build --build-arg APP_VERSION=1.0.0 --platform linux/amd64 -t quay.io/tjungbau/simple-app:1.0.0 .
+podman push quay.io/tjungbau/simple-app:1.0.0
 ----
 
 NOTE: Make the Quay repository public. A private repository works too, but then you need a pull secret for the cluster and registry credentials for the Image Updater, which adds two moving parts to the first test. There is a section on private registries further down.
@@ -105,18 +119,28 @@ Verify that the image runs locally before you involve a cluster:
 
 [source,bash]
 ----
-podman run --rm -p 8080:8080 quay.io/<your_quay_account>/simple-app:1.0.0
+podman run --rm -p 8080:8080 quay.io/tjungbau/simple-app:1.0.0
 curl -s http://localhost:8080
 ----
 
-== The demo application
+It should return the HTML page with the version number.
 
-The configuration repository holds a Kustomize overlay. The layout is deliberately small:
+[source,text]
+----
+<html><body style="font-family:sans-serif">
+<h1>simple-app</h1>
+<p>version: 1.0.0</p>
+</body></html>
+----
+
+== The Kubernetes manifests
+
+The configuration repository https://github.com/tjungbauer/argocd-image-updater-demo.git holds a Kustomize overlay. The layout is deliberately small:
 
 .Repository layout
 [source,text]
 ----
-my-app-config/
+argocd-image-updater-demo/
 └── overlays
     └── dev
         ├── deployment.yaml
@@ -124,6 +148,8 @@ my-app-config/
         ├── route.yaml
         └── kustomization.yaml
 ----
+
+NOTE: Change the repository URL to your own, if you want to use a different repository.
 
 .overlays/dev/deployment.yaml
 [source,yaml]
@@ -146,7 +172,7 @@ spec:
     spec:
       containers:
         - name: simple-app
-          image: quay.io/<your_quay_account>/simple-app:1.0.0 # <1>
+          image: quay.io/tjungbau/simple-app:1.0.0 # <1>
           ports:
             - name: http
               containerPort: 8080
@@ -171,7 +197,7 @@ spec:
               type: RuntimeDefault
 ----
 <1> The tag written here is only the starting point. Kustomize overrides it, and later the Image Updater overrides the Kustomize value.
-<2> This block satisfies the `restricted-v2` security context constraint explicitly. OpenShift would inject most of it, but if the namespace enforces the restricted Pod Security Standard, the manifest has to carry it.
+<2> This block satisfies the *restricted-v2* security context constraint explicitly. OpenShift would inject most of it, but if the namespace enforces the restricted Pod Security Standard, the manifest has to carry it.
 
 .overlays/dev/service.yaml
 [source,yaml]
@@ -212,18 +238,22 @@ spec:
 ----
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-namespace: my-app-dev
+namespace: image-updater-demo
 resources:
   - deployment.yaml
   - service.yaml
   - route.yaml
 images: # <1>
-  - name: quay.io/<your_quay_account>/simple-app
+  - name: quay.io/tjungbau/simple-app
     newTag: "1.0.0"
 ----
-<1> This is the parameter the Image Updater will modify. Without an `images` section, Kustomize has nothing to override and the Image Updater has nothing to write to.
+<1> This is the parameter the Image Updater will modify. Without an *images* section, Kustomize has nothing to override and the Image Updater has nothing to write to.
 
-The Argo CD application is a normal one. No annotations, no special fields:
+Be sure that the above manifests are pushed to your repository.
+
+== The Argo CD application
+
+The Argo CD application is a normal one. No annotations, no special fields. As repository, we use the one we just created.
 
 .Argo CD Application
 [source,yaml]
@@ -231,17 +261,17 @@ The Argo CD application is a normal one. No annotations, no special fields:
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: my-app-dev
+  name: image-updater-demo
   namespace: openshift-gitops # <1>
 spec:
   project: default
   source:
-    repoURL: https://github.com/mycompany/my-app-config.git
+    repoURL: https://github.com/tjungbauer/argocd-image-updater-demo.git
     targetRevision: main
     path: overlays/dev
   destination:
     server: https://kubernetes.default.svc
-    namespace: my-app-dev
+    namespace: image-updater-demo
   syncPolicy:
     automated: # <2>
       prune: true
@@ -249,7 +279,7 @@ spec:
     syncOptions:
       - CreateNamespace=true
 ----
-<1> Remember this namespace. The `ImageUpdater` resource has to live in the same namespace as the applications it references.
+<1> Remember this namespace. The *ImageUpdater* resource has to live in the same namespace as the applications it references.
 <2> With an automated sync policy an image update is rolled out immediately. Leave it out if you want a human to press the button.
 
 Apply the application and check that it comes up:
@@ -257,15 +287,15 @@ Apply the application and check that it comes up:
 [source,bash]
 ----
 oc apply -f application.yaml
-oc get application my-app-dev -n openshift-gitops
-oc get pods,route -n my-app-dev
+oc get application image-updater-demo -n openshift-gitops
+oc get pods,route -n image-updater-demo
 ----
 
 Open the route in a browser. It should show `version: 1.0.0`.
 
 == Enabling the Argo CD Image Updater
 
-The controller is enabled per Argo CD instance in the `ArgoCD` custom resource:
+The controller is enabled per Argo CD instance in the *ArgoCD* custom resource. By default, it is not enabled.
 
 .Enable the Image Updater
 [source,yaml]
@@ -290,7 +320,7 @@ oc patch argocd openshift-gitops -n openshift-gitops \
   -p '{"spec":{"imageUpdater":{"enabled":true}}}'
 ----
 
-Wait for the controller to appear. The Operator names the deployment after the Argo CD instance, so for the default instance it is `openshift-gitops-argocd-image-updater-controller`:
+Wait for the controller to appear. The Operator names the deployment after the Argo CD instance, so for the default instance it is *openshift-gitops-argocd-image-updater-controller*.
 
 [source,bash]
 ----
@@ -303,7 +333,7 @@ oc get deployment -n openshift-gitops | grep image-updater
 openshift-gitops-argocd-image-updater-controller   1/1     1     1     2m
 ----
 
-TIP: If you use a differently named Argo CD instance, the deployment name changes with it. The commands in this article use the default name. Store it in a variable if you work on a custom instance.
+NOTE: If you use a differently named Argo CD instance, the deployment name changes with it. The commands in this article use the default name. Store it in a variable if you work on a custom instance.
 
 Keep the log open in a second terminal for the rest of this article:
 
@@ -332,22 +362,18 @@ spec:
       - name: IMAGE_UPDATER_LOGLEVEL # <1>
         value: info
       - name: IMAGE_UPDATER_WATCH_NAMESPACES # <2>
-        value: "openshift-gitops,team-a,team-b"
-    resources: # <3>
-      limits:
-        cpu: 500m
-        memory: 1024Mi
-      requests:
-        cpu: 250m
-        memory: 512Mi
+        value: "openshift-gitops,image-updater-demo"
 ----
-<1> Log level of the controller. Valid values are `debug`, `info`, `warn` and `error`. Set it to `debug` while you build your first `ImageUpdater` resources. It tells you which tags were considered and why they were rejected.
-<2> Comma-separated list of namespaces watched for `ImageUpdater` resources and for Argo CD applications.
-<3> Requests and limits for the controller.
+<1> Log level of the controller. Valid values are *debug*, *info*, *warn* and *error*. Set it to *debug* while you build your first *ImageUpdater* resources. It tells you which tags were considered and why they were rejected.
+<2> Comma-separated list of namespaces watched for *ImageUpdater* resources and for Argo CD applications.
 
 == The first ImageUpdater resource
 
-The `ImageUpdater` custom resource answers three questions: which applications, which images, and where does the result go.
+The *ImageUpdater* custom resource answers three questions:
+
+. which applications
+. which images
+. where does the result go
 
 .imageupdater.yaml
 [source,yaml]
@@ -355,34 +381,33 @@ The `ImageUpdater` custom resource answers three questions: which applications, 
 apiVersion: argocd-image-updater.argoproj.io/v1alpha1
 kind: ImageUpdater
 metadata:
-  name: my-app-updater
+  name: image-updater-demo
   namespace: openshift-gitops # <1>
 spec:
   applicationRefs:
-    - namePattern: "my-app-*" # <2>
+    - namePattern: "image-updater-demo" # <2>
       images:
         - alias: "simple-app" # <3>
-          imageName: "quay.io/<your_quay_account>/simple-app:~1.0" # <4>
+          imageName: "quay.io/tjungbau/simple-app:~1.0" # <4>
 ----
-<1> The controller uses `metadata.namespace` to decide where to search for applications. A resource in `openshift-gitops` will never find an application in `team-a`.
+<1> The controller uses *metadata.namespace* to decide where to search for applications. A resource in *openshift-gitops* will never find an application in *image-updater-demo*.
 <2> Glob pattern matching the application name.
 <3> A name for this image inside the resource. You need it when you map Helm parameters later.
-<4> The image, including a version constraint. `~1.0` allows patch releases inside 1.0, so 1.0.1 and 1.0.7 are accepted while 1.1.0 is not.
+<4> The image, including a version constraint. *~1.0* allows patch releases inside 1.0, so 1.0.1 and 1.0.7 are accepted while 1.1.0 is not.
 
 Apply it and check the status:
 
 [source,bash]
 ----
 oc apply -f imageupdater.yaml
-oc get imageupdater my-app-updater -n openshift-gitops \
-  -o jsonpath='{.status.matchedApplications}{"\n"}'
+oc get imageupdater image-updater-demo -n openshift-gitops -o yaml
 ----
 
-If this returns `1`, the selector works. If it returns `0` or nothing, the resource is in the wrong namespace or the name pattern does not match.
+If this returns *1*, the selector works. If it returns *0* or nothing, the resource is in the wrong namespace or the name pattern does not match.
 
-CAUTION: Always set a version constraint. Without one, the Image Updater may move to any newer version it finds, including a major release. In 1.21 the field `spec.namespace` was removed from this API. A resource that still contains it fails validation.
+CAUTION: Always set a version constraint. Without one, the Image Updater may move to any newer version it finds, including a major release. In 1.21 the field *spec.namespace* was removed from this API. A resource that still contains it fails validation.
 
-A second rule that is easy to break in a large repository: never let two `ImageUpdater` resources match the same application. Both will update it and overwrite each other, and the image version will keep flipping back and forth.
+CAUTION: A second rule that is easy to break in a large repository: never let two *ImageUpdater* resources match the same application. Both will update it and overwrite each other, and the image version will keep flipping back and forth.
 
 === Triggering the first update
 
@@ -390,53 +415,60 @@ Now build and push a new patch version:
 
 [source,bash]
 ----
-podman build --build-arg APP_VERSION=1.0.1 -t quay.io/<your_quay_account>/simple-app:1.0.1 .
-podman push quay.io/<your_quay_account>/simple-app:1.0.1
+podman build --build-arg APP_VERSION=1.0.1 --platform linux/amd64 -t quay.io/tjungbau/simple-app:1.0.1 .
+podman push quay.io/tjungbau/simple-app:1.0.1
 ----
 
-The controller polls the registry, so the update appears after the reconciliation interval, which you can shorten or lengthen with `IMAGE_UPDATER_INTERVAL`. Watch the log, then confirm the result on the `Application` resource:
+The controller polls the registry, so the update appears after the reconciliation interval. Watch the log, then confirm the result on the *Application* resource:
 
 [source,bash]
 ----
-oc get application my-app-dev -n openshift-gitops \
+oc get application image-updater-demo -n openshift-gitops \
   -o jsonpath='{.spec.source.kustomize.images}{"\n"}'
 ----
 
 .Example output
 [source,text]
 ----
-["quay.io/<your_quay_account>/simple-app:1.0.1"]
+["quay.io/tjungbau/simple-app:1.0.1"]
 ----
 
-This is the default write-back method at work: the controller wrote a Kustomize parameter override into the `Application` resource on the cluster. Because the application has an automated sync policy, Argo CD rolls it out. Reload the route and the page shows `version: 1.0.1`.
+This is the default write-back method at work: the controller wrote a Kustomize parameter override into the *Application* resource on the cluster. Because the application has an automated sync policy, Argo CD rolls it out. Reload the route and the page shows *version: 1.0.1*.
 
 The update history in the status tells you what happened and when:
 
 [source,bash]
 ----
-oc get imageupdater my-app-updater -n openshift-gitops \
-  -o jsonpath='{.status.lastUpdateHistory}{"\n"}'
+oc get imageupdater image-updater-demo -n openshift-gitops -o jsonpath='{.status.recentUpdates}{"\n"}'
 ----
 
-Now look at the repository. Nothing changed there. The `kustomization.yaml` still says `1.0.0`, and the cluster runs `1.0.1`. That is the reason the next section exists.
+.Example output
+[source,json]
+----
+[{"alias":"simple-app","applicationsUpdated":1,"image":"quay.io/tjungbau/simple-app","message":"Updated from 1.0.0 to 1.0.1.","newVersion":"1.0.1","updatedAt":"2026-09-15T15:36:07Z"}]
+----
+
+Now look at the repository. Nothing changed there. The `kustomization.yaml` still says `1.0.0`, and the cluster runs `1.0.1`. Argo CD simply overrides the value with the new one. That is the reason the next section exists.
+
 
 == Write-back methods
 
-This is the decision that determines whether your setup still deserves the label GitOps. There are three methods.
 
 === Method 1: Argo CD API, the default
 
-The controller writes the new image into the `Application` resource, which is what you just saw. No configuration is needed. If you omit `writeBackConfig`, this is what you get.
+The controller writes the new image into the *Application* resource, which is what you just saw. No configuration is needed. If you omit *writeBackConfig*, this is what you get.
 
-It is quick and it is simple. It also has a failure mode that costs people an afternoon: if the `Application` itself is managed in Git, for example through an App-of-Apps pattern (see link:/gitopscollection/2024-04-02-configure_app_of_apps[Ep.4]), the next sync from Git overwrites the parameter override. The cluster falls back to the old image and the reason is not obvious.
+*It is quick and it is simple*. It also has a failure mode that costs people an afternoon: if the *Application* itself is managed in Git, for example through an App-of-Apps pattern (see link:/gitopscollection/2024-04-02-configure_app_of_apps[Ep.4]), the next sync from Git overwrites the parameter override. The cluster falls back to the old image and the reason is not obvious.
 
 Use this method for applications created through the UI or the CLI, and for experiments like the one above.
+
+WARNING: Do not treat this method as a production-ready solution.
 
 === Method 2: Git write-back
 
 The Git method fits the idea that the repository is the single source of truth. The controller clones the repository, checks out the branch, writes the change and pushes it.
 
-Create a secret holding credentials with write access to the configuration repository. For HTTPS the secret needs the keys `username` and `password`, and the password should be a personal access token:
+Here a secret must be created that holds credentials with **write access** to the configuration repository. For HTTPS the secret needs the keys *username* and *password*, and the password should be a personal access token:
 
 [source,bash]
 ----
@@ -460,32 +492,32 @@ spec:
     - namePattern: "my-app-dev"
       images:
         - alias: "simple-app"
-          imageName: "quay.io/<your_quay_account>/simple-app:~1.0"
+          imageName: "quay.io/tjungbau/simple-app:~1.0"
   writeBackConfig:
     method: "git:secret:openshift-gitops/git-creds" # <1>
     gitConfig:
-      repository: "https://github.com/mycompany/my-app-config.git" # <2>
+      repository: "https://github.com/tjungbauer/argocd-image-updater-demo.git" # <2>
       branch: "main" # <3>
 ----
-<1> Use the Git method with the credentials from the referenced secret. Plain `method: "git"` reuses the credentials Argo CD already has for the repository, which are often read-only.
+<1> Use the Git method with the credentials from the referenced secret. Plain *method: "git"* reuses the credentials Argo CD already has for the repository, which are often read-only.
 <2> The repository that receives the commit.
 <3> The target branch.
 
-IMPORTANT: The secret has to live in the same namespace as the `ImageUpdater` resource. Cross-namespace references are rejected, so that a team cannot read a secret it does not own.
+IMPORTANT: The secret has to live in the same namespace as the *ImageUpdater* resource (here: *openshift-gitops*). Cross-namespace references are rejected, so that a team cannot read a secret it does not own.
 
 Push version 1.0.2 and watch the repository:
 
 [source,bash]
 ----
-podman build --build-arg APP_VERSION=1.0.2 -t quay.io/<your_quay_account>/simple-app:1.0.2 .
-podman push quay.io/<your_quay_account>/simple-app:1.0.2
+podman build --build-arg APP_VERSION=1.0.2 --platform linux/amd64 -t quay.io/tjungbau/simple-app:1.0.2 .
+podman push quay.io/tjungbau/simple-app:1.0.2
 ----
 
-By default the controller does not touch your `kustomization.yaml`. It creates or updates a file called `.argocd-source-my-app-dev.yaml` in the application path. That file contains a parameter override which Argo CD merges on top of the rendered manifests. Your own files stay untouched, which is safe, but it also means the repository now contains two statements about the image version: `kustomization.yaml` says 1.0.0 and the generated file says 1.0.2.
+By default the controller does not touch your *kustomization.yaml*. It creates or updates a file called *.argocd-source-image-updater-demo.yaml* in the application path. That file contains a parameter override which Argo CD merges on top of the rendered manifests. Your own files stay untouched, which is safe, but it also means the repository now contains two statements about the image version: *kustomization.yaml* says 1.0.0 and the generated file says 1.0.2.
 
 If you prefer the commit to change the source of truth itself, set a write-back target:
 
-.Writing into the kustomization
+.Kustomize write-back
 [source,yaml]
 ----
   writeBackConfig:
@@ -499,7 +531,7 @@ If you prefer the commit to change the source of truth itself, set a write-back 
 
 For Helm applications the equivalent target is a values file:
 
-.Writing into a Helm values file
+.Helm write-back
 [source,yaml]
 ----
   writeBackConfig:
@@ -509,11 +541,11 @@ For Helm applications the equivalent target is a values file:
       writeBackTarget: "helmvalues:/helm/config/values.yaml"
 ----
 
-NOTE: After switching from the API method to a Git method, remove the leftover override from the `Application` resource once, otherwise the old value stays in `spec.source.kustomize.images` and keeps winning: `oc patch application my-app-dev -n openshift-gitops --type json -p '[{"op":"remove","path":"/spec/source/kustomize/images"}]'`
+CAUTION: after switching from the API method to a Git method, remove the leftover override from the *Application* resource once, otherwise the old value stays in *spec.source.kustomize.images* and keeps winning: *oc patch application my-app-dev -n openshift-gitops --type json -p '[{"op":"remove","path":"/spec/source/kustomize/images"}]'*
 
 === Method 3: Pull request or merge request
 
-If your `main` branch is protected, the controller cannot push to it. The pull request method extends the Git method. The commit goes to a generated branch named `image-updater-<namespace>-<appName>-<sha256>`, and a pull or merge request is opened against the base branch. If a request for the same branch pair already exists, no duplicate is created.
+If your *main* branch is protected, which makes sense, the controller cannot push to it. The pull request method extends the Git method. The commit goes to a generated branch named *image-updater-<namespace>-<appName>-<sha256>*, and a pull or merge request is opened against the base branch. If a request for the same branch pair already exists, no duplicate is created.
 
 .GitHub pull request
 [source,yaml]
@@ -526,7 +558,21 @@ If your `main` branch is protected, the controller cannot push to it. The pull r
       pullRequest:
         github: {} # <1>
 ----
-<1> For GitLab, use `gitlab: {}` instead.
+<1> For GitLab, use *gitlab: {}* instead.
+
+Push version 1.0.3 and watch the repository:
+
+[source,bash]
+----
+podman build --build-arg APP_VERSION=1.0.3 --platform linux/amd64 -t quay.io/tjungbau/simple-app:1.0.3 .
+podman push quay.io/tjungbau/simple-app:1.0.3
+----
+
+And once the Controller has created the pull request, you can see it in the GitHub UI:
+
+image::ep-17-git-pullrequest.png?width=800[Pull Request]
+
+This pull request can now be reviewed and merged (or rejected).
 
 CAUTION: Creating a pull request requires credentials with a bearer token, so a personal access token or GitHub App credentials. SSH keys do not work here, because the controller has to call the SCM API over HTTP and an SSH key provides no token for that.
 
@@ -551,36 +597,36 @@ CAUTION: Creating a pull request requires credentials with a bearer token, so a 
 
 == Update strategies
 
-"Newer" is less obvious than it sounds. A tag like `v1.0.0-3f2a1b` is not a semantic version, and `latest` never changes its name. Four strategies are available, configured with `commonUpdateSettings.updateStrategy`:
+A tag like `v1.0.0-3f2a1b` is not a semantic version, and `latest` never changes its name. Four strategies are available, configured with *commonUpdateSettings.updateStrategy*:
 
 [cols="1,3"]
 |===
 |Strategy |Description
 
-|`semver` (default)
+|*semver* (default)
 |Updates to the highest version matching the semantic version constraint. The right choice when the pipeline produces release tags, as in the example above.
 
-|`newest-build`
+|*newest-build*
 |Updates to the tag with the most recent creation timestamp, regardless of version numbering. This is the strategy for pipelines that tag with a build ID or a commit SHA.
 
-|`alphabetical`
+|*alphabetical*
 |Updates to the last tag when sorted alphabetically. Useful for date-based tags such as `2026-09-06`.
 
-|`digest`
+|*digest*
 |Tracks a mutable tag such as `latest` by its SHA256 digest and updates when the digest changes.
 |===
 
-In practice a strategy is combined with a tag filter, because registries contain plenty of tags you do not want to deploy:
+In practice a strategy is combined with a tag filter, because registries contain plenty of tags you usually do not want to deploy:
 
 .newest-build with a tag filter
 [source,yaml]
 ----
 spec:
   applicationRefs:
-    - namePattern: "my-app-dev"
+    - namePattern: "image-updater-demo"
       images:
         - alias: "simple-app"
-          imageName: "quay.io/<your_quay_account>/simple-app"
+          imageName: "quay.io/tjungbau/simple-app"
           commonUpdateSettings:
             updateStrategy: "newest-build" # <1>
             allowTags: "regexp:^build-[0-9]+$" # <2>
@@ -590,8 +636,8 @@ spec:
 
 Two parameters control the filtering:
 
-`allowTags`:: A match function applied to every tag. Supports `regexp:<expression>` and `any`, which is the default.
-`ignoreTags`:: A comma-separated list of glob patterns that are excluded.
+*allowTags*:: A match function applied to every tag. Supports *regexp:<expression>* and *any*, which is the default.
+*ignoreTags*:: A comma-separated list of glob patterns that are excluded.
 
 .Allowing release tags and ignoring release candidates
 [source,yaml]
@@ -601,15 +647,15 @@ Two parameters control the filtering:
             ignoreTags: "*-rc*"
 ----
 
-TIP: If a filter does not behave as expected, set `IMAGE_UPDATER_LOGLEVEL` to `debug`. The log shows which tags were fetched and which ones survived the filter. That is faster than guessing at the regular expression.
+TIP: If a filter does not behave as expected, set *IMAGE_UPDATER_LOGLEVEL* to *debug*. The log shows which tags were fetched and which ones survived the filter. That is faster than guessing at the regular expression.
 
-To try the `newest-build` strategy with the demo image, push a few tags in a row:
+To try the *newest-build* strategy with the demo image, push a few tags in a row:
 
 [source,bash]
 ----
 for i in 1 2 3; do
-  podman build --build-arg APP_VERSION="build-${i}" -t quay.io/<your_quay_account>/simple-app:build-${i} .
-  podman push quay.io/<your_quay_account>/simple-app:build-${i}
+  podman build --build-arg APP_VERSION="build-${i}" -t quay.io/tjungbau/simple-app:build-${i} .
+  podman push quay.io/tjungbau/simple-app:build-${i}
 done
 ----
 
@@ -638,7 +684,7 @@ spec:
 
 Name pattern and label selector can be combined, in which case both have to match.
 
-There is a third variant meant for ApplicationSets. If every generated application should carry its own image configuration, set `useAnnotations: true`. The controller then reads the configuration from the `argocd-image-updater.argoproj.io/image-list` annotation of each application instead of from the resource:
+There is a third variant meant for ApplicationSets. If every generated application should carry its own image configuration, set *useAnnotations: true*. The controller then reads the configuration from the *argocd-image-updater.argoproj.io/image-list* annotation of each application instead of from the resource:
 
 .Reading the image configuration from the applications
 [source,yaml]
@@ -648,7 +694,7 @@ spec:
     - namePattern: "generated-app-*"
       useAnnotations: true # <1>
 ----
-<1> With this enabled, an `images` block in the resource is ignored for this `applicationRef`. Only `namePattern` and `labelSelectors` remain effective.
+<1> With this enabled, an *images* block in the resource is ignored for this *applicationRef*. Only *namePattern* and *labelSelectors* remain effective.
 
 NOTE: Combining `useAnnotations: true` with `namePattern: "*"` and no label selector means every application in the namespace is processed. That works, but it costs performance on a large instance.
 
@@ -669,28 +715,11 @@ spec:
           imageName: "registry.example.com/mycompany/simple-app:~1.0"
           pullSecret: "pullsecret:openshift-gitops/myregistry-pull-secret" # <1>
 ----
-<1> Uses a Docker-style pull secret with a `.dockerconfigjson` key.
+<1> Uses a Docker-style pull secret with a *.dockerconfigjson* key.
 
-The `pullSecret` field understands four formats:
+The well-known registries are supported out of the box.
 
-[cols="1,2"]
-|===
-|Format |Description
-
-|`secret:<namespace>/<name>#<field>`
-|Reads a specific field of a secret. The value has to be `<username>:<password>`.
-
-|`pullsecret:<namespace>/<name>`
-|Uses a Docker-style pull secret.
-
-|`env:<variable>`
-|Reads the credentials from an environment variable, again as `<username>:<password>`.
-
-|`ext:<path_to_script>`
-|Executes a script that prints `<username>:<password>` to stdout. Useful for cloud registries with short-lived tokens.
-|===
-
-For a registry that is not known out of the box, describe it once in the `argocd-image-updater-config` config map in the namespace of the Argo CD instance:
+For a registry that is not known out of the box, describe it once in the *argocd-image-updater-config* config map in the namespace of the Argo CD instance:
 
 .Registering a custom registry
 [source,yaml]
@@ -714,114 +743,26 @@ data:
 <3> Credentials for querying the registry API.
 <4> Whether this registry is used for images without a registry prefix.
 
-NOTE: Pull secrets are read on the cluster where the Image Updater controller runs. If your applications are deployed to a remote cluster, the secret still has to exist locally.
-
-== Monitoring
-
-The `ImageUpdater` resource exposes a status subresource, which is the first place to look:
-
-[source,bash]
-----
-oc get imageupdater my-app-updater -n openshift-gitops -o yaml
-----
-
-.Example status
-[source,yaml]
-----
-status:
-  conditions:
-  - lastTransitionTime: "2026-06-03T10:00:00Z"
-    message: Image Updater is operating normally
-    reason: ReconciliationSucceeded
-    status: "True"
-    type: Ready
-  matchedApplications: 1 # <1>
-  matchedImages: 1
-  lastUpdateHistory: # <2>
-  - timestamp: "2026-06-03T09:55:00Z"
-    application: my-app-dev
-    image: quay.io/<your_quay_account>/simple-app:1.0.1
-    previousVersion: 1.0.0
-----
-<1> If this is `0`, the selector matches nothing. Check the namespace of the resource first, that is the most common mistake.
-<2> The update history is useful in a post-mortem, because it records when which image was raised from which version.
-
-Three conditions are reported: `Ready`, `Reconciling` and `Error`. For the error case, the condition message contains the detail.
-
-== Webhooks for immediate updates
-
-By default the controller polls the registries, which puts a delay between the push and the update. If that delay bothers you, let the registry notify the controller:
-
-.Enabling the webhook server
-[source,yaml]
-----
-apiVersion: argoproj.io/v1beta1
-kind: ArgoCD
-metadata:
-  name: openshift-gitops
-  namespace: openshift-gitops
-spec:
-  imageUpdater:
-    enabled: true
-    env:
-      - name: ENABLE_WEBHOOK # <1>
-        value: "true"
-      - name: WEBHOOK_PORT
-        value: "8082"
-      - name: QUAY_WEBHOOK_SECRET # <2>
-        value: <your_secret>
-----
-<1> Starts the webhook server, which exposes `/webhook` for the notifications and `/healthz` for health checks.
-<2> A shared secret that validates incoming notifications. Equivalent variables exist for the other supported registries.
-
-The registry URL carries a `type` query parameter identifying the sender, for example `https://image-updater.example.com/webhook?type=quay.io`. Supported values are `docker.io`, `ghcr.io`, `harbor`, `quay.io`, `aliyun-acr` and `cloudevents` for AWS ECR through EventBridge.
-
-The webhook server uses TLS 1.3 by default and reads its certificate from the `argocd-image-updater-tls` secret, generating a self-signed one if that secret does not exist. You still have to expose the port yourself, for example with a `Route` pointing at the webhook service.
-
-NOTE: GitHub Container Registry and Harbor validate the secret themselves. For Docker Hub and Quay you append `&secret=<YOUR_SECRET>` to the webhook URL.
-
 == Practical considerations
 
 These are the questions that come up in customer workshops.
 
-*Who is committing to our repository?* A bot account with a personal access token. Treat it like any other privileged identity: a dedicated account, minimal scope, rotated regularly, and no administrator rights. If branch protection requires signed commits, the git command line inside the controller has to sign them, which means providing a GPG or SSH signing key to the pod. Upstream this is configured with `git.commit-signing-key` and `git.commit-signing-method` in the `argocd-image-updater-config` config map. Test it before you promise it to a security team, because it goes beyond what the product documentation covers today.
+*Who is committing to our repository?*:: A bot account with a personal access token. Treat it like any other privileged identity: a dedicated account, minimal scope, rotated regularly, and no administrator rights. If branch protection requires signed commits, the git command line inside the controller has to sign them, which means providing a GPG or SSH signing key to the pod. Upstream this is configured with *git.commit-signing-key* and *git.commit-signing-method* in the *argocd-image-updater-config* config map. I was not able to test this yet, but it should be considered for production use.
 
-*Does this break our Secure Supply Chain?* No, but it changes where the gate sits. Previously the pipeline was the only writer, and it had already verified signatures, scanned the image with ACS and generated an SBOM (see link:/securesupplychain/2023-06-15-securesupplychain-intro[the Secure Supply Chain series]). If the Image Updater now picks images directly from the registry, the tag itself becomes the contract. Let the pipeline push a release tag such as `1.2.3` only after all checks passed, and restrict the Image Updater with `allowTags: "regexp:^[0-9]+\\.[0-9]+\\.[0-9]+$"`. Everything that failed a check never gets a tag that the Image Updater accepts.
+*Does this break our Secure Supply Chain?*:: No, but it changes where the gate sits. Previously the pipeline was the only writer, and it had already verified signatures, scanned the image with ACS and generated an SBOM (see link:/securesupplychain/2023-06-15-securesupplychain-intro[the Secure Supply Chain series]). If the Image Updater now picks images directly from the registry, the tag itself becomes the contract. Let the pipeline push a release tag such as *1.2.3* only after all checks passed, and restrict the Image Updater with *allowTags: "regexp:^[0-9]+\\.[0-9]+\\.[0-9]+$"*. Everything that failed a check never gets a tag that the Image Updater accepts.
 
-*Do we still need the Tekton task?* Not for the tag bump. The pipeline keeps building, testing, scanning, signing and publishing. It stops editing YAML in another repository, which was always the least pleasant part of it.
-
-*Can we roll back?* With a Git write-back method, a rollback is a `git revert`. With the API method there is nothing to revert.
-
-== Troubleshooting
-
-*No application is found.* Check `status.matchedApplications`. If it is `0`, the resource is probably in a different namespace than the applications, or `IMAGE_UPDATER_WATCH_NAMESPACES` does not include that namespace.
-
-*The image is updated and then reverted.* Either the API write-back method is used for an application managed in Git, or two `ImageUpdater` resources match the same application.
-
-*Git operations fail under load.* In 1.21.0 the controller could leak goroutines with the Git write-back method, and Git operations then failed with an error about not being able to fork. This was fixed in 1.21.1. On 1.21.0 the documented mitigations are a longer interval, a periodic restart of the deployment, or higher pod PID limits:
-
-[source,yaml]
-----
-spec:
-  imageUpdater:
-    env:
-      - name: IMAGE_UPDATER_INTERVAL
-        value: 15m
-----
-
-*The pod starts but nothing happens.* Run with `IMAGE_UPDATER_LOGLEVEL=debug`. In most cases the tags were fetched correctly and then rejected by the version constraint or by `allowTags`.
-
-*The pod does not start on OpenShift.* If you built your own test image and it fails with a permission error, the cause is almost always the file permissions inside the image. OpenShift assigns a random UID, so `/www` and its contents have to be readable by everyone, which is what the two `chmod` calls in the Containerfile take care of.
+*Can we roll back?*:: With a Git write-back method, a rollback is a *git revert*. With the API method there is nothing to revert.
 
 == Limitations
 
-* Applications have to be managed by Argo CD. Standalone Kubernetes workloads are not supported.
 * Only Kustomize-rendered and Helm-rendered manifests are supported. A Helm chart has to expose parameters for the image.
 * Image pull secrets have to exist on the cluster where the controller runs.
-* One application has to be targeted by exactly one `ImageUpdater` resource.
+* One application has to be targeted by exactly one *ImageUpdater* resource.
 
 == Summary
 
-The Argo CD Image Updater replaces a piece of glue that most of us wrote ourselves, and it does so declaratively. An `ImageUpdater` resource states which applications are watched, which images are tracked, which versions are acceptable and where the result is persisted. Since OpenShift GitOps 1.21 it is generally available and enabled with one flag in the `ArgoCD` custom resource.
+The Argo CD Image Updater replaces a piece of glue that most of us wrote ourselves, and it does so declaratively. An *ImageUpdater* resource states which applications are watched, which images are tracked, which versions are acceptable and where the result is persisted. Since OpenShift GitOps 1.21 it is generally available and enabled with one flag in the *ArgoCD* custom resource.
 
-If you take one thing from this article, let it be the write-back decision. The default API method is the fastest way to a working demo and the fastest way to a confusing incident. For anything that matters, write back to Git: directly on a development branch, and through a pull request wherever the branch is protected. The repository stays the source of truth, a rollback stays a `git revert`, and the audit trail stays intact.
+If you take one thing from this article, let it be the write-back decision. The default API method is the fastest way to a working demo and the fastest way to a confusing incident. For anything that matters, write back to Git: directly on a development branch, and through a pull request wherever the branch is protected. The repository stays the source of truth, a rollback stays a *git revert*, and the audit trail stays intact.
+
+And as always: *If it is not in Git, it does not exist.*

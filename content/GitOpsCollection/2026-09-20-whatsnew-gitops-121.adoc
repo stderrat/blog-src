@@ -1,7 +1,7 @@
 --- 
 title: "What's new in OpenShift GitOps, 1.21 Edition"
 description: "An overview of what changed in Red Hat OpenShift GitOps 1.21 - new features, breaking changes, deprecations, and what it means for the setups described in the GitOps Episodes series"
-date: "2026-09-09"
+date: "2026-09-20"
 doctype: book
 weight: 100
 

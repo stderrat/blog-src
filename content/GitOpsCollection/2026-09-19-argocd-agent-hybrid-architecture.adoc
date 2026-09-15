@@ -1,7 +1,7 @@
 --- 
 title: "[Ep.18] Argo CD Agent - migrating without a big bang using the hybrid architecture"
 description: "How to run the Argo CD Agent principal next to an existing Argo CD instance and migrate applications one by one, using the hybrid architecture introduced as Technology Preview in OpenShift GitOps 1.21"
-date: "2026-09-08"
+date: "2026-09-19"
 doctype: book
 weight: 100
 

@@ -137,8 +137,13 @@
     
     <!-- WebP image upgrade for better performance (works with AsciiDoc) -->
     <script src="{{"js/webp-upgrade.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
-    <script src="{{"js/highlight.pack.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
+    <script src="{{"js/highlight.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+    <script src="{{"js/merge-html.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+    <script>
+      hljs.configure({ ignoreUnescapedHTML: true });
+      hljs.addPlugin(mergeHTMLPlugin);
+      hljs.highlightAll();
+    </script>
 
     <!-- Modernizr removed - replaced with inline JS in header.html -->
     <script src="{{"js/learn.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
