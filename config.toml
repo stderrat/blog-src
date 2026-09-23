@@ -255,6 +255,7 @@ staticDir = ['themes/hugo-theme-learn/static', 'static']
 # Hugo 0.162+ denies text/html in content/ by default (CVE-2026-50133).
 # Homepage uses Markdown; only opt in here if you add trusted .html content files.
 [security]
+  allowContent = ['! ^text/html$', '^text/org$', '^text/markdown', '^text/asciidoc']
   enableInlineShortcodes = false
   [security.exec]
     allow = ['^dart-sass-embedded$', '^go$', '^npx$', '^postcss$', '^asciidoctor$', '^git$']
