@@ -17,6 +17,12 @@ disableBreadcrumb: true
 authors: [Thomas Jungbauer]
 draft: false
 type: post
+tested_with:
+  - product: OpenShift Container Platform
+    version: "4.21"
+  - product: Red Hat OpenShift GitOps
+    version: "1.21.1"
+reviewed: 2026-09-15
 categories:
    - GitOps
    - OpenShift

@@ -55,6 +55,7 @@ home = [ "HTML", "RSS", "JSON", "TJFeed"]
   feedExcludeSections = ["legaldisclosure", "search", "rss", "helm-charts", "gitops-catalog"]
   # Brand name for og:site_name / JSON-LD publisher (keep title for browser tabs if desired)
   siteName = "YAUB"
+  outdatedAfterMonths = 24
   # Per-page author from authors taxonomy (yaub/head-meta.html / jsonld.html)
   defaultAuthor = "Toni Schmidbauer & Thomas Jungbauer"
   publisherLogo = "/images/apple-touch-icon-180x180.png"

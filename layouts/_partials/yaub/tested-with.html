@@ -1,0 +1,26 @@
+{{- /*
+  yaub/tested-with.html
+  Renders a "Tested with" box from front matter. Place it in the article
+  template directly below the meta line (date / author / reading time).
+
+  Front matter example:
+    tested_with:
+      - product: OpenShift Container Platform
+        version: "4.21"
+      - product: Red Hat OpenShift GitOps
+        version: "1.21.1"
+    reviewed: 2026-09-15        # optional, date of last technical review
+*/ -}}
+{{- with .Params.tested_with }}
+<aside class="yaub-tested-with" aria-label="Tested with">
+  <span class="yaub-tested-with__label"><i class="fas fa-vial" aria-hidden="true"></i> Tested with</span>
+  <ul class="yaub-tested-with__list">
+    {{- range . }}
+    <li><span class="yaub-tested-with__product">{{ .product }}</span> <span class="yaub-tested-with__version">{{ .version }}</span></li>
+    {{- end }}
+  </ul>
+  {{- with $.Params.reviewed }}
+  <span class="yaub-tested-with__reviewed">Last reviewed: {{ time.Format ":date_medium" . }}</span>
+  {{- end }}
+</aside>
+{{- end }}

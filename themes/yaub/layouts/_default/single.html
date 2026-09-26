@@ -57,6 +57,9 @@
 {{ partial "bookmark-button.html" . }}
 </p>
 
+{{ partial "yaub/outdated-banner.html" . }}
+{{ partial "yaub/tested-with.html" . }}
+
 {{ if $featured_image }}
 {{ if .Params.show_featured_image_article }}
 {{/* Trimming the slash and adding absURL make sure the image works no matter where our site lives */}}

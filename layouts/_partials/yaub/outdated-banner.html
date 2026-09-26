@@ -1,0 +1,42 @@
+{{- /*
+  yaub/outdated-banner.html
+  Shows a notice on articles that are likely outdated.
+
+  Rules (first match wins):
+  1. front matter "evergreen: true"        -> no banner
+  2. front matter "eol_note: <text>"       -> banner with that text (AsciiDoc/Markdown allowed)
+     optional "superseded_by: /path/"      -> link to the successor article
+  3. age of "reviewed" (or date) > site.Params.outdatedAfterMonths (default 24)
+                                           -> generic banner
+
+  "reviewed" is used instead of Lastmod on purpose: a typo fix must not
+  make a 2020 article look current.
+  The banner is calculated at build time, which is fine for a site that
+  is rebuilt on every push.
+*/ -}}
+{{- if and .IsPage (not .Params.evergreen) -}}
+  {{- $months := site.Params.outdatedAfterMonths | default 24 -}}
+  {{- $ref := .Date -}}
+  {{- with .Params.reviewed -}}{{- $ref = time.AsTime . -}}{{- end -}}
+  {{- $cutoff := now.AddDate 0 (mul -1 $months) 0 -}}
+  {{- $successor := "" -}}
+  {{- with .Params.superseded_by -}}{{- with site.GetPage . -}}{{- $successor = . -}}{{- end -}}{{- end -}}
+  {{- if .Params.eol_note }}
+<div class="yaub-outdated yaub-outdated--eol" role="note">
+  <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+  <div>
+    <strong>Outdated:</strong> {{ .Params.eol_note | .RenderString }}
+    {{- with $successor }} See <a href="{{ .RelPermalink }}">{{ .LinkTitle }}</a> instead.{{ end }}
+  </div>
+</div>
+  {{- else if $ref.Before $cutoff }}
+<div class="yaub-outdated" role="note">
+  <i class="fas fa-clock-rotate-left" aria-hidden="true"></i>
+  <div>
+    This article was written {{ time.Format "January 2006" $ref }}. Product versions, commands and
+    screenshots may have changed since then. Please verify against the current documentation.
+    {{- with $successor }} A newer article is available: <a href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>.{{ end }}
+  </div>
+</div>
+  {{- end -}}
+{{- end -}}
