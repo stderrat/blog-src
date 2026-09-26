@@ -1,0 +1,35 @@
+{{- /*
+  yaub/head-meta.html
+  Replaces the author / og:site_name / article:* / JSON-LD block in the
+  <head> partial.
+
+  Fixes:
+  - meta author from the "authors" taxonomy (Params.name preferred)
+  - og:site_name from params.siteName (e.g. "YAUB"), not the long title/description
+  - article:author as property URLs; JSON-LD via yaub/jsonld.html
+  - thin taxonomy pages get noindex (see yaub/robots.html)
+*/ -}}
+{{- $siteName := site.Params.siteName | default site.Title -}}
+{{- $authors := slice -}}
+{{- range .GetTerms "authors" -}}
+  {{- $authors = $authors | append . -}}
+{{- end -}}
+{{- $authorNames := slice -}}
+{{- range $authors -}}
+  {{- $authorNames = $authorNames | append (.Params.name | default .LinkTitle) -}}
+{{- end -}}
+{{- if not $authorNames -}}
+  {{- with .Params.author -}}{{- $authorNames = slice . -}}{{- end -}}
+{{- end -}}
+{{- if not $authorNames -}}
+  {{- $authorNames = slice (site.Params.defaultAuthor | default "Toni Schmidbauer & Thomas Jungbauer") -}}
+{{- end -}}
+<meta name="author" content="{{ delimit $authorNames ", " }}">
+{{ partial "yaub/robots.html" . }}
+<meta property="og:site_name" content="{{ $siteName }}">
+{{- if .IsPage }}
+{{- range $authors }}
+<meta property="article:author" content="{{ .Permalink }}">
+{{- end }}
+{{- end }}
+{{ partial "yaub/jsonld.html" (dict "page" . "authors" $authors "authorNames" $authorNames) }}

@@ -239,4 +239,4 @@ spec:
 
 ### Step 5: Install the Application and Local OpenTelemetry Collector
 
-Follow the steps from the link:/day-2/observability/2025-11-26-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part4/[previous article] to install the application and local OpenTelemetry Collector in the new namespace.
+Follow the steps from the link:/openshift-platform/observability/observability/2025-11-26-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part4/[previous article] to install the application and local OpenTelemetry Collector in the new namespace.

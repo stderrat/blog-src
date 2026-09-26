@@ -53,7 +53,7 @@ Before starting, ensure you have the following Systems or Operators installed (u
 - S3-compatible storage (for TempoStack, based on OpenShift Data Foundation)
 - Cluster Observability Operator (v1.3.0) - for now this Operator is only used to extend the OpenShift UI with the tracing UI.
 
-NOTE: For all configurations I also created a proper GitOps implementation (of course :)). However, first I would like to show the actual configuration. The GitOps implementation can be found at the section link:/day-2/observability/2025-11-24-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part2/#_gitops_deployment[GitOps Deployment].
+NOTE: For all configurations I also created a proper GitOps implementation (of course :)). However, first I would like to show the actual configuration. The GitOps implementation can be found at the section link:/openshift-platform/observability/observability/2025-11-24-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part2/#_gitops_deployment[GitOps Deployment].
 
 ### Step 1: Verify/Deploy Tempo Operator
 
@@ -324,7 +324,7 @@ This will create the Argo CD Application that can be synchronized with the clust
 
 image::tempo-argocd.png?width=640px[Tempo Deployment via Argo CD]
 
-As seen above, many resources are created using a single Helm Chart (ok, with some Sub-Charts). The actual configuration is done in the values.yaml file. The full values file is quite long, so I will break it down to the different Sub-Charts and add the complete file link:/day-2/observability/2025-11-24-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part2/#_complete_values_file[at the end] that latest file I am using for testing can be found at https://github.com/tjungbauer/openshift-clusterconfig-gitops/blob/main/clusters/management-cluster/setup-tempo-operator/values.yaml[values.yaml^]. 
+As seen above, many resources are created using a single Helm Chart (ok, with some Sub-Charts). The actual configuration is done in the values.yaml file. The full values file is quite long, so I will break it down to the different Sub-Charts and add the complete file link:/openshift-platform/observability/observability/2025-11-24-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part2/#_complete_values_file[at the end] that latest file I am using for testing can be found at https://github.com/tjungbauer/openshift-clusterconfig-gitops/blob/main/clusters/management-cluster/setup-tempo-operator/values.yaml[values.yaml^]. 
 
 ### Values File Snippets for GitOps
 

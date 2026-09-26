@@ -36,7 +36,7 @@ aliases: [
 :toc:
 
 
-In the previous articles, we deployed a distributed tracing infrastructure with TempoStack and OpenTelemetry Collector. We also deployed a Grafana instance to visualize the traces. The configuration was done in a way that allows everybody to read the traces. Every link:/day-2/observability/2025-11-24-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part2/#_step_3_configure_rbac_for_tempostack_trace_access_readwrite[*system:authenticated*] user is able to read **ALL** traces.
+In the previous articles, we deployed a distributed tracing infrastructure with TempoStack and OpenTelemetry Collector. We also deployed a Grafana instance to visualize the traces. The configuration was done in a way that allows everybody to read the traces. Every link:/openshift-platform/observability/observability/2025-11-24-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part2/#_step_3_configure_rbac_for_tempostack_trace_access_readwrite[*system:authenticated*] user is able to read **ALL** traces.
 This is usually not what you want. You want to limit trace access to only the appropriate namespace.
 
 In this article, we'll limit the read access to traces. The users of the *team-a* namespace will only be able to see their own traces. 
@@ -47,8 +47,8 @@ In this article, we'll limit the read access to traces. The users of the *team-a
 
 Before we begin, make sure you have:
 
-- TempoStack deployed and configured (from link:/day-2/observability/2025-11-24-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part2/[Part 2])
-- Team-a namespace with traces flowing (from link:/day-2/observability/2025-11-26-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part4/[Part 4])
+- TempoStack deployed and configured (from link:/openshift-platform/observability/observability/2025-11-24-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part2/[Part 2])
+- Team-a namespace with traces flowing (from link:/openshift-platform/observability/observability/2025-11-26-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part4/[Part 4])
 - A separate user for the team-a namespace.
 
 
@@ -71,7 +71,7 @@ As you can see, the user can see traces from the *tenantB* namespace, although t
 
 ## The Original RBAC Configuration
 
-In link:/day-2/observability/2025-11-24-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part2/[Part 2], we created a ClusterRoleBinding to grant read access to traces for everybody who is authenticated.
+In link:/openshift-platform/observability/observability/2025-11-24-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part2/[Part 2], we created a ClusterRoleBinding to grant read access to traces for everybody who is authenticated.
 
 [source,yaml]
 ----

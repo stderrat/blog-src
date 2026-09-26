@@ -25,7 +25,7 @@ aliases: [
 :icons: font
 :toc:
 
-As described at link:/compliance/2021/07/compliance-operator/[Compliance Operator] the Compliance Operator can be used to scan the OpenShift cluster environment against security benchmark, like CIS. 
+As described at link:/openshift-platform/security/compliance/2021-07-19-complianceoperator/[Compliance Operator] the Compliance Operator can be used to scan the OpenShift cluster environment against security benchmark, like CIS. 
 Fetching the actual results might be a bit tricky tough. 
 
 With OpenShift 4.8 plugins to the `oc` command are allowed. One of these plugin os `oc compliance`, which allows you to easily fetch scan results, re-run scans and so on.
@@ -145,7 +145,7 @@ drwxrwxrwt. 18 root root   4096 Jul 30 16:05 ..
 
 == Re-Run Scans 
 Sometimes it is necessary to re-run scans. This can be done by annotating the appropriate scan as described at: 
-link:/compliance/2021/07/compliance-operator/#_performing_a_rescan[Performing a Rescan]
+link:/openshift-platform/security/compliance/2021-07-19-complianceoperator/#_performing_a_rescan[Performing a Rescan]
 
 With the oc plugin you can simply trigger a re-scan with a single command: 
 

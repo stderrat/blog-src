@@ -85,7 +85,7 @@ CAUTION: This FIRST OpenShift-GitOps will be deployed with *cluster-admin* privi
 
 . Waiting for Deployments to become ready
 
-. Deploy the *Application of Applications* that is responsible for automatically deploying a set of Applications or ApplicationSets (see <<The Argo CD Object Manager Application>>)
+. Deploy the *Application of Applications* that is responsible for automatically deploying a set of Applications or ApplicationSets (see <<_the_argo_cd_resources_manager_application>>)
 
 The following shows the output of the command: 
 

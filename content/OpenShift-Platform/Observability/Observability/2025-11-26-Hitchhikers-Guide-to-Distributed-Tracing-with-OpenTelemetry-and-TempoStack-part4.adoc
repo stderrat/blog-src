@@ -34,7 +34,7 @@ aliases: [
 :icons: font
 :toc:
 
-With the link:/day-2/observability/2025-11-23-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part1/[architecture defined], link:/day-2/observability/2025-11-24-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part2/[TempoStack deployed], and the link:/day-2/observability/2025-11-25-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part3/[Central Collector configured], we're now ready to complete the distributed tracing pipeline. It's time to deploy real applications and see traces flowing through the entire system!
+With the link:/openshift-platform/observability/observability/2025-11-23-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part1/[architecture defined], link:/openshift-platform/observability/observability/2025-11-24-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part2/[TempoStack deployed], and the link:/openshift-platform/observability/observability/2025-11-25-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part3/[Central Collector configured], we're now ready to complete the distributed tracing pipeline. It's time to deploy real applications and see traces flowing through the entire system!
 
 In this fourth installment, we'll focus on the **application layer** - deploying **Local OpenTelemetry Collectors** in team namespaces and configuring example applications to generate traces. You'll see how applications automatically get enriched with Kubernetes metadata, how namespace-based routing directs traces to the correct TempoStack tenants, and how the entire two-tier architecture comes together.
 

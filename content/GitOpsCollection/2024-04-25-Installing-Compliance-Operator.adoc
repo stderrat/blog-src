@@ -27,7 +27,7 @@ aliases: [
 :toc:
 
 
-In the previous articles, we have discussed the link:/gitopscollection/2023-12-28-gitops-repostructure/[Git repository folder structure] and the configuration of the link:gitopscollection/2024-04-02-configure_app_of_apps/[App-Of-Apps]. Now it is time to deploy our first configuration. One of the first things I usually deploy is the https://docs.openshift.com/container-platform/4.15/security/compliance_operator/co-overview.html[Compliance Operator^]. This Operator is recommended for any cluster and can be deployed without any addition to the Subscription. 
+In the previous articles, we have discussed the link:/gitopscollection/2023-12-28-gitops-repostructure/[Git repository folder structure] and the configuration of the link:/gitopscollection/2024-04-02-configure_app_of_apps/[App-Of-Apps]. Now it is time to deploy our first configuration. One of the first things I usually deploy is the https://docs.openshift.com/container-platform/4.15/security/compliance_operator/co-overview.html[Compliance Operator^]. This Operator is recommended for any cluster and can be deployed without any addition to the Subscription. 
 
 In this article, I will describe how it is installed and how the Helm Chart is configured.
 

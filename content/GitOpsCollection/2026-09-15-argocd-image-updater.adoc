@@ -403,6 +403,14 @@ oc apply -f imageupdater.yaml
 oc get imageupdater image-updater-demo -n openshift-gitops -o yaml
 ----
 
+Check how many applications the resource matched:
+
+[source,bash]
+----
+oc get imageupdater image-updater-demo -n openshift-gitops \
+  -o jsonpath='{.status.applicationsMatched}{"\n"}'
+----
+
 If this returns *1*, the selector works. If it returns *0* or nothing, the resource is in the wrong namespace or the name pattern does not match.
 
 CAUTION: Always set a version constraint. Without one, the Image Updater may move to any newer version it finds, including a major release. In 1.21 the field *spec.namespace* was removed from this API. A resource that still contains it fails validation.
@@ -749,7 +757,7 @@ These are the questions that come up in customer workshops.
 
 *Who is committing to our repository?*:: A bot account with a personal access token. Treat it like any other privileged identity: a dedicated account, minimal scope, rotated regularly, and no administrator rights. If branch protection requires signed commits, the git command line inside the controller has to sign them, which means providing a GPG or SSH signing key to the pod. Upstream this is configured with *git.commit-signing-key* and *git.commit-signing-method* in the *argocd-image-updater-config* config map. I was not able to test this yet, but it should be considered for production use.
 
-*Does this break our Secure Supply Chain?*:: No, but it changes where the gate sits. Previously the pipeline was the only writer, and it had already verified signatures, scanned the image with ACS and generated an SBOM (see link:/securesupplychain/2023-06-15-securesupplychain-intro[the Secure Supply Chain series]). If the Image Updater now picks images directly from the registry, the tag itself becomes the contract. Let the pipeline push a release tag such as *1.2.3* only after all checks passed, and restrict the Image Updater with *allowTags: "regexp:^[0-9]+\\.[0-9]+\\.[0-9]+$"*. Everything that failed a check never gets a tag that the Image Updater accepts.
+*Does this break our Secure Supply Chain?*:: No, but it changes where the gate sits. Previously the pipeline was the only writer, and it had already verified signatures, scanned the image with ACS and generated an SBOM (see link:/securesupplychain/2023-06-15-securesupplychain-intro[the Secure Supply Chain series]). If the Image Updater now picks images directly from the registry, the tag itself becomes the contract. Let the pipeline push a release tag such as *1.2.3* only after all checks passed, and restrict the Image Updater with `allowTags: "regexp:^[0-9]+\.[0-9]+\.[0-9]+$"`. Everything that failed a check never gets a tag that the Image Updater accepts.
 
 *Can we roll back?*:: With a Git write-back method, a rollback is a *git revert*. With the API method there is nothing to revert.
 

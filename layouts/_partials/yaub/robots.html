@@ -1,0 +1,14 @@
+{{- /*
+  yaub/robots.html
+  Taxonomy terms with fewer than site.Params.minTermPages articles are
+  thin pages. 286 of 457 sitemap URLs are currently tag/category pages.
+  Those pages stay reachable, but are not indexed.
+*/ -}}
+{{- $min := site.Params.minTermPages | default 3 -}}
+{{- if and (eq .Kind "term") (lt (len (where .Pages "Kind" "page")) $min) -}}
+<meta name="robots" content="noindex, follow">
+{{- else if .Params.noindex -}}
+<meta name="robots" content="noindex, follow">
+{{- else -}}
+<meta name="robots" content="index, follow">
+{{- end -}}

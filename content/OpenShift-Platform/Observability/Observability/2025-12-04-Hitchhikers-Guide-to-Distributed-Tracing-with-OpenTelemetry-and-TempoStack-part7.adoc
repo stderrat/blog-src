@@ -45,8 +45,8 @@ While we have been using the integrated tracing UI in OpenShift, it is time to s
 Before we begin, make sure you have:
 
 - The Grafana Operator installed cluster-wide (we'll cover this first)
-- TempoStack deployed and configured (from link:/day-2/observability/2025-11-24-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part2/[Part 2])
-- Team-a namespace with traces flowing (from link:/day-2/observability/2025-11-26-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part4/[Part 4])
+- TempoStack deployed and configured (from link:/openshift-platform/observability/observability/2025-11-24-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part2/[Part 2])
+- Team-a namespace with traces flowing (from link:/openshift-platform/observability/observability/2025-11-26-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part4/[Part 4])
 
 ## The Grafana Operator
 

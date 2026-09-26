@@ -1,0 +1,30 @@
+{{- /*
+  yaub/feed-pages.html
+  Returns the list of regular pages that belong into the feed of the
+  current context, newest first.
+
+  Why: Hugo's default page order is Weight > Date > Title. Articles that
+  carry a "weight" (series ordering in the sidebar) were sorted to the top
+  of every feed, and the item limit then cut off the newest articles.
+  In addition the home feed was restricted to a subset of sections, so
+  "gitopscollection" never appeared in /index.xml.
+
+  Usage:  {{ $pages := partial "yaub/feed-pages.html" . }}
+
+  Front matter opt-out per page:   exclude_from_feed: true
+  Site params:
+    feedExcludeSections: sections that never go into the home feed
+*/ -}}
+{{- $pages := slice -}}
+{{- if .IsHome -}}
+  {{- $exclude := site.Params.feedExcludeSections | default (slice "legaldisclosure" "search" "rss") -}}
+  {{- $pages = where site.RegularPages "Section" "not in" $exclude -}}
+{{- else if .IsSection -}}
+  {{- $pages = .RegularPagesRecursive -}}
+{{- else -}}
+  {{- /* taxonomy terms (categories, tags, authors): only real articles,
+         no section list pages such as /gitops-catalog/ */ -}}
+  {{- $pages = where .Pages "Kind" "page" -}}
+{{- end -}}
+{{- $pages = where $pages "Params.exclude_from_feed" "!=" true -}}
+{{- return $pages.ByDate.Reverse -}}

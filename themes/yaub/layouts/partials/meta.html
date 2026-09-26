@@ -1,19 +1,19 @@
 <!-- Basic Meta Tags -->
 <meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{ with .Site.Params.description }}{{ . }}{{ end }}{{ end }}">
-{{ with .Site.Params.author }}<meta name="author" content="{{ . }}">{{ end }}
 <meta name="keywords" content="{{ with .Params.tags }}{{ delimit . ", "}}{{ end }}" />
 <meta name="title" content="{{ .Title }}">
-<meta name="robots" content="index, follow">
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <meta name="language" content="English">
 <link rel="canonical" href="{{ .Permalink }}" />
+
+{{/* author, robots, og:site_name, article:author, JSON-LD — see yaub/head-meta.html */}}
+{{ partial "yaub/head-meta.html" . }}
 
 <!-- Open Graph Meta Tags -->
 <meta property="og:title" content="{{ .Title }}">
 <meta property="og:description" content="{{ with .Description }}{{ . }}{{ else }}{{ .Site.Params.description }}{{ end }}">
 <meta property="og:type" content="{{ if .IsPage }}article{{ else }}website{{ end }}">
 <meta property="og:url" content="{{ .Permalink }}">
-<meta property="og:site_name" content="{{ .Site.Title }}">
 {{- with .Params.images -}}
 <meta property="og:image" content="{{ index . 0 | absURL }}">
 {{- else -}}
@@ -51,36 +51,3 @@
 {{- end -}}
 {{- end -}}
 {{- end -}}
-
-<!-- Technical Blog Specific -->
-{{ if .IsPage }}
-<meta name="article:author" content="{{ with .Params.author }}{{ . }}{{ else }}{{ .Site.Params.author }}{{ end }}">
-<meta name="article:tag" content="technical blog, {{ with .Params.categories }}{{ delimit . ", " }}{{ end }}">
-{{ end }}
-
-<!-- JSON-LD Structured Data -->
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "{{ if .IsPage }}TechArticle{{ else }}Blog{{ end }}",
-  "headline": "{{ .Title }}",
-  "description": "{{ with .Description }}{{ . }}{{ else }}{{ .Site.Params.description }}{{ end }}",
-  "url": "{{ .Permalink }}",
-  {{ if .IsPage }}
-  "datePublished": "{{ .Date.Format "2006-01-02T15:04:05Z07:00" }}",
-  "dateModified": "{{ .Lastmod.Format "2006-01-02T15:04:05Z07:00" }}",
-  "author": {
-    "@type": "Person",
-    "name": "{{ with .Params.author }}{{ . }}{{ else }}{{ .Site.Params.author }}{{ end }}"
-  },
-  {{ with .Params.categories }}"about": [
-    {{ range $i, $category := . }}{{ if $i }},{{ end }}"{{ $category }}"{{ end }}
-  ],{{ end }}
-  {{ end }}
-  "publisher": {
-    "@type": "Organization",
-    "name": "{{ .Site.Title }}",
-    "url": "{{ .Site.BaseURL }}"
-  }
-}
-</script>

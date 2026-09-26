@@ -71,7 +71,7 @@ This article covers:
 
 == Handling Initialisation and Unsealing
 
-The challenge with GitOps is that initialisation and unsealing are one-off or stateful operations. Below are several approaches. The problem is always the same: where do you start? You must have the unseal keys available to start the process. Do you keep them locally, do you keep them in a Kubernetes Secret, do you use an external Key Management System (KMS)? The most robust for production in my opinion is auto-unseal using a KMS (see <<_approach_4_auto_unseal_with_kms_recommended_for_production>> and the following sections). It uses an external Key Management System (KMS) to store the keys. This way, the keys are not stored in the cluster and are not exposed to the risk of being compromised. 
+The challenge with GitOps is that initialisation and unsealing are one-off or stateful operations. Below are several approaches. The problem is always the same: where do you start? You must have the unseal keys available to start the process. Do you keep them locally, do you keep them in a Kubernetes Secret, do you use an external Key Management System (KMS)? The most robust for production in my opinion is auto-unseal using a KMS (see <<_approach_3_auto_unseal_with_key_management_service_kms_recommended_for_production>> and the following sections). It uses an external Key Management System (KMS) to store the keys. This way, the keys are not stored in the cluster and are not exposed to the risk of being compromised. 
 
 Let's have a look at the different options.
 

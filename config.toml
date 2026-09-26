@@ -5,7 +5,7 @@ theme = ["yaub"]
 enableGitInfo = true
 copyright = "Toni Schmidbauer & Thomas Jungbauer"
 enableRobotsTXT = true
-rssLimit = 20
+rssLimit = 50
 
 [sitemap]
 changefreq = 'monthly'
@@ -51,6 +51,15 @@ home = [ "HTML", "RSS", "JSON", "TJFeed"]
   titleSeparator = "::"
   mainSections = ['service-mesh', 'OpenShift', 'ansible', 'compliance', 'general', 'GitOpsCollection', 'gitops-catalog', 'Day-2', 'SecureSupplyChain', 'ACS', 'Azure', 'Quay', 'Java', "What's New"]
   recent_posts_number = 10
+  # Home RSS feed: omit utility / catalog sections (see layouts/_partials/yaub/feed-pages.html)
+  feedExcludeSections = ["legaldisclosure", "search", "rss", "helm-charts", "gitops-catalog"]
+  # Brand name for og:site_name / JSON-LD publisher (keep title for browser tabs if desired)
+  siteName = "YAUB"
+  # Per-page author from authors taxonomy (yaub/head-meta.html / jsonld.html)
+  defaultAuthor = "Toni Schmidbauer & Thomas Jungbauer"
+  publisherLogo = "/images/apple-touch-icon-180x180.png"
+  minTermPages = 3
+  seriesSections = ["/gitopscollection", "/openshift-platform/security/secrets-management/openbao", "/openshift-platform/observability/observability", "/securesupplychain", "/openshift-platform/virtualization"]
 
 [taxonomies]
   category = 'categories'

@@ -34,7 +34,7 @@ aliases: [
 :icons: font
 :toc:
 
-With the architecture defined in link:/day-2/observability/2025-11-23-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part1/[Part 1] and TempoStack deployed in link:/day-2/observability/2025-11-24-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part2/[Part 2], it's time to tackle the heart of our distributed tracing system: the **Central OpenTelemetry Collector**. This is the critical component that sits between your application namespaces and TempoStack, orchestrating trace flow, metadata enrichment, and tenant routing.
+With the architecture defined in link:/openshift-platform/observability/observability/2025-11-23-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part1/[Part 1] and TempoStack deployed in link:/openshift-platform/observability/observability/2025-11-24-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part2/[Part 2], it's time to tackle the heart of our distributed tracing system: the **Central OpenTelemetry Collector**. This is the critical component that sits between your application namespaces and TempoStack, orchestrating trace flow, metadata enrichment, and tenant routing.
 
 <!--more--> 
 
@@ -48,8 +48,8 @@ To be honest, this was the most challenging part of the entire setup to get righ
 
 Before starting, ensure you have completed the previous parts and have:
 
-- **Part 1 completed**: link:/day-2/observability/2025-11-23-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part1/[Hitchhiker's Guide to Observability with OpenTelemetry and Tempo]
-- **Part 2 completed**: link:/day-2/observability/2025-11-24-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part2/[Deploy Grafana Tempo and TempoStack]
+- **Part 1 completed**: link:/openshift-platform/observability/observability/2025-11-23-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part1/[Hitchhiker's Guide to Observability with OpenTelemetry and Tempo]
+- **Part 2 completed**: link:/openshift-platform/observability/observability/2025-11-24-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part2/[Deploy Grafana Tempo and TempoStack]
 - **OpenShift cluster** (v4.20) with Red Hat build of OpenTelemetry Operator installed (v0.135.0-1)
 - **Access** Cluster-admin access
 

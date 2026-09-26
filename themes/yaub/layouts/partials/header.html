@@ -217,8 +217,7 @@
       {{ printf `<link rel="%s" type="%s" href="%s" title="%s" />` .Rel .MediaType.Type .Permalink $.Site.Title | safeHTML }}
     {{ end -}}
 
-    {{- /* SEO: Breadcrumb structured data for search engines */ -}}
-    {{ partial "breadcrumb-jsonld.html" . }}
+    {{- /* Breadcrumb JSON-LD is emitted by yaub/jsonld.html via head-meta */ -}}
   </head>
   <body data-url="{{ .RelPermalink }}">
     <!-- Skip to content link for keyboard navigation accessibility -->
@@ -357,7 +356,7 @@
               {{/* Skip the root breadcrumb - just output current value */}}
               {{.value|safeHTML}}
             {{ else }}
-              {{ $value := (printf "<span itemscope='' itemprop='itemListElement' itemtype='http://schema.org/ListItem'><a itemprop='item' href='%s'> <span itemprop='name'>%s</span><meta itemprop='position' content='%d' /></a></span> > %s" $parent.RelPermalink $parent.Title (sub (.origPage.Scratch.Get "depth") .position) .value ) }}
+              {{ $value := (printf "<span><a href='%s'><span>%s</span></a></span> > %s" $parent.RelPermalink $parent.Title .value ) }}
               {{ template "breadcrumb" dict "origPage" .origPage "page" $parent "value" $value "position" (add .position 1) }}
             {{ end }}
           {{else}}

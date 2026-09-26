@@ -78,7 +78,7 @@
         <div class="sub-top-nav">
 
            {{$toc := (and (not .Params.disableToc) (not .Params.chapter))}}
-            <div id="breadcrumbs" class="display-inline float-unset" itemscope="" itemtype="http://schema.org/BreadcrumbList">
+            <div id="breadcrumbs" class="display-inline float-unset">
                 <span id="sidebar-toggle-span">
                     <a href="#" id="sidebar-toggle" data-sidebar-toggle="" aria-label="Toggle Sidebar">
                       <i class="fas fa-bars"><p class="hide">&nbsp;navi</p></i>
@@ -106,7 +106,7 @@
             {{ $title := .Title }}
             {{ $url := .Permalink }}
             {{ $description := .Params.description | default .Summary | plainify | truncate 200 }}
-            {{ $siteName := .Site.Title }}
+            {{ $siteName := .Site.Params.siteName | default .Site.Title }}
             
             {{/* URL-encoded versions for share links */}}
             {{ $encodedUrl := $url | urlquery }}

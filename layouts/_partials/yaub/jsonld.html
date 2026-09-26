@@ -1,0 +1,74 @@
+{{- /*
+  yaub/jsonld.html
+  Structured data. Built from dicts and serialised with jsonify, so no
+  manual escaping is needed.
+
+  Changes compared to the current output:
+  - author: one Person per author (with url) instead of one combined name
+  - publisher: params.siteName (YAUB) plus logo instead of the description text
+  - image (featured_image / images / image), mainEntityOfPage, keywords, wordCount
+  - isPartOf: the series (section listed in site.Params.seriesSections)
+  - BreadcrumbList as separate JSON-LD (replaces microdata on #breadcrumbs)
+
+  Input: dict "page" "authors" "authorNames"
+*/ -}}
+{{- $p := .page -}}
+{{- $siteName := site.Params.siteName | default site.Title -}}
+{{- $logo := site.Params.publisherLogo | default "/images/apple-touch-icon-180x180.png" -}}
+{{- $publisher := dict "@type" "Organization" "name" $siteName "url" site.Home.Permalink "logo" (dict "@type" "ImageObject" "url" ($logo | absURL)) -}}
+{{- if $p.IsPage -}}
+  {{- $authors := slice -}}
+  {{- range .authors -}}
+    {{- $authors = $authors | append (dict "@type" "Person" "name" (.Params.name | default .LinkTitle) "url" .Permalink) -}}
+  {{- end -}}
+  {{- if not $authors -}}
+    {{- range .authorNames -}}{{- $authors = $authors | append (dict "@type" "Person" "name" .) -}}{{- end -}}
+  {{- end -}}
+  {{- $ld := dict
+      "@context" "https://schema.org"
+      "@type" "TechArticle"
+      "headline" $p.Title
+      "description" ($p.Description | default ($p.Summary | plainify | htmlUnescape | truncate 300))
+      "url" $p.Permalink
+      "mainEntityOfPage" (dict "@type" "WebPage" "@id" $p.Permalink)
+      "datePublished" ($p.Date.Format "2006-01-02T15:04:05Z07:00")
+      "dateModified" ($p.Lastmod.Format "2006-01-02T15:04:05Z07:00")
+      "author" $authors
+      "publisher" $publisher
+      "inLanguage" site.Language.Locale
+      "wordCount" $p.WordCount
+  -}}
+  {{- $img := "" -}}
+  {{- with $p.Params.images -}}{{- $img = index . 0 -}}{{- end -}}
+  {{- if not $img -}}{{- with $p.Params.featured_image -}}{{- $img = . -}}{{- end -}}{{- end -}}
+  {{- if not $img -}}{{- with $p.Params.featuredImage -}}{{- $img = . -}}{{- end -}}{{- end -}}
+  {{- if not $img -}}{{- with $p.Params.image -}}{{- $img = . -}}{{- end -}}{{- end -}}
+  {{- with $img -}}{{- $ld = merge $ld (dict "image" (. | absURL)) -}}{{- end -}}
+  {{- with $p.Params.tags -}}{{- $ld = merge $ld (dict "keywords" (delimit . ", ")) -}}{{- end -}}
+  {{- with $p.Params.categories -}}{{- $ld = merge $ld (dict "about" .) -}}{{- end -}}
+  {{- with $p.Params.tested_with -}}
+    {{- $deps := slice -}}
+    {{- range . -}}{{- $deps = $deps | append (printf "%s %s" .product .version) -}}{{- end -}}
+    {{- $ld = merge $ld (dict "dependencies" (delimit $deps ", ")) -}}
+  {{- end -}}
+  {{- /* series */ -}}
+  {{- range site.Params.seriesSections -}}
+    {{- with site.GetPage . -}}
+      {{- if $p.IsDescendant . -}}
+        {{- $ld = merge $ld (dict "isPartOf" (dict "@type" "CreativeWorkSeries" "name" .Title "url" .Permalink)) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end }}
+<script type="application/ld+json">{{ $ld | jsonify | safeJS }}</script>
+{{- else if $p.IsHome }}
+<script type="application/ld+json">{{ dict "@context" "https://schema.org" "@type" "Blog" "name" $siteName "description" site.Params.description "url" site.Home.Permalink "publisher" $publisher | jsonify | safeJS }}</script>
+{{- end }}
+{{- /* Breadcrumbs */ -}}
+{{- if not $p.IsHome -}}
+  {{- $items := slice -}}
+  {{- $crumbs := $p.Ancestors.Reverse | append $p -}}
+  {{- range $i, $c := $crumbs -}}
+    {{- $items = $items | append (dict "@type" "ListItem" "position" (add $i 1) "name" $c.LinkTitle "item" $c.Permalink) -}}
+  {{- end }}
+<script type="application/ld+json">{{ dict "@context" "https://schema.org" "@type" "BreadcrumbList" "itemListElement" $items | jsonify | safeJS }}</script>
+{{- end -}}

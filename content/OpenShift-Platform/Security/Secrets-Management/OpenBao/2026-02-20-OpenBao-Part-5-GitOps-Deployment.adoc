@@ -529,7 +529,7 @@ This will create the following Applications:
 NOTE: The ApplicationSet adds the prefix **in-cluster-** to each Application name so that they remain unique in Argo CD.
 
 .Argo CD: OpenBao Argo CD Applications
-image::part5_openbao_argocd.png[OpenBao Argo CD Applications]
+image::logos/part5_openbao_argocd.png[OpenBao Argo CD Applications]
 
 The first Application to synchronise is **in-cluster-openbao-ca-certificate**.
 
