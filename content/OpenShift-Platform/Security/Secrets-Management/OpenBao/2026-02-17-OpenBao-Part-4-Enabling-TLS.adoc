@@ -1,4 +1,4 @@
---- 
+---
 title: "The Guide to OpenBao - Enabling TLS on OpenShift - Part 4"
 description: "Enable TLS for OpenBao and the Agent Injector on OpenShift using cert-manager for encryption in transit and production-ready secret management"
 date: "2026-02-17"
@@ -17,15 +17,10 @@ authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
-   - OpenShift
-   - Security
-   - Secret Management
-
-tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "TLS", "cert-manager"] 
-
-aliases: [ 
-	 "/openshift/security/openbao/2026-02-14-openbao-enabling-tls/",
-]
+  - OpenShift
+  - Security
+tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "TLS", "cert-manager", "Secret Management"]
+aliases: ["/openshift/security/openbao/2026-02-14-openbao-enabling-tls/"]
 ---
 
 :imagesdir: /openshift-platform/security/secrets-management/openbao/images/

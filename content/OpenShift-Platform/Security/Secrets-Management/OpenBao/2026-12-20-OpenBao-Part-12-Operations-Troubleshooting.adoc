@@ -1,4 +1,4 @@
---- 
+---
 title: "The Guide to OpenBao - Operations and Troubleshooting - Part 12"
 description: "Day-2 operations, common issues and solutions, log analysis, migration from Vault, and CLI command reference for OpenBao"
 date: "2026-04-20"
@@ -17,16 +17,10 @@ authors: [Thomas Jungbauer]
 type: post
 draft: true
 categories:
-   - OpenShift
-   - Security
-   - Secret Management
-
-tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "Operations", "Troubleshooting"] 
-
-aliases: [ 
-	 "/openshift/security/openbao/2026-02-16-openbao-operations-troubleshooting/",
-	 "/openshift-platform/security/secrets-management/openbao/2026-04-20-openbao-part-11-operations-troubleshooting/",
-]
+  - OpenShift
+  - Security
+tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "Operations", "Troubleshooting", "Secret Management"]
+aliases: ["/openshift/security/openbao/2026-02-16-openbao-operations-troubleshooting/", "/openshift-platform/security/secrets-management/openbao/2026-04-20-openbao-part-11-operations-troubleshooting/"]
 ---
 
 :imagesdir: /openshift-platform/security/secrets-management/openbao/images/

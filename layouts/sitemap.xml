@@ -1,0 +1,21 @@
+{{- /*
+  sitemap.xml - excludes thin taxonomy terms (see yaub/robots.html) and
+  the taxonomy overview pages from the sitemap. Everything else behaves
+  like Hugo's embedded sitemap template.
+*/ -}}
+{{- $min := site.Params.minTermPages | default 3 -}}
+{{ printf "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>" | safeHTML }}
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  {{- range where .Pages "Sitemap.Disable" "ne" true }}
+    {{- if and (eq .Kind "term") (lt (len (where .Pages "Kind" "page")) $min) }}{{ continue }}{{ end }}
+    {{- if .Params.noindex }}{{ continue }}{{ end }}
+    {{- if .Permalink }}
+  <url>
+    <loc>{{ .Permalink }}</loc>
+    {{- if not .Lastmod.IsZero }}
+    <lastmod>{{ .Lastmod.Format "2006-01-02T15:04:05-07:00" | safeHTML }}</lastmod>
+    {{- end }}
+  </url>
+    {{- end }}
+  {{- end }}
+</urlset>

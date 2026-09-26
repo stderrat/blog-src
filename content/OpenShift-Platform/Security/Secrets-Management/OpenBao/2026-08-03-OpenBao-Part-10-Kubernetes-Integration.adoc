@@ -1,8 +1,8 @@
---- 
+---
 title: "The Guide to OpenBao - Kubernetes Integration - Part 10"
 description: "Integrating OpenBao with Kubernetes workloads using Agent Injector, CSI Provider, and External Secrets Operator on OpenShift"
 date: "2026-08-03"
-doctype: book 
+doctype: book
 weight: 92
 
 series: "The Guide to OpenBao"
@@ -17,16 +17,10 @@ authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
-   - OpenShift
-   - Security
-   - Secret Management
-
-tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "Kubernetes", "CSI", "External Secrets Operator"] 
-
-aliases: [ 
-	 "/openshift/security/openbao/2026-02-14-openbao-kubernetes-integration/",
-	 "/openshift-platform/security/secrets-management/openbao/2026-04-18-openbao-part-9-kubernetes-integration/",
-]
+  - OpenShift
+  - Security
+tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "Kubernetes", "CSI", "External Secrets Operator", "Secret Management"]
+aliases: ["/openshift/security/openbao/2026-02-14-openbao-kubernetes-integration/", "/openshift-platform/security/secrets-management/openbao/2026-04-18-openbao-part-9-kubernetes-integration/"]
 ---
 
 :imagesdir: /openshift-platform/security/secrets-management/openbao/images/

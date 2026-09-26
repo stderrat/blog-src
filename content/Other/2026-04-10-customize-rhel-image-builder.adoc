@@ -15,14 +15,11 @@ disableBreadcrumb: false
 authors: [Toni Schmidbauer]
 type: post
 categories:
-   - RHEL10
-   - image-builder
-   - Virtualization
+  - Other
+  - Virtualization
+tags: ["Other", "Home Lab", "RHEL", "Image builder", "bootc", RHEL10, image-builder]
 
-tags: ["Other", "Home Lab", "RHEL", "Image builder", "bootc"]
-
-aliases: [
-]
+aliases: []
 ---
 
 :imagesdir: /other/images/homelab/

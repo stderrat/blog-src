@@ -1,4 +1,4 @@
---- 
+---
 title: "The Guide to OpenBao - Standalone Installation - Part 2"
 description: "Installing OpenBao as a standalone service outside of Kubernetes for testing and edge deployments"
 date: "2026-02-12"
@@ -17,15 +17,10 @@ authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
-   - OpenShift
-   - Security
-   - Secret Management
-
-tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "Installation"] 
-
-aliases: [ 
-	 "/openshift/security/openbao/2026-02-09-openbao-standalone-installation/",
-]
+  - OpenShift
+  - Security
+tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "Installation", "Secret Management"]
+aliases: ["/openshift/security/openbao/2026-02-09-openbao-standalone-installation/"]
 ---
 
 :imagesdir: /openshift-platform/security/secrets-management/openbao/images/

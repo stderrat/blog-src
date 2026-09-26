@@ -1,4 +1,4 @@
---- 
+---
 title: "NodeSelector"
 description: "Placeing Pods Using the NodeSelector"
 date: "2021-08-26"
@@ -10,14 +10,11 @@ series_part: 2
 authors: [Thomas Jungbauer]
 type: post
 categories:
-   - OpenShift
-   - Pod Placement
-tags: ["OCP", "Day-2", "OpenShift", "Pod Placement", "NodeSelector"] 
+  - OpenShift
+  - Day-2
+tags: ["OCP", "Day-2", "OpenShift", "Pod Placement", "NodeSelector"]
 
-aliases: [ 
-	 "/openshift/day-2/pod-placement-nodeselector",
-	 "/day-2/pod-placement/2021-08-27-podplacement/",
-] 
+aliases: ["/openshift/day-2/pod-placement-nodeselector", "/day-2/pod-placement/2021-08-27-podplacement/"]
 ---
 
 :imagesdir: /openshift-platform/day-2/images/

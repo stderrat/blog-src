@@ -1,4 +1,4 @@
---- 
+---
 title: "The Hitchhiker's Guide to Observability - Understanding Traces - Part 5"
 description: "Understanding Traces - Part 5"
 date: "2025-11-27"
@@ -16,18 +16,11 @@ disableBreadcrumb: true
 authors: [Thomas Jungbauer]
 type: post
 categories:
-   - OpenShift
-   - Observability
-   - Distributed Tracing
-   - OpenTelemetry
-   - Tempo
-   - Grafana
+  - OpenShift
+  - Observability
+tags: ["OCP", "Day-2", "OpenShift", "Observability", "Distributed Tracing", "Tempo", "Grafana", "OTL", "OTLP", "Logging", "Metrics", OpenTelemetry]
 
-tags: ["OCP", "Day-2", "OpenShift", "Observability", "Distributed Tracing", "Tempo", "Grafana", "OTL", "OTLP", "Logging", "Metrics"] 
-
-aliases: [ 
-	 "/day-2/observability/2025-11-27-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part5/",
-]
+aliases: ["/day-2/observability/2025-11-27-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part5/"]
 ---
 
 :imagesdir: /openshift-platform/observability/images/observability/

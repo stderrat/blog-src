@@ -1,4 +1,4 @@
---- 
+---
 title: "Introducing AdminNetworkPolicies"
 description: "Introducing AdminNetworkPolicies"
 date: "2024-11-06"
@@ -8,16 +8,12 @@ authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
-   - OpenShift
-   - Security
-   - Network
-tags: ["OpenShift", "OCP", "Security", "NetworkPolicies", "Helm", "AdminNetworkPolicy", "BaselineAdminNetworkPolicy"] 
+  - OpenShift
+  - Security
+  - Networking
+tags: ["OpenShift", "OCP", "Security", "NetworkPolicies", "Helm", "AdminNetworkPolicy", "BaselineAdminNetworkPolicy", Network]
 
-aliases: [ 
-	 "/posts-output/2024-11-06-anp-and-banp/",
-   "/openshift/2024/11/introducting-adminnetworkpolicies/",
-   "/openshift/2024/11/introducing-adminnetworkpolicies/",
-] 
+aliases: ["/posts-output/2024-11-06-anp-and-banp/", "/openshift/2024/11/introducting-adminnetworkpolicies/", "/openshift/2024/11/introducing-adminnetworkpolicies/"]
 ---
 
 :imagesdir: /openshift-platform/security/network-policies/images/

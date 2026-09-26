@@ -10,14 +10,11 @@ series_part: 3
 authors: [Thomas Jungbauer]
 type: post
 categories:
-   - OpenShift
-   - Pod Placement
+  - OpenShift
+  - Day-2
 tags: ["OCP", "Day-2", "OpenShift", "Pod Placement", "Affinity", "Anti-Affinity"]
 
-aliases: [ 
-	 "/openshift/day-2/pod-placement-pod-affinity",
-	 "/day-2/pod-placement/2021-08-28-affinity/",
-] 
+aliases: ["/openshift/day-2/pod-placement-pod-affinity", "/day-2/pod-placement/2021-08-28-affinity/"]
 ---
 
 :imagesdir: /openshift-platform/day-2/images/

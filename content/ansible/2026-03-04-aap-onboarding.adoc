@@ -15,15 +15,10 @@ disableBreadcrumb: false
 authors: [Toni Schmidbauer]
 type: post
 categories:
-   - Ansible
-   - "Ansible Automation Platform"
-   - Onboarding
-   - "Configuration as Code"
-
+  - Ansible
 tags: ["Ansible", "Ansible Automation Platform", "Onboarding", "Configuration as Code", "GitOps", "DevOps"]
 
-aliases: [
-]
+aliases: []
 ---
 
 :imagesdir: /ansible/images/onboarding

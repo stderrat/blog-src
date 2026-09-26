@@ -1,4 +1,4 @@
---- 
+---
 title: "Node Affinity"
 description: "Placeing Pods Using the Node Affinity rules"
 date: "2021-08-26"
@@ -10,13 +10,11 @@ series_part: 4
 authors: [Thomas Jungbauer]
 type: post
 categories:
-   - OpenShift
-   - Pod Placement
-tags: ["OCP", "Day-2", "OpenShift", "Pod Placement", "Affinity"] 
+  - OpenShift
+  - Day-2
+tags: ["OCP", "Day-2", "OpenShift", "Pod Placement", "Affinity"]
 
-aliases: [ 
-	 "/openshift/day-2/pod-placement-node-affinity",
-] 
+aliases: ["/openshift/day-2/pod-placement-node-affinity"]
 ---
 
 :imagesdir: /openshift-platform/day-2/images/

@@ -1,4 +1,4 @@
---- 
+---
 title: "The Guide to OpenBao - Introduction - Part 1"
 description: "Introduction to OpenBao - What it is, why it exists, and when to use it for secret management"
 date: "2026-02-11"
@@ -17,15 +17,10 @@ authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
-   - OpenShift
-   - Security
-   - Secret Management
-
-tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "Encryption"] 
-
-aliases: [ 
-	 "/openshift/security/openbao/2026-02-08-openbao-introduction/",
-]
+  - OpenShift
+  - Security
+tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "Encryption", "Secret Management"]
+aliases: ["/openshift/security/openbao/2026-02-08-openbao-introduction/"]
 ---
 
 :imagesdir: /openshift-platform/security/secrets-management/openbao/images/

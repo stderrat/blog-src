@@ -1,4 +1,4 @@
---- 
+---
 title: "The Guide to OpenBao - End-to-End Example - Part 13"
 description: "Complete end-to-end example deploying a secure application with OpenBao including dynamic database credentials, TLS certificates, and GitOps configuration"
 date: "2026-04-23"
@@ -17,17 +17,11 @@ authors: [Thomas Jungbauer]
 type: post
 draft: true
 categories:
-   - OpenShift
-   - Security
-   - Secret Management
-   - GitOps
-
-tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "GitOps", "PKI", "Database"] 
-
-aliases: [ 
-	 "/openshift/security/openbao/2026-02-17-openbao-end-to-end-example/",
-	 "/openshift-platform/security/secrets-management/openbao/2026-04-23-openbao-part-12-end-to-end-example/",
-]
+  - OpenShift
+  - Security
+  - GitOps
+tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "GitOps", "PKI", "Database", "Secret Management"]
+aliases: ["/openshift/security/openbao/2026-02-17-openbao-end-to-end-example/", "/openshift-platform/security/secrets-management/openbao/2026-04-23-openbao-part-12-end-to-end-example/"]
 ---
 
 :imagesdir: /openshift-platform/security/secrets-management/openbao/images/

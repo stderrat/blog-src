@@ -1,4 +1,4 @@
---- 
+---
 title: "OpenShift Virtualization Networking - The Overview"
 description: "OpenShift Virtualization Networking - The Overview"
 date: "2025-12-29"
@@ -15,15 +15,12 @@ disableBreadcrumb: false
 authors: [Thomas Jungbauer]
 type: post
 categories:
-   - OpenShift
-   - Virtualization
-   - Networking
-   - KubeVirt
+  - OpenShift
+  - Virtualization
+  - Networking
+tags: ["OCP", "Day-2", "OpenShift", "Virtualization", "Networking", "KubeVirt", "OpenShift Virtualization", "CNV", "NMState", "Multus"]
 
-tags: ["OCP", "Day-2", "OpenShift", "Virtualization", "Networking", "KubeVirt", "OpenShift Virtualization", "CNV", "NMState", "Multus"] 
-
-aliases: [ 
-]
+aliases: []
 ---
 
 :imagesdir: /openshift-platform/virtualization/images/network-overview

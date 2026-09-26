@@ -114,9 +114,8 @@
     <link href="{{(printf "%s" .) | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" rel="stylesheet">
     {{- end }}
 
-{{ with .OutputFormats.Get "rss" }}
-  {{ printf `<link rel="%s" type="%s" href="%s" title="%s" />` .Rel .MediaType.Type .Permalink $.Site.Title | safeHTML }}
-{{ end }}
+{{/* Unique RSS alternate titles — see yaub/alternate-feeds.html */}}
+{{ partial "yaub/alternate-feeds.html" . }}
 
 
     <script src="{{"js/jquery-3.7.1.min.js"| relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}"></script>
@@ -214,7 +213,10 @@
     {{ partial "custom-header.html" . }}
 
     {{ range .AlternativeOutputFormats -}}
+      {{- /* Skip RSS — handled by yaub/alternate-feeds.html with distinct titles */ -}}
+      {{- if ne (lower .Name) "rss" -}}
       {{ printf `<link rel="%s" type="%s" href="%s" title="%s" />` .Rel .MediaType.Type .Permalink $.Site.Title | safeHTML }}
+      {{- end -}}
     {{ end -}}
 
     {{- /* Breadcrumb JSON-LD is emitted by yaub/jsonld.html via head-meta */ -}}

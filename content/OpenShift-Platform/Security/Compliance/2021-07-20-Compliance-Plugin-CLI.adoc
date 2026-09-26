@@ -1,4 +1,4 @@
---- 
+---
 title: "oc compliance command line plugin"
 description: "Using the oc client plugin os-compliance"
 date: "2021-07-20"
@@ -9,16 +9,11 @@ authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
-   - OpenShift
-   - Compliance
-   - Security
+  - OpenShift
+  - Security
 tags: ["Hardening", "OpenShift", "OCP", "security", "compliance", "plugin"]
 
-aliases: [
-    "/posts-output/2021-07-20-Compliance-Plugin-CLI/",
-    "/compliance/2021/07/oc-compliance-command-line-plugin/",
-    "/compliance/2021/07/oc-compliance-command-line-plugin/",
-] 
+aliases: ["/posts-output/2021-07-20-Compliance-Plugin-CLI/", "/compliance/2021/07/oc-compliance-command-line-plugin/", "/compliance/2021/07/oc-compliance-command-line-plugin/"]
 ---
 
 :imagesdir: /openshift-platform/security/compliance/images/

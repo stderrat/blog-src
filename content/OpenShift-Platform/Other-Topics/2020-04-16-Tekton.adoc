@@ -1,4 +1,4 @@
---- 
+---
 title: "OpenShift Pipelines - Tekton Introduction"
 description: "Using OpenShift 4.x and OpenShift Pipelines using Tekton for your CI/CD process"
 date: "2020-04-16"
@@ -9,14 +9,11 @@ authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
-   - OpenShift
-   - Tekton
+  - OpenShift
+  - Supply Chain
 tags: ["Pipelines", "OpenShift", "OCP", "Tekton"]
 
-aliases: [ 
-	 "/posts-output/2020-04-16-Tekton/",
-	 "/openshift/2020/04/openshift-pipelines-tekton-introduction/",
-] 
+aliases: ["/posts-output/2020-04-16-Tekton/", "/openshift/2020/04/openshift-pipelines-tekton-introduction/"]
 ---
 
 :imagesdir: /openshift-platform/other-topics/images/

@@ -1,4 +1,4 @@
---- 
+---
 title: "Single log out from Keycloak and OpenShift"
 description: "How to configure Keycloak and OpenShift for Single Log Out"
 date: "2025-05-22"
@@ -8,16 +8,11 @@ authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
-   - OpenShift
-   - Security
-   - Authentication
-tags: ["OpenShift", "OCP", "Security", "Authentication", "SSO", "OpenID", "IDP"] 
+  - OpenShift
+  - Security
+tags: ["OpenShift", "OCP", "Security", "Authentication", "SSO", "OpenID", "IDP"]
 
-aliases: [ 
-	 "/posts-output/2025-05-22-keycloak-openshift-singlelogout/",
-   "/openshift/2025/05/keycloak-openshift-singlelogout/",
-   "/openshift/2025/05/single-log-out-from-keycloak-and-openshift/",
-] 
+aliases: ["/posts-output/2025-05-22-keycloak-openshift-singlelogout/", "/openshift/2025/05/keycloak-openshift-singlelogout/", "/openshift/2025/05/single-log-out-from-keycloak-and-openshift/"]
 ---
 
 :imagesdir: /openshift-platform/security/authentication/images/keycloak/

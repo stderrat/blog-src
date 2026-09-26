@@ -15,15 +15,10 @@ disableBreadcrumb: false
 authors: [Toni Schmidbauer]
 type: post
 categories:
-   - OKD
-   - Single Node
-   - Disconnected
-   - Installation
-
+  - Installation
 tags: ["OKD", "OpenShift", "Single Node", "Installation", "Disconnected"]
 
-aliases: [
-]
+aliases: []
 ---
 
 :imagesdir: /openshift-platform/infrastructure/images/okd-sno-disconnected

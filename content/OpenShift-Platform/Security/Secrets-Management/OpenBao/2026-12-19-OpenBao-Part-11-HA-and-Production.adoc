@@ -1,4 +1,4 @@
---- 
+---
 title: "The Guide to OpenBao - High Availability and Production Best Practices - Part 11"
 description: "Production hardening for OpenBao including auto-unseal, disaster recovery, backup strategies, monitoring, and performance tuning"
 date: "2026-04-19"
@@ -17,16 +17,10 @@ authors: [Thomas Jungbauer]
 type: post
 draft: true
 categories:
-   - OpenShift
-   - Security
-   - Secret Management
-
-tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "High Availability", "Production", "Backup"] 
-
-aliases: [ 
-	 "/openshift/security/openbao/2026-02-15-openbao-ha-production/",
-	 "/openshift-platform/security/secrets-management/openbao/2026-04-19-openbao-part-10-ha-and-production/",
-]
+  - OpenShift
+  - Security
+tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "High Availability", "Production", "Backup", "Secret Management"]
+aliases: ["/openshift/security/openbao/2026-02-15-openbao-ha-production/", "/openshift-platform/security/secrets-management/openbao/2026-04-19-openbao-part-10-ha-and-production/"]
 ---
 
 :imagesdir: /openshift-platform/security/secrets-management/openbao/images/

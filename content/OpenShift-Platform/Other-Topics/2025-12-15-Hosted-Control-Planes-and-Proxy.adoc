@@ -13,15 +13,12 @@ authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
-   - OpenShift
-   - Hosted Control Plane
-   - Security
+  - OpenShift
+  - Installation
+  - Security
+tags: ["OCP", "OpenShift", "Hosted Control Plane", "Proxy", "HyperShift", "HCP", "Security"]
 
-tags: ["OCP", "OpenShift", "Hosted Control Plane", "Proxy", "HyperShift", "HCP", "Security"] 
-
-aliases: [
-   "/openshift/2025/12/hosted-control-planes-behind-a-proxy/",
-]
+aliases: ["/openshift/2025/12/hosted-control-planes-behind-a-proxy/"]
 ---
 
 :imagesdir: /openshift-platform/other-topics/images/

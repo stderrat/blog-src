@@ -1,4 +1,4 @@
---- 
+---
 title: "The Hitchhiker's Guide to Observability - Limit Read Access to Traces - Part 8"
 description: "Limit Read Access to Traces - Part 8"
 date: "2025-12-06"
@@ -17,18 +17,11 @@ disableBreadcrumb: true
 authors: [Thomas Jungbauer]
 type: post
 categories:
-   - OpenShift
-   - Observability
-   - Distributed Tracing
-   - OpenTelemetry
-   - Tempo
-   - Grafana
+  - OpenShift
+  - Observability
+tags: ["OCP", "Day-2", "OpenShift", "Observability", "Distributed Tracing", "Tempo", "Grafana", "OTL", "OTLP", "Logging", "Metrics", OpenTelemetry]
 
-tags: ["OCP", "Day-2", "OpenShift", "Observability", "Distributed Tracing", "Tempo", "Grafana", "OTL", "OTLP", "Logging", "Metrics"] 
-
-aliases: [ 
-	 "/day-2/observability/2025-12-06-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part8/",
-]
+aliases: ["/day-2/observability/2025-12-06-hitchhikers-guide-to-distributed-tracing-with-opentelemetry-and-tempostack-part8/"]
 ---
 
 :imagesdir: /openshift-platform/observability/images/observability/

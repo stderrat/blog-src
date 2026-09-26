@@ -1,4 +1,4 @@
---- 
+---
 title: "The Guide to OpenBao - GitOps Deployment with Argo CD - Part 5"
 description: "Deploying and managing OpenBao using GitOps principles with Argo CD for declarative, version-controlled secret management infrastructure"
 date: "2026-02-20"
@@ -17,16 +17,11 @@ authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
-   - OpenShift
-   - Security
-   - Secret Management
-   - GitOps
-
-tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "GitOps", "Argo CD"] 
-
-aliases: [ 
-	 "/openshift/security/openbao/2026-02-15-openbao-gitops-deployment/",
-]
+  - OpenShift
+  - Security
+  - GitOps
+tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "GitOps", "Argo CD", "Secret Management"]
+aliases: ["/openshift/security/openbao/2026-02-15-openbao-gitops-deployment/"]
 ---
 
 :imagesdir: /openshift-platform/security/secrets-management/openbao/images/

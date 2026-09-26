@@ -15,16 +15,10 @@ disableBreadcrumb: false
 authors: [Toni Schmidbauer]
 type: post
 categories:
-   - Ansible
-   - "Ansible Automation Platform"
-   - Renovate
-   - Collections
-   - Dependencies
-
+  - Ansible
 tags: ["Ansible", "Ansible Automation Platform", "Renovate", "Collections", "Dependencies"]
 
-aliases: [
-]
+aliases: []
 ---
 
 :imagesdir: /ansible/images/onboarding

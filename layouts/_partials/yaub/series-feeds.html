@@ -1,0 +1,22 @@
+{{- /*
+  yaub/series-feeds.html
+  List of per-series feeds for the /rss/ page. The feeds themselves
+  already exist (every section renders an index.xml); they were only not
+  linked anywhere. With the new rss.xml they are sorted by date as well.
+
+  Site params:
+    seriesSections: ["/gitopscollection", "/openshift-platform/security/secrets-management/openbao", ...]
+*/ -}}
+{{- with site.Params.seriesSections }}
+<h2>Series</h2>
+<ul>
+  {{- range . }}
+    {{- with site.GetPage . }}
+      {{- $section := . }}
+      {{- with .OutputFormats.Get "RSS" }}
+  <li><a href="{{ .Permalink }}">{{ $section.Title }}</a> ({{ len $section.RegularPagesRecursive }} articles)</li>
+      {{- end }}
+    {{- end }}
+  {{- end }}
+</ul>
+{{- end }}

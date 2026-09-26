@@ -1,4 +1,4 @@
---- 
+---
 title: "Working with Environments"
 description: "Create separate environments on one OpenShift cluster"
 date: "2022-01-12"
@@ -7,14 +7,11 @@ doctype: book
 authors: [Thomas Jungbauer]
 type: post
 categories:
-   - OpenShift
-   - Pod Placement
-tags: ["OCP", "Day-2", "OpenShift", "Pod Placement", "NodeSelector", "Environments", "Ingress", "IngressController", "Labels", "Annotations"] 
+  - OpenShift
+  - Day-2
+tags: ["OCP", "Day-2", "OpenShift", "Pod Placement", "NodeSelector", "Environments", "Ingress", "IngressController", "Labels", "Annotations"]
 
-aliases: [ 
-	 "/openshift/day-2/working-with-environments",
-	 "/day-2/labels_environmets/2022-01-12-creatingenvironment/",
-] 
+aliases: ["/openshift/day-2/working-with-environments", "/day-2/labels_environmets/2022-01-12-creatingenvironment/"]
 ---
 
 :imagesdir: /openshift-platform/day-2/images/

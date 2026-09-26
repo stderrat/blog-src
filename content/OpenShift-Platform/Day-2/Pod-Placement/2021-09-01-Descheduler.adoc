@@ -1,4 +1,4 @@
---- 
+---
 title: "Using Descheduler"
 description: "Evicting pods using the Descheduler"
 date: "2021-08-26"
@@ -10,14 +10,10 @@ series_part: 7
 authors: [Thomas Jungbauer]
 type: post
 categories:
-   - OpenShift
-   - Pod Placement
-tags: ["OCP", "Day-2", "OpenShift", "Descheduler"] 
-
-aliases: [ 
-	 "/openshift/day-2/descheduler/",
-	 "/day-2/pod-placement/2021-09-01-descheduler/",
-] 
+  - OpenShift
+  - Day-2
+tags: ["OCP", "Day-2", "OpenShift", "Descheduler", "Pod Placement"]
+aliases: ["/openshift/day-2/descheduler/", "/day-2/pod-placement/2021-09-01-descheduler/"]
 ---
 
 :imagesdir: /openshift-platform/day-2/images/

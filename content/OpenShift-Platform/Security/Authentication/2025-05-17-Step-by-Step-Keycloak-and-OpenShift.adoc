@@ -1,4 +1,4 @@
---- 
+---
 title: "Step by Step - Using Keycloak Authentication in OpenShift"
 description: "Install and configure Keycloak in OpenShift for authentication"
 date: "2025-05-17"
@@ -8,16 +8,11 @@ authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
-   - OpenShift
-   - Security
-   - Authentication
-tags: ["OpenShift", "OCP", "Security", "Authentication", "SSO", "OpenID", "IDP"] 
+  - OpenShift
+  - Security
+tags: ["OpenShift", "OCP", "Security", "Authentication", "SSO", "OpenID", "IDP"]
 
-aliases: [ 
-	 "/posts-output/2025-05-17-openshift-sso/",
-   "/openshift/2025/05/step-by-step-keycloak-and-openshift/",
-   "/openshift/2025/05/step-by-step-using-keycloak-authentication-in-openshift/",
-] 
+aliases: ["/posts-output/2025-05-17-openshift-sso/", "/openshift/2025/05/step-by-step-keycloak-and-openshift/", "/openshift/2025/05/step-by-step-using-keycloak-authentication-in-openshift/"]
 ---
 
 :imagesdir: /openshift-platform/security/authentication/images/keycloak/

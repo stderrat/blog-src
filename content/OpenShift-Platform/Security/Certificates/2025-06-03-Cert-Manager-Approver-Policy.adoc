@@ -1,4 +1,4 @@
---- 
+---
 title: "Cert-Manager Policy Approver in OpenShift"
 description: "How to configure Cert-Manager Approver Policy in OpenShift"
 date: "2025-06-03"
@@ -12,16 +12,11 @@ authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
-   - OpenShift
-   - Security
-   - Cert-Manager
-tags: ["OpenShift", "OCP", "Security", "Cert-Manager", "Certificate", "CertificateRequestPolicy", "Approver Policy"] 
+  - OpenShift
+  - Security
+tags: ["OpenShift", "OCP", "Security", "Cert-Manager", "Certificate", "CertificateRequestPolicy", "Approver Policy"]
 
-aliases: [ 
-	 "/posts-output/2025-06-03-cert-manager-approver-policy/",
-   "/openshift/2025/06/cert-manager-approver-policy",
-   "/openshift/2025/06/cert-manager-policy-approver-in-openshift/",
-] 
+aliases: ["/posts-output/2025-06-03-cert-manager-approver-policy/", "/openshift/2025/06/cert-manager-approver-policy", "/openshift/2025/06/cert-manager-policy-approver-in-openshift/"]
 ---
 
 :imagesdir: /openshift-platform/security/certificates/images/cert-manager/

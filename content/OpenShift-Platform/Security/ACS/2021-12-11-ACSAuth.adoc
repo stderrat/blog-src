@@ -1,4 +1,4 @@
---- 
+---
 title: "Advanced Cluster Security - Authentication"
 description: "Red Hat Advanced Cluster Security - Authentication"
 date: "2021-12-11"
@@ -9,15 +9,10 @@ authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
-   - Security
-   - Advanced Cluster Security
-tags: ["ACS", "Advanced Cluster Security", "OpenShift", "Security", "Keycloak", "Authentication", "SSO", "Stackrox"] 
+  - Security
+tags: ["ACS", "Advanced Cluster Security", "OpenShift", "Security", "Keycloak", "Authentication", "SSO", "Stackrox"]
 
-aliases: [ 
-    "/posts-output/2021-12-11-ACSAuth/",
-    "/acs/2021/12/advanced-cluster-security-authentication/",
-    "/acs/2021-12-11-acsauth/"
-] 
+aliases: ["/posts-output/2021-12-11-ACSAuth/", "/acs/2021/12/advanced-cluster-security-authentication/", "/acs/2021-12-11-acsauth/"]
 ---
 
 :imagesdir: /openshift-platform/security/acs/images/

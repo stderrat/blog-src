@@ -1,4 +1,4 @@
---- 
+---
 title: "Topology Spread Constraints"
 description: "Placeing Pods Using Topology Spread Constraints"
 date: "2021-08-26"
@@ -10,14 +10,11 @@ series_part: 6
 authors: [Thomas Jungbauer]
 type: post
 categories:
-   - OpenShift
-   - Pod Placement
-tags: ["OCP", "Day-2", "OpenShift", "Pod Placement", "Topology Spread Constraints"] 
+  - OpenShift
+  - Day-2
+tags: ["OCP", "Day-2", "OpenShift", "Pod Placement", "Topology Spread Constraints"]
 
-aliases: [ 
-	 "/openshift/day-2/pod-placement-topology-spread-constraints/",
-	 "/day-2/pod-placement/2021-08-31-topologyspreadcontraints/",
-] 
+aliases: ["/openshift/day-2/pod-placement-topology-spread-constraints/", "/day-2/pod-placement/2021-08-31-topologyspreadcontraints/"]
 ---
 
 :imagesdir: /openshift-platform/day-2/images/

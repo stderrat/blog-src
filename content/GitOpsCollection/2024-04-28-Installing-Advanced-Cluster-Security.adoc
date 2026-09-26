@@ -1,4 +1,4 @@
---- 
+---
 title: "[Ep.6] Setup & Configure Advanced Cluster Security"
 description: "Installing and configuring ACS using GitOps approach."
 date: "2024-04-28"
@@ -11,15 +11,12 @@ authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
-   - OpenShift
-   - GitOps
-   - Security
-   - Advanced Cluster Security
-tags: ["ApplicationSet", "Application", "Compliance", "OpenShift", "OCP", "GitOps", "Argo CD", "ACS", "Advanced Cluster Security", "Stackrox"] 
+  - OpenShift
+  - GitOps
+  - Security
+tags: ["ApplicationSet", "Application", "Compliance", "OpenShift", "OCP", "GitOps", "Argo CD", "ACS", "Advanced Cluster Security", "Stackrox"]
 
-aliases: [ 
-	 "/posts-output/2024-04-28-setup-acs/",
-] 
+aliases: ["/posts-output/2024-04-28-setup-acs/"]
 ---
 
 :imagesdir: /gitopscollection/images/

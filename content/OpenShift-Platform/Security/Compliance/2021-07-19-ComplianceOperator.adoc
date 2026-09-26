@@ -1,4 +1,4 @@
---- 
+---
 title: "Compliance Operator"
 description: "Hardening OpenShift using the Compliance Operator"
 date: "2021-07-19"
@@ -9,16 +9,11 @@ authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
-   - OpenShift
-   - Compliance
-   - Security
+  - OpenShift
+  - Security
 tags: ["Hardening", "OpenShift", "OCP", "security", "compliance", "Compliance Operator"]
 
-aliases: [
-    "/posts-output/2021-07-19-ComplianceOperator/",
-    "/compliance/2021/07/compliance-operator/",
-    "/compliance/2021/07/compliance-operator/",
-]
+aliases: ["/posts-output/2021-07-19-ComplianceOperator/", "/compliance/2021/07/compliance-operator/", "/compliance/2021/07/compliance-operator/"]
 ---
 
 :imagesdir: /openshift-platform/security/compliance/images/

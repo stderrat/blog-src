@@ -1,4 +1,4 @@
---- 
+---
 title: "The Guide to OpenBao - OpenShift Deployment with Helm - Part 3"
 description: "Deploying OpenBao on OpenShift and Kubernetes using the official Helm chart for production-ready secret management"
 date: "2026-02-13"
@@ -17,15 +17,10 @@ authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
-   - OpenShift
-   - Security
-   - Secret Management
-
-tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "Helm", "Kubernetes"] 
-
-aliases: [ 
-	 "/openshift/security/openbao/2026-02-13-openbao-openshift-deployment/",
-]
+  - OpenShift
+  - Security
+tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "Helm", "Kubernetes", "Secret Management"]
+aliases: ["/openshift/security/openbao/2026-02-13-openbao-openshift-deployment/"]
 ---
 
 :imagesdir: /openshift-platform/security/secrets-management/openbao/images/

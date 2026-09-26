@@ -1,4 +1,4 @@
---- 
+---
 title: "[Ep.5] Setup & Configure Compliance Operator"
 description: "Installing and configuring Compliance Operator using GitOps approach."
 date: "2024-04-25"
@@ -11,15 +11,12 @@ authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
-   - OpenShift
-   - GitOps
-   - Security
-   - Compliance
-tags: ["ApplicationSet", "Application", "Compliance", "OpenShift", "OCP", "GitOps", "Argo CD", "Compliance Operator"] 
+  - OpenShift
+  - GitOps
+  - Security
+tags: ["ApplicationSet", "Application", "Compliance", "OpenShift", "OCP", "GitOps", "Argo CD", "Compliance Operator"]
 
-aliases: [ 
-	 "/posts-output/2024-04-25-setup-compliance-operator/",
-] 
+aliases: ["/posts-output/2024-04-25-setup-compliance-operator/"]
 ---
 
 :imagesdir: /gitopscollection/images/

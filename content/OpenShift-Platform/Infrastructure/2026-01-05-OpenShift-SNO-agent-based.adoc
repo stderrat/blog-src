@@ -15,15 +15,13 @@ disableBreadcrumb: false
 authors: [Toni Schmidbauer]
 type: post
 categories:
-   - OpenShift
-   - Single Node
-   - Agent Based Installation
-   - PXE
-
+  - OpenShift
+  - Installation
+  - Agent Based Installation
+  - PXE
 tags: ["OCP", "OpenShift", "Single Node", "Installation", "Agent Based", "ipxe"]
 
-aliases: [
-]
+aliases: []
 ---
 
 :imagesdir: /openshift-platform/infrastructure/images/sno-agent-based

@@ -11,7 +11,7 @@ tags: ["OCP", "Day-2", "OpenShift", "Pod Placement", "NodeSelector", "Taints", "
 <p class="intro-tagline">Despite the name, we hope you'll find these articles genuinely helpful! 😊</p>
 
 <h4>Who are we?</h4>
-<p>We're <strong>Thomas Jungbauer</strong> and <strong>Toni Schmidbauer</strong> — two seasoned IT professionals with over 20 years of experience each. Currently, we work as architects at <strong>Red Hat Austria</strong>, helping customers design and implement OpenShift and Ansible solutions.</p>
+<p>We're <strong>Thomas Jungbauer</strong> and <strong>Toni Schmidbauer</strong> — two experienced IT professionals, each with over 20 years' experience. We work as architects in Austria, helping customers design and implement OpenShift and Ansible Automation Platform solutions.</p>
 
 <h4>What's this blog about?</h4>
 <p>Real-world problems, practical solutions. We document issues we've encountered in the field along with step-by-step guides to reproduce and resolve them. Our goal: save you hours of frustrating documentation searches and trial-and-error testing.</p>

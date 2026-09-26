@@ -15,15 +15,12 @@ authors:
   - Toni Schmidbauer
 type: post
 categories:
-   - OpenShift
-   - Virtualization
-   - Networking
-   - KubeVirt
+  - OpenShift
+  - Virtualization
+  - Networking
+tags: ["OCP", "Networking", "UDN", "CUDN", "User Defined Networking", "Multus", KubeVirt]
 
-tags: ["OCP", "Networking", "UDN", "CUDN", "User Defined Networking", "Multus"]
-
-aliases: [
-]
+aliases: []
 ---
 
 :imagesdir: /openshift-platform/networking/images/udn-overview

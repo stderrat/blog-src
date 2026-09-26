@@ -1,0 +1,30 @@
+{{- /*
+  yaub/alternate-feeds.html
+  Replaces the <link rel="alternate"> lines in <head>.
+  Avoids duplicate home/section RSS links and gives each feed a distinct
+  title (feed readers otherwise show every feed with the same name).
+
+  Uses params.siteName (e.g. YAUB) when set, otherwise site.Title.
+*/ -}}
+{{- $siteName := site.Params.siteName | default site.Title -}}
+{{- with site.Home.OutputFormats.Get "RSS" }}
+<link rel="alternate" type="application/rss+xml" href="{{ .Permalink }}" title="{{ $siteName }} (all articles)">
+{{- end }}
+{{- if not .IsHome }}
+  {{- with .OutputFormats.Get "RSS" }}
+<link rel="alternate" type="application/rss+xml" href="{{ .Permalink }}" title="{{ $.Title }} – {{ $siteName }}">
+  {{- else }}
+    {{- /* article page: offer the feed of its series, if any */ -}}
+    {{- $page := . }}
+    {{- range site.Params.seriesSections }}
+      {{- with site.GetPage . }}
+        {{- if $page.IsDescendant . }}
+          {{- $section := . }}
+          {{- with .OutputFormats.Get "RSS" }}
+<link rel="alternate" type="application/rss+xml" href="{{ .Permalink }}" title="{{ $section.Title }} – {{ $siteName }}">
+          {{- end }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+{{- end }}

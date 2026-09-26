@@ -1,0 +1,68 @@
+# taxonomy-map.yaml
+# Consolidates the 55 current categories into 13. Every category that is
+# mapped away is kept as a tag, so no information gets lost and the tag
+# pages stay intact.
+#
+#   <old category>: <new category>        -> category renamed, old value added as tag
+#   <old category>: null                  -> category removed, old value added as tag
+#   categories not listed here stay as they are
+#
+# Target categories (13):
+#   OpenShift, GitOps, Security, Ansible, Observability, Networking,
+#   Virtualization, Service Mesh, Supply Chain, Installation, Day-2,
+#   Quay, Other
+
+map:
+  # --- duplicates -------------------------------------------------------
+  Network: Networking
+  Secrets: Security
+  Secret Management: Security
+  Istio: Service Mesh
+  Ansible Automation Platform: Ansible
+
+  # --- product/tool names that belong into tags ------------------------
+  Advanced Cluster Security: Security
+  Compliance: Security
+  Cert-Manager: Security
+  Keycloak: Security
+  OIDC: Security
+  Authentication: Security
+  Auditd: Security
+
+  Distributed Tracing: Observability
+  OpenTelemetry: Observability
+  Tempo: Observability
+  Grafana: Observability
+
+  Gateway-API: Networking
+  Ingress: Networking
+
+  KubeVirt: Virtualization
+
+  Tekton: Supply Chain
+
+  Disconnected: Installation
+  Single Node: Installation
+  OKD: Installation
+  Hosted Control Plane: Installation
+
+  Pod Placement: Day-2
+
+  Renovate: Ansible
+  Collections: Ansible
+  Dependencies: Ansible
+  Configuration as Code: Ansible
+  Onboarding: Ansible
+
+  Bootc: Other
+  Bootc-Image-Builder: Other
+  Image-Builder: Other
+  RHEL10: Other
+  MacOS: Other
+  UTM: Other
+  Java: Other
+  Changelog: Other
+  Helm Charts: GitOps
+
+  # "Kubernetes" is always combined with OpenShift on this blog
+  Kubernetes: null

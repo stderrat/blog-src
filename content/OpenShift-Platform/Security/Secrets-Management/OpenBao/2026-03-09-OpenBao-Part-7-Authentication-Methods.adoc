@@ -1,4 +1,4 @@
---- 
+---
 title: "The Guide to OpenBao - Authentication Methods - Part 7"
 description: "Configuring authentication methods in OpenBao including Kubernetes auth, OIDC, LDAP, and AppRole for secure access control"
 date: "2026-03-09"
@@ -17,13 +17,9 @@ authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
-   - OpenShift
-   - Kubernetes
-   - Security
-   - Secret Management
-
-tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "Authentication", "Kubernetes", "LDAP", "Policies"] 
-
+  - OpenShift
+  - Security
+tags: ["OCP", "Day-2", "OpenShift", "OpenBao", "Vault", "Secrets", "Security", "Authentication", "Kubernetes", "LDAP", "Policies", "Secret Management"]
 aliases: []
 ---
 

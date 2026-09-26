@@ -15,17 +15,11 @@ disableBreadcrumb: false
 authors: [Toni Schmidbauer]
 type: post
 categories:
-   - macOS
-   - UTM
-   - RHEL10
-   - bootc
-   - bootc-image-builder
-   - Virtualization
+  - Other
+  - Virtualization
+tags: ["Other", "Home Lab", "RHEL", "Containers", "bootc", macOS, UTM, RHEL10, bootc-image-builder]
 
-tags: ["Other", "Home Lab", "RHEL", "Containers", "bootc"]
-
-aliases: [
-]
+aliases: []
 ---
 
 :imagesdir: /other/images/homelab/

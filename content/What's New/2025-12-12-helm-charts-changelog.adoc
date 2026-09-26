@@ -15,16 +15,10 @@ authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
-   - Helm Charts
-   - GitOps
-   - Changelog
-
-tags: ["Helm", "Charts", "Changelog", "ArgoCD", "OpenShift", "Kubernetes", "GitOps"]
-
-aliases: [
-   "/helm-charts-changelog",
-   "/charts/changelog",
-]
+  - GitOps
+  - Other
+tags: ["Helm", "Charts", "Changelog", "ArgoCD", "OpenShift", "Kubernetes", "GitOps", "Helm Charts"]
+aliases: ["/helm-charts-changelog", "/charts/changelog"]
 ---
 
 :imagesdir: /whats-new/images/

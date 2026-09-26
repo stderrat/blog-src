@@ -1,4 +1,4 @@
---- 
+---
 title: "Red Hat Quay Registry - Integrate Keycloak"
 description: "Red Hat Quay Registry - Authentication with Keycloak"
 date: "2025-09-19"
@@ -9,17 +9,12 @@ authors: [Thomas Jungbauer]
 type: post
 draft: false
 categories:
-   - OpenShift
-   - Quay
-   - OIDC
-   - Keycloak
-tags: ["Quay", "Registry", "OpenShift", "Container Security", "Keycloak", "Authentication", "OIDC"] 
+  - OpenShift
+  - Quay
+  - Security
+tags: ["Quay", "Registry", "OpenShift", "Container Security", "Keycloak", "Authentication", "OIDC"]
 
-aliases: [ 
-	 "/posts-output/2025-09-19-Quay-Keycloak/",
-	 "/quay/2025/09/red-hat-quay-registry-integrate-keycloak/",
-	 "/quay/2025-09-19-quay-integrate-keycloak/",
-] 
+aliases: ["/posts-output/2025-09-19-Quay-Keycloak/", "/quay/2025/09/red-hat-quay-registry-integrate-keycloak/", "/quay/2025-09-19-quay-integrate-keycloak/"]
 ---
 
 :imagesdir: /openshift-platform/quay/images/
