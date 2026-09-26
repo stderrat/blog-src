@@ -7,7 +7,7 @@ weight: 10
 
 draft: true
 
-featured_image: /other/images/homelab/cat_laboratory.png
+featured_image: /suse/images/logos/opensuse_cloud_init.png
 show_featured_image_summary: true
 show_featured_image_article: true
 disableBreadcrumb: false
