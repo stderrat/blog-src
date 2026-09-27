@@ -205,7 +205,7 @@
             // Initialize window.relearn for zoom functionality
             window.relearn = window.relearn || {};
             window.relearn.themeUseMermaid = true;
-            window.relearn.mermaidConfig = { securityLevel: 'loose' };
+            window.relearn.mermaidConfig = { securityLevel: 'antiscript' };
             
             // Translation strings for mermaid zoom
             window.T_Reset_view = 'Reset view';
@@ -216,11 +216,11 @@
                 console.log('Toast:', msg);
             };
             
-            // Initialize mermaid with cross-browser compatible settings
+            // Initialize mermaid. antiscript keeps HTML labels such as <br/> and strips script.
             if (typeof mermaid !== 'undefined') {
                 mermaid.initialize({ 
                     startOnLoad: false,  // We'll manually trigger it
-                    securityLevel: 'loose',  // Firefox/Safari compatible
+                    securityLevel: 'antiscript',
                     theme: 'default'
                 });
             }
