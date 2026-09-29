@@ -1,0 +1,103 @@
+{{/*
+  responsive-image — WebP + width srcset when processable; else static WebP pair / plain img.
+
+  Params: src, alt, class, pictureClass, loading, decoding, sizes, style, page, fetchpriority
+*/}}
+{{- $src := .src | default "" -}}
+{{- $alt := .alt | default "" -}}
+{{- $class := .class | default "" -}}
+{{- $pictureClass := .pictureClass | default "" -}}
+{{- $loading := .loading | default "lazy" -}}
+{{- $decoding := .decoding | default "async" -}}
+{{- $sizes := .sizes | default "(max-width: 768px) 100vw, 720px" -}}
+{{- $style := .style | default "" -}}
+{{- $page := .page -}}
+{{- $fetchpriority := .fetchpriority | default "" -}}
+
+{{- $cleanSrc := replaceRE `(?i)^https?://[^/]+` "" $src -}}
+{{- if not (hasPrefix $cleanSrc "/") -}}{{- $cleanSrc = printf "/%s" $cleanSrc -}}{{- end -}}
+{{- $cleanSrc = replaceRE `\?.*$` "" $cleanSrc -}}
+
+{{- $res := partial "func/ResolveImageResource.html" (dict "src" $cleanSrc "page" $page) -}}
+
+{{- if $res -}}
+  {{- $widths := slice 480 768 1024 1400 -}}
+  {{- $origW := $res.Width -}}
+  {{- $origH := $res.Height -}}
+  {{- $webpParts := slice -}}
+  {{- $fallParts := slice -}}
+  {{- $fallbackType := $res.MediaType.SubType -}}
+  {{- if eq $fallbackType "jpg" -}}{{- $fallbackType = "jpeg" -}}{{- end -}}
+  {{- $isWebp := eq (strings.ToLower $fallbackType) "webp" -}}
+  {{- $defaultFall := $res -}}
+
+  {{- range $widths -}}
+    {{- if le . $origW -}}
+      {{- $webp := $res.Resize (printf "%dx webp q85" .) -}}
+      {{- $webpParts = $webpParts | append (printf "%s %dw" $webp.RelPermalink .) -}}
+      {{- if $isWebp -}}
+        {{- $fallParts = $fallParts | append (printf "%s %dw" $webp.RelPermalink .) -}}
+        {{- $defaultFall = $webp -}}
+      {{- else -}}
+        {{- $fall := $res.Resize (printf "%dx q85" .) -}}
+        {{- $fallParts = $fallParts | append (printf "%s %dw" $fall.RelPermalink .) -}}
+        {{- $defaultFall = $fall -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- if eq (len $webpParts) 0 -}}
+    {{- $w := cond (gt $origW 0) $origW 480 -}}
+    {{- $webpOne := $res.Resize (printf "%dx webp q85" $w) -}}
+    {{- $webpParts = slice (printf "%s %dw" $webpOne.RelPermalink $w) -}}
+    {{- if $isWebp -}}
+      {{- $fallParts = slice (printf "%s %dw" $res.RelPermalink $w) -}}
+      {{- $defaultFall = $res -}}
+    {{- else -}}
+      {{- $fallOne := $res.Resize (printf "%dx q85" $w) -}}
+      {{- $fallParts = slice (printf "%s %dw" $fallOne.RelPermalink $w) -}}
+      {{- $defaultFall = $fallOne -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- $aspect := "" -}}
+  {{- if and $origW $origH -}}{{- $aspect = printf "aspect-ratio:%d/%d;" $origW $origH -}}{{- end -}}
+  {{- $imgStyle := printf "%s%s" $aspect $style -}}
+
+  <picture{{ with $pictureClass }} class="{{ . }}"{{ end }}>
+    <source type="image/webp" srcset="{{ delimit $webpParts ", " }}" sizes="{{ $sizes }}">
+    {{- if not $isWebp -}}
+    <source type="image/{{ $fallbackType }}" srcset="{{ delimit $fallParts ", " }}" sizes="{{ $sizes }}">
+    {{- end -}}
+    <img src="{{ $defaultFall.RelPermalink }}"
+         alt="{{ $alt }}"
+         {{ with $class }}class="{{ . }}"{{ end }}
+         width="{{ $defaultFall.Width }}"
+         height="{{ $defaultFall.Height }}"
+         loading="{{ $loading }}"
+         decoding="{{ $decoding }}"
+         {{ with $fetchpriority }}fetchpriority="{{ . }}"{{ end }}
+         sizes="{{ $sizes }}"
+         srcset="{{ delimit $fallParts ", " }}"
+         data-webp-upgraded="true"
+         style="max-width:100%;height:auto;{{ $imgStyle | safeCSS }}">
+  </picture>
+
+{{- else -}}
+  {{- /* Keep original URL working — WebP sibling when present */ -}}
+  {{- $webpSrc := replace $cleanSrc ".png" ".webp" | replace ".jpg" ".webp" | replace ".jpeg" ".webp" | replace ".PNG" ".webp" | replace ".JPG" ".webp" | replace ".JPEG" ".webp" -}}
+  {{- $webpRes := partial "func/ResolveImageResource.html" (dict "src" $webpSrc "page" $page) -}}
+  {{- $hasWebp := and (ne $webpSrc $cleanSrc) (or $webpRes (fileExists (printf "static%s" $webpSrc))) -}}
+  {{- if $hasWebp -}}
+  <picture{{ with $pictureClass }} class="{{ . }}"{{ end }}>
+    <source srcset="{{ with $webpRes }}{{ .RelPermalink }}{{ else }}{{ $webpSrc | relURL }}{{ end }}" type="image/webp">
+    <img src="{{ $cleanSrc | relURL }}" alt="{{ $alt }}" {{ with $class }}class="{{ . }}"{{ end }}
+         loading="{{ $loading }}" decoding="{{ $decoding }}" {{ with $fetchpriority }}fetchpriority="{{ . }}"{{ end }}
+         data-webp-upgraded="true" style="max-width:100%;height:auto;{{ $style | safeCSS }}">
+  </picture>
+  {{- else -}}
+  <img src="{{ $cleanSrc | relURL }}" alt="{{ $alt }}" {{ with $class }}class="{{ . }}"{{ end }}
+       loading="{{ $loading }}" decoding="{{ $decoding }}" {{ with $fetchpriority }}fetchpriority="{{ . }}"{{ end }}
+       style="max-width:100%;height:auto;{{ $style | safeCSS }}">
+  {{- end -}}
+{{- end -}}

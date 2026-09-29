@@ -17,3 +17,6 @@ pom.xml.asc
 
 # Cursor (machine-local symlinks to skills/rules; run ai-library link-to-blog.sh after clone)
 .cursor/
+
+# Hugo image processing cache
+/resources/

@@ -8,5 +8,6 @@ aliases:
   - "/categories/bootc-image-builder/"
   - "/categories/image-builder/"
   - "/categories/macos/"
+  - "/categories/java/"
 ---
 

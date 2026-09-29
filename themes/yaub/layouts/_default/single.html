@@ -62,11 +62,18 @@
 
 {{ if $featured_image }}
 {{ if .Params.show_featured_image_article }}
-{{/* Trimming the slash and adding absURL make sure the image works no matter where our site lives */}}
-  {{ $featured_image := (trim $featured_image "/") | absURL }}
     <div class="pr3-ns mb4 mb0-ns w-100 featured-img-container">
       <a href="{{.RelPermalink}}">
-        <img src="{{ $featured_image }}" class="img featured-img" alt="image from {{ .Title }}" loading="eager" decoding="async" style="max-width:100%;height:auto;box-shadow:none;">
+        {{- partial "responsive-image.html" (dict
+          "src" $featured_image
+          "alt" (printf "image from %s" .Title)
+          "class" "img featured-img"
+          "page" .
+          "loading" "eager"
+          "fetchpriority" "high"
+          "sizes" "(max-width: 768px) 100vw, min(100vw, 1200px)"
+          "style" "box-shadow:none;"
+        ) -}}
       </a>
     </div>
 {{ end }}

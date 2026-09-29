@@ -1,0 +1,44 @@
+{{/*
+  ResolveImageResource — locate a processable image resource for a site path.
+  @param src  string
+  @param page page (optional)
+  @return resource or ""
+*/}}
+{{- $src := .src | default "" -}}
+{{- $page := .page -}}
+{{- $img := "" -}}
+
+{{- if $src -}}
+  {{- $clean := replaceRE `(?i)^https?://[^/]+` "" ($src | strings.TrimSpace) -}}
+  {{- $clean = strings.TrimPrefix "/" $clean -}}
+  {{- $clean = replaceRE `\?.*$` "" $clean -}}
+  {{- $base := path.Base $clean -}}
+  {{- $ext := strings.ToLower (path.Ext $base) -}}
+
+  {{- if not (in (slice ".svg" ".gif" ".ico" ".avif") $ext) -}}
+    {{- if $page -}}
+      {{- with $page.Resources.GetMatch $base -}}
+        {{- $img = . -}}
+      {{- else -}}
+        {{- with $page.Resources.GetMatch (printf "**/%s" $base) -}}
+          {{- $img = . -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+
+    {{- if not $img -}}
+      {{- with resources.Get (printf "imgproc/content/%s" $clean) -}}{{- $img = . -}}{{- end -}}
+    {{- end -}}
+    {{- if not $img -}}
+      {{- with resources.Get (printf "imgproc/static/%s" $clean) -}}{{- $img = . -}}{{- end -}}
+    {{- end -}}
+    {{- if not $img -}}
+      {{- with resources.GetMatch (printf "imgproc/content/**/%s" $base) -}}{{- $img = . -}}{{- end -}}
+    {{- end -}}
+    {{- if not $img -}}
+      {{- with resources.GetMatch (printf "imgproc/static/**/%s" $base) -}}{{- $img = . -}}{{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- return $img -}}

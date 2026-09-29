@@ -16,7 +16,8 @@
     <div class="content">
       {{ with .Content }}{{ . }}{{ end }} 
       {{ range $taxonomyName, $taxonomy := .Site.Taxonomies }} 
-      {{ if ne $taxonomyName "tags" }}
+      {{/* Skip tags (listed elsewhere) and empty taxonomies such as unused archive */}}
+      {{ if and (ne $taxonomyName "tags") (gt (len $taxonomy) 0) }}
       <h2>{{ $taxonomyName | title }}</h2>
       <ul>
         {{ range $key, $value := $taxonomy }}

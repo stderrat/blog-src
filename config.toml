@@ -6,6 +6,7 @@ enableGitInfo = true
 copyright = "Toni Schmidbauer & Thomas Jungbauer"
 enableRobotsTXT = true
 rssLimit = 50
+timeZone = "Europe/Vienna"
 
 [sitemap]
 changefreq = 'monthly'
@@ -49,7 +50,18 @@ home = [ "HTML", "RSS", "JSON", "TJFeed"]
   disableNextPrev = false
   disableMermaid = false
   titleSeparator = "::"
-  mainSections = ['service-mesh', 'OpenShift', 'ansible', 'compliance', 'general', 'GitOpsCollection', 'gitops-catalog', 'Day-2', 'SecureSupplyChain', 'ACS', 'Azure', 'Quay', 'Java', "What's New"]
+  # Top-level content sections (Hugo .Section names). Legacy flat names removed.
+  mainSections = [
+    'openshift-platform',
+    'gitopscollection',
+    'securesupplychain',
+    'ansible',
+    'integrations',
+    'other',
+    "what's-new",
+    'suse',
+    'openbao-series',
+  ]
   recent_posts_number = 10
   # Home RSS feed: omit utility / catalog sections (see layouts/_partials/yaub/feed-pages.html)
   feedExcludeSections = ["legaldisclosure", "search", "rss", "helm-charts", "gitops-catalog"]
@@ -277,4 +289,44 @@ staticDir = ['themes/hugo-theme-learn/static', 'static']
   [security.http]
     methods = ['(?i)GET|POST']
     urls = ['.*']
+
+# Image derivatives for responsive srcset (#9)
+[imaging]
+  quality = 85
+  resampleFilter = "Lanczos"
+  [imaging.exif]
+    disableDate = false
+    disableLatLong = true
+
+# Mount raster images into assets for resources.Process (full default mounts required)
+[module]
+  [[module.mounts]]
+    source = "content"
+    target = "content"
+  [[module.mounts]]
+    source = "data"
+    target = "data"
+  [[module.mounts]]
+    source = "layouts"
+    target = "layouts"
+  [[module.mounts]]
+    source = "i18n"
+    target = "i18n"
+  [[module.mounts]]
+    source = "archetypes"
+    target = "archetypes"
+  [[module.mounts]]
+    source = "assets"
+    target = "assets"
+  [[module.mounts]]
+    source = "static"
+    target = "static"
+  [[module.mounts]]
+    source = "content"
+    target = "assets/imgproc/content"
+    files = ["**.png", "**.jpg", "**.jpeg", "**.webp", "**.PNG", "**.JPG", "**.JPEG", "**.WEBP"]
+  [[module.mounts]]
+    source = "static"
+    target = "assets/imgproc/static"
+    files = ["**.png", "**.jpg", "**.jpeg", "**.webp", "**.PNG", "**.JPG", "**.JPEG", "**.WEBP"]
 ######

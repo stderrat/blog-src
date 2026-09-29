@@ -1,47 +1,8 @@
-{{- /* 
-  Hugo's automatic image renderer override
-  Serves WebP with PNG/JPG fallback only when WebP exists
-  Works for all Markdown/AsciiDoc images
-  
-  CLS Prevention: Uses aspect-ratio for layout stability
-*/ -}}
-
-{{- $src := .Destination }}
-{{- $alt := .Text }}
-{{- $title := .Title }}
-
-{{- /* Generate WebP source path */ -}}
-{{- $webpSrc := replace $src ".png" ".webp" | replace ".jpg" ".webp" | replace ".jpeg" ".webp" | replace ".PNG" ".webp" | replace ".JPG" ".webp" | replace ".JPEG" ".webp" }}
-
-{{- /* Check if WebP file exists */ -}}
-{{- $hasWebp := false }}
-{{- $webpStaticPath := printf "static%s" $webpSrc }}
-{{- if fileExists $webpStaticPath }}
-  {{- $hasWebp = true }}
-{{- else }}
-  {{- /* Also check in content directory (page resources) */ -}}
-  {{- $webpResource := .Page.Resources.GetMatch (printf "*%s*" (path.Base $webpSrc)) }}
-  {{- if $webpResource }}
-    {{- $hasWebp = true }}
-  {{- end }}
-{{- end }}
-
-{{- /* Try to get image resource for dimensions (works for page resources) */ -}}
-{{- $img := .Page.Resources.GetMatch (printf "*%s*" (path.Base $src)) }}
-{{- $width := "" }}
-{{- $height := "" }}
-{{- if $img }}
-  {{- $width = $img.Width }}
-  {{- $height = $img.Height }}
-{{- end }}
-
-{{- /* Only use picture element with WebP source if WebP exists */ -}}
-{{- if $hasWebp }}
-<picture>
-  <source srcset="{{ $webpSrc | relURL }}" type="image/webp">
-  <img src="{{ $src | relURL }}" alt="{{ $alt }}"{{ with $title }} title="{{ . }}"{{ end }}{{ with $width }} width="{{ . }}"{{ end }}{{ with $height }} height="{{ . }}"{{ end }} loading="lazy" decoding="async" style="max-width:100%;height:auto;max-height:80vh;{{ with $width }}{{ with $height }}aspect-ratio:{{ $width }}/{{ $height }};{{ end }}{{ end }}">
-</picture>
-{{- else }}
-<img src="{{ $src | relURL }}" alt="{{ $alt }}"{{ with $title }} title="{{ . }}"{{ end }}{{ with $width }} width="{{ . }}"{{ end }}{{ with $height }} height="{{ . }}"{{ end }} loading="lazy" decoding="async" style="max-width:100%;height:auto;max-height:80vh;{{ with $width }}{{ with $height }}aspect-ratio:{{ $width }}/{{ $height }};{{ end }}{{ end }}">
-{{- end }}
-
+{{- partial "responsive-image.html" (dict
+  "src" .Destination
+  "alt" .Text
+  "page" .Page
+  "loading" "lazy"
+  "sizes" "(max-width: 768px) 100vw, 720px"
+  "style" "max-height:80vh;"
+) -}}

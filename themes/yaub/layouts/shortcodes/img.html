@@ -1,48 +1,21 @@
 {{ $_hugo_config := `{ "version": 1 }` }}
-{{- $src := .Get "src" }}
-{{- $alt := .Get "alt" | default "" }}
-{{- $width := .Get "width" | default "" }}
-{{- $height := .Get "height" | default "" }}
-{{- $class := .Get "class" | default "" }}
+{{- $src := .Get "src" -}}
+{{- $alt := .Get "alt" | default "" -}}
+{{- $class := .Get "class" | default "" -}}
+{{- $sizes := .Get "sizes" | default "(max-width: 768px) 100vw, 720px" -}}
+{{- $w := .Get "width" -}}
+{{- $h := .Get "height" -}}
+{{- $style := "" -}}
+{{- if and $w $h -}}
+  {{- $style = printf "aspect-ratio:%s/%s;" $w $h -}}
+{{- end -}}
 
-{{- /* Try to load the image resource */ -}}
-{{- $img := "" }}
-{{- with .Page.Resources.GetMatch $src }}
-  {{- $img = . }}
-{{- else }}
-  {{- with resources.Get $src }}
-    {{- $img = . }}
-  {{- end }}
-{{- end }}
-
-{{- if $img }}
-  {{- /* Image processing available - create WebP version */ -}}
-  {{- $webp := $img.Resize (printf "%s webp q85" $width) }}
-  {{- $fallback := $img.Resize (printf "%s q85" $width) }}
-  {{- $imgWidth := $fallback.Width }}
-  {{- $imgHeight := $fallback.Height }}
-  
-  <picture{{ with $class }} class="{{ . }}"{{ end }}>
-    <source srcset="{{ $webp.RelPermalink }}" type="image/webp">
-    <source srcset="{{ $fallback.RelPermalink }}" type="image/{{ $img.MediaType.SubType }}">
-    <img src="{{ $fallback.RelPermalink }}" alt="{{ $alt }}" loading="lazy" decoding="async" width="{{ $imgWidth }}" height="{{ $imgHeight }}" style="aspect-ratio:{{ $imgWidth }}/{{ $imgHeight }};">
-  </picture>
-{{- else }}
-  {{- /* Fallback for external or static images */ -}}
-  {{- $webpSrc := replace $src ".png" ".webp" | replace ".jpg" ".webp" | replace ".jpeg" ".webp" | replace ".PNG" ".webp" | replace ".JPG" ".webp" | replace ".JPEG" ".webp" }}
-  {{- /* Check if WebP exists */ -}}
-  {{- $hasWebp := false }}
-  {{- $webpStaticPath := printf "static%s" $webpSrc }}
-  {{- if fileExists $webpStaticPath }}
-    {{- $hasWebp = true }}
-  {{- end }}
-  {{- if $hasWebp }}
-  <picture{{ with $class }} class="{{ . }}"{{ end }}>
-    <source srcset="{{ $webpSrc | relURL }}" type="image/webp">
-    <img src="{{ $src | relURL }}" alt="{{ $alt }}" loading="lazy" decoding="async"{{ with $width }} width="{{ . }}"{{ end }}{{ with $height }} height="{{ . }}"{{ end }}>
-  </picture>
-  {{- else }}
-  <img{{ with $class }} class="{{ . }}"{{ end }} src="{{ $src | relURL }}" alt="{{ $alt }}" loading="lazy" decoding="async"{{ with $width }} width="{{ . }}"{{ end }}{{ with $height }} height="{{ . }}"{{ end }}>
-  {{- end }}
-{{- end }}
-
+{{- partial "responsive-image.html" (dict
+  "src" $src
+  "alt" $alt
+  "class" $class
+  "page" .Page
+  "loading" "lazy"
+  "sizes" $sizes
+  "style" $style
+) -}}

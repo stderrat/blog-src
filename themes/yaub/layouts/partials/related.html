@@ -13,35 +13,15 @@
         <a href="{{ .RelPermalink }}" class="related-card no-highlight{{ if not .Params.featured_image }} no-image{{ end }}">
             {{/* Only show image container if featured_image exists */}}
             {{ with .Params.featured_image }}
-            {{/* 
-                featured_image_position controls which part of the image is shown.
-                Set in the RELATED article's frontmatter:
-                  featured_image_position: "center"      (default)
-                  featured_image_position: "top"         (show top of image)
-                  featured_image_position: "bottom"      (show bottom)
-                  featured_image_position: "center top"  (horizontal center, vertical top)
-                  featured_image_position: "20% 80%"     (custom x% y%)
-            */}}
-            {{ $imgSrc := . }}
-            {{ $webpSrc := replace . ".png" ".webp" | replace ".jpg" ".webp" | replace ".jpeg" ".webp" | replace ".PNG" ".webp" | replace ".JPG" ".webp" | replace ".JPEG" ".webp" }}
-            {{/* Check if WebP exists */}}
-            {{ $webpStaticPath := printf "static%s" $webpSrc }}
-            {{ $hasWebp := fileExists $webpStaticPath }}
             <div class="related-card-image">
-                {{ if $hasWebp }}
-                <picture>
-                    <source srcset="{{ $webpSrc }}" type="image/webp">
-                    <img src="{{ $imgSrc }}" 
-                         alt="Featured image for {{ $article.Title }}" 
-                         loading="lazy" 
-                         style="object-position: {{ $position }};">
-                </picture>
-                {{ else }}
-                <img src="{{ $imgSrc }}" 
-                     alt="Featured image for {{ $article.Title }}" 
-                     loading="lazy" 
-                     style="object-position: {{ $position }};">
-                {{ end }}
+                {{- partial "responsive-image.html" (dict
+                  "src" .
+                  "alt" (printf "Featured image for %s" $article.Title)
+                  "page" $article
+                  "loading" "lazy"
+                  "sizes" "(max-width: 640px) 100vw, 280px"
+                  "style" (printf "object-position: %s;object-fit:cover;width:100%;height:100%;" $position)
+                ) -}}
             </div>
             {{ end }}
             <div class="related-card-content">

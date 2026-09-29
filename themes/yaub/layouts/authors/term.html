@@ -1,11 +1,12 @@
 {{ partial "header.html" . }}
 
-<!-- Author Term Page - Shows articles by specific author -->
+{{/* Author term page — profile from content/authors/<slug>/_index.md + articles */}}
+{{ $authorName := .Params.name | default (.Data.Term | default .Title) }}
 
-{{ $authorName := .Data.Term | default .Title }}
-{{ $authorSlug := .Data.Term | urlize }}
+{{ partial "authors/profile.html" (dict "author" . "linkName" false) }}
 
-<!-- Articles by this Author -->
+<hr class="author" />
+
 <h2 class="gradient-header" style="margin: 2rem 0 1rem 0;">
   <em>Articles by {{ $authorName }}</em>
 </h2>

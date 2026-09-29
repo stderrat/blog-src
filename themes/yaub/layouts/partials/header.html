@@ -64,19 +64,22 @@
     <meta name="color-scheme" content="dark light">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <!-- Content Security Policy for XSS protection -->
+    <!-- Baseline CSP via meta (GitHub Pages cannot set HTTP CSP). Prefer static/_headers on hosts that support it. -->
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'self';
-        script-src 'self' 'unsafe-inline' 'unsafe-eval' https://giscus.app https://pagefind.app;
+        script-src 'self' 'unsafe-inline' https://giscus.app;
         style-src 'self' 'unsafe-inline' https://giscus.app;
         img-src 'self' data: https: blob:;
         font-src 'self' data:;
         connect-src 'self' https://giscus.app https://charts.stderr.at;
+        worker-src 'self';
         frame-src https://giscus.app;
         object-src 'none';
         base-uri 'self';
         form-action 'self';
+        upgrade-insecure-requests
     ">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
     
     {{ hugo.Generator }}
     {{ partial "meta.html" . }}
@@ -179,8 +182,16 @@
       .fonts-loading picture img, .fonts-loading article img,
       .fonts-first-load #body img, .fonts-first-load #body-inner img, .fonts-first-load .imageblock img,
       .fonts-first-load picture img, .fonts-first-load article img { opacity: 0; }
-      .featured-img-container { overflow: hidden; }
-      .featured-img { max-width: 100% !important; height: auto !important; box-shadow: none !important; max-height: none !important; }
+      .featured-img-container { overflow: hidden; display: flex; justify-content: center; }
+      .featured-img-container > a { display: block; max-width: 100%; width: 100%; }
+      .featured-img {
+        max-width: 100% !important;
+        width: auto !important;
+        height: auto !important;
+        box-shadow: none !important;
+        max-height: min(85vh, 56rem) !important;
+        object-fit: contain;
+      }
       .fonts-loading .featured-img, .fonts-first-load .featured-img { opacity: 0; }
       /* Fade-in animation only on first visit */
       @keyframes imgFadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -221,7 +232,10 @@
 
     {{- /* Breadcrumb JSON-LD is emitted by yaub/jsonld.html via head-meta */ -}}
   </head>
-  <body data-url="{{ .RelPermalink }}">
+  {{- $fullWidth := false -}}
+  {{- if and (eq .Kind "term") (eq .Data.Singular "author") -}}{{- $fullWidth = true -}}{{- end -}}
+  {{- if in (slice "helm-charts" "gitops-catalog") .Section -}}{{- $fullWidth = true -}}{{- end -}}
+  <body data-url="{{ .RelPermalink }}"{{ if $fullWidth }} class="full-width-content"{{ end }}>
     <!-- Skip to content link for keyboard navigation accessibility -->
     <a href="#main-content" class="skip-to-content">Skip to main content</a>
     
