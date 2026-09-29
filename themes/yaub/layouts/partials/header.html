@@ -235,7 +235,11 @@
   {{- $fullWidth := false -}}
   {{- if and (eq .Kind "term") (eq .Data.Singular "author") -}}{{- $fullWidth = true -}}{{- end -}}
   {{- if in (slice "helm-charts" "gitops-catalog") .Section -}}{{- $fullWidth = true -}}{{- end -}}
-  <body data-url="{{ .RelPermalink }}"{{ if $fullWidth }} class="full-width-content"{{ end }}>
+  {{- /* Cap prose width pages (singles) get article-page so scroll-to-top can hug #body-inner */ -}}
+  {{- $bodyClasses := slice -}}
+  {{- if $fullWidth -}}{{- $bodyClasses = $bodyClasses | append "full-width-content" -}}{{- end -}}
+  {{- if and (eq .Kind "page") (not $fullWidth) -}}{{- $bodyClasses = $bodyClasses | append "article-page" -}}{{- end -}}
+  <body data-url="{{ .RelPermalink }}"{{ with $bodyClasses }} class="{{ delimit . " " }}"{{ end }}>
     <!-- Skip to content link for keyboard navigation accessibility -->
     <a href="#main-content" class="skip-to-content">Skip to main content</a>
     
