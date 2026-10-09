@@ -5,7 +5,7 @@ date: "2026-10-09"
 doctype: book
 authors: [Thomas Jungbauer]
 type: post
-draft: true
+draft: false
 
 featured_image: /openshift-platform/security/compliance/logos/compliance-operator-customrules-cel-logo.png
 show_featured_image_summary: true
@@ -722,9 +722,9 @@ Namespace ownership, default-deny NetworkPolicies and the cluster-admin allow-li
 
 == Thank You
 
-This article would not exist without https://www.linkedin.com/in/mthuring/[Max Thüringer^] and Steffen Lützenkirchen. After listening to the talk *"More than just Compliance"* at OpenShift User Conference in Vienna, I wanted to see how far the CEL scanner of the Compliance Operator can go. 
+This article would not exist without https://www.linkedin.com/in/mthuring/[Max Thüringer^] and https://www.linkedin.com/in/steffen-l-b0a840249/[Steffen Lützenkirchen^]. After listening to the talk *"More than just Compliance"* at OpenShift User Conference in Vienna, I wanted to see how far the CEL scanner of the Compliance Operator can go. 
 
-Thank you, https://www.linkedin.com/in/mthuring/[Max Thüringer^] and Steffen Lützenkirchen, for sharing your ideas and for the inspiration.
+Thank you, https://www.linkedin.com/in/mthuring/[Max Thüringer^] and https://www.linkedin.com/in/steffen-l-b0a840249/[Steffen Lützenkirchen^], for sharing your ideas and for the inspiration.
 
 == References
 
