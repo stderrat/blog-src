@@ -1,0 +1,426 @@
+---
+title: "ValidatingAdmissionPolicy and how to use it"
+description: "Use a CEL-based ValidatingAdmissionPolicy to make sure application namespaces are created with mandatory ownership labels and that these labels cannot be removed later."
+date: "2026-10-15"
+doctype: book
+authors: [Thomas Jungbauer]
+type: post
+draft: false
+
+featured_image: /openshift-platform/security/compliance/logos/validating-admission-policy-logo.png
+show_featured_image_summary: true
+show_featured_image_article: true
+featured_image_position: 25% 35%
+
+categories:
+   - OpenShift
+   - Security
+   - Compliance
+tags: ["OpenShift", "OCP", "Compliance", "CEL", "ValidatingAdmissionPolicy", "Admission Control", "Namespaces", "Security"]
+---
+
+:imagesdir: /openshift-platform/security/compliance/images/
+:icons: font
+:toc:
+
+In my last article about the Compliance Operator, link:/openshift-platform/security/compliance/2026-10-09-compliance-operator-customrules-cel/[Compliance Operator: Writing Your Own Checks with CEL and CustomRules], we discussed `CustomRule` and how they can enhance the Compliance Operator. CustomRules are good for defining your own policies, for example to check whether a namespace is created with the correct labels. But they cannot stop someone from changing something on the cluster.
+
+The Compliance Operator can *detect* violations, but it cannot *prevent* them. This is where `ValidatingAdmissionPolicy` comes in. It is a native Kubernetes feature that runs directly inside the kube-apiserver. It uses the same language as the CustomRules, CEL, and it can be used to prevent violations from happening in the first place.
+
+<!--more-->
+
+== Introduction
+
+In this article we will write a policy that:
+
+* rejects the creation of an application namespace without the mandatory labels `example.com/owner` and `example.com/cost-centre`,
+* rejects removing these labels (or setting them to an empty value),
+* ignores platform namespaces, or, in a second variant, only applies to namespaces that follow a naming convention.
+
+The list of excluded platform namespaces is the same as in the Compliance Operator article. This is important: the admission policy and the CustomRule must look at the same set of namespaces, otherwise one of them reports something the other one ignores.
+
+== Why a ValidatingAdmissionPolicy?
+
+For a long time, admission control meant writing your own webhook or installing a policy engine such as Gatekeeper or Kyverno. Both are fine tools and worth checking out, but for a simple rule like ours they bring a lot of moving parts that we can avoid if we do not need them.
+
+A `ValidatingAdmissionPolicy` (VAP) is evaluated *inside* the kube-apiserver. The API `admissionregistration.k8s.io/v1` is available since Kubernetes 1.30, which means OpenShift 4.17 and later. A VAP consists of two objects:
+
+*ValidatingAdmissionPolicy*:: _What_ is checked: which requests are matched and which CEL expressions must be true.
+*ValidatingAdmissionPolicyBinding*:: _Where_ and _how_ the policy is enforced (bound to): which namespaces or objects it applies to and what happens on a violation (`Deny`, `Warn`, `Audit`).
+
+NOTE: If you have followed the link:/openshift-platform/security/compliance/2026-10-09-compliance-operator-customrules-cel/[Compliance Operator article], the CEL expressions below will look familiar. The difference: a CustomRule evaluates a *list* of objects on a schedule; a VAP evaluates *one* object at the moment it is created or changed.
+
+== Prerequisites
+
+* OpenShift 4.17 or newer with cluster-admin permissions.
+
+== Designing the Policy
+
+Before writing any YAML, three design decisions have to be made. At the end they will define the policy and its behaviour:
+
+. What exactly is forbidden on UPDATE?
+. Which namespaces are affected?
+. How to roll it out?
+
+=== Decision 1: What exactly is forbidden on UPDATE?
+
+This is an important decision and it hit me hard during my tests. The initial approach would be: _"every namespace must always have the labels"_, checked on CREATE and UPDATE. This is a TRAP. 
+
+Kubernetes clusters already contain namespaces without these labels. Controllers and operators update namespaces all the time; for example OpenShift synchronises the Pod Security labels and sets the annotations for the SCC UID ranges. If we enforced the labels on every UPDATE, we would eventually break the platform.
+
+Therefore the policy must treat the two operations CREATE and UPDATE differently:
+
+[cols="1,3",options="header"]
+|===
+|Operation|Rule
+
+|CREATE
+|All required labels must be present with a non-empty value. If the labels are missing, the request is rejected.
+
+|UPDATE
+|A required label that was set before (non-empty) must not be removed or emptied. However, changing the value, for example when the ownership moves to another team, is allowed. Updates of old namespaces that never had the labels are allowed as well. If the label is removed or emptied, the request is rejected.
+|===
+
+=== Decision 2: Which namespaces are affected?
+
+Typically, there are two approaches: 
+
+*Variant A: exclude platform namespaces*:: Everything is checked except the platform namespaces. This was used in the Compliance Operator article: everything that starts with `openshift` or `kube-`, the namespace `default`, plus additional namespaces that are used by the platform. Adapt the list to whatever runs on your clusters. This is a good approach, but requires you to maintain the list of namespaces that are excluded.
+*Variant B: namespaces with a naming convention*:: Only namespaces that follow a convention, for example `app-<name>`, are checked. Everything else, such as sandboxes or personal projects, is left alone. This is a good approach as well, but requires you to enforce the naming convention when namespaces are created.
+
+=== Decision 3: How to roll it out?
+
+A policy on namespaces affects everybody, including cluster administrators, GitOps tools and the OpenShift project request template. Therefore we start in `Warn`/`Audit` mode and switch to `Deny` once we know that nothing breaks. I mean, it is always good practice to test first :)
+
+---
+
+== Step 1: The ValidatingAdmissionPolicy
+
+Create the following file `01-vap-namespace-ownership-labels.yaml`. It will check for the existence of the required labels on CREATE and UPDATE requests. Such rules are typically built like this:
+
+. *matchConstraints*: decide which requests are matched.
+. *matchConditions*: decide which namespaces are affected or not affected.
+. *variables*: define the labels that are required.
+. *validations*: define the rules that are checked.
+
+.01-vap-namespace-ownership-labels.yaml
+[source,yaml]
+----
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: namespace-ownership-labels
+spec:
+  failurePolicy: Fail # <1>
+  matchConstraints: # <2>
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["namespaces"]
+  matchConditions: # <3>
+    - name: exclude-platform-namespaces
+      expression: >-
+        !object.metadata.name.matches('^(openshift.*|kube-.*|open-cluster-management.*|cert-manager.*|stackrox.*|rhacs-.*|default)$')
+  variables:
+    - name: requiredLabels # <4>
+      expression: >-
+        ['example.com/owner', 'example.com/cost-centre']
+    - name: missingLabels # <5>
+      expression: >-
+        variables.requiredLabels.filter(key,
+          !has(object.metadata.labels) ||
+          !(key in object.metadata.labels) ||
+          object.metadata.labels[key] == '')
+    - name: removedLabels # <6>
+      expression: >-
+        request.operation != 'UPDATE' || !has(oldObject.metadata.labels) ? [] :
+        variables.missingLabels.filter(key,
+          key in oldObject.metadata.labels &&
+          oldObject.metadata.labels[key] != '')
+  validations:
+    - expression: >- # <7>
+        request.operation != 'CREATE' || size(variables.missingLabels) == 0
+      messageExpression: >- # <8>
+        'Namespace ' + object.metadata.name + ' must carry the label(s) ' +
+        variables.missingLabels.join(', ') + ' with a non-empty value.'
+      reason: Invalid
+    - expression: >- # <9>
+        size(variables.removedLabels) == 0
+      messageExpression: >-
+        'The label(s) ' + variables.removedLabels.join(', ') +
+        ' must not be removed from namespace ' + object.metadata.name +
+        ' or set to an empty value.'
+      reason: Forbidden
+----
+<1> `failurePolicy: Fail` rejects the request if the expression cannot be evaluated. The other option is `Ignore`. For a required policy that must always be applied this is the right choice.
+<2> The policy matches *CREATE* and *UPDATE* requests for namespaces. *DELETE* is not matched, so namespaces can still be removed.
+<3> `matchConditions` decide whether the policy applies to a request at all. Here, the platform namespaces are skipped (Variant A). The regular expression is the same as in the CustomRules. Do not forget the anchors `^` and `$`: without them `matches()` searches for a substring.
+<4> `variables` define the labels that are required. `requiredLabels` is the single place where the label keys are defined.
+<5> `missingLabels` is the list of required labels that are missing or empty in the *new* object.
+<6> `removedLabels` is the list of labels that are missing now but were set (non-empty) in `oldObject`. For CREATE requests there is no `oldObject`.
+<7> Validation for CREATE: nothing may be missing.
+<8> `messageExpression` gives feedback to the user and tells *which* labels are the problem.
+<9> Validation for UPDATE: nothing that existed may be removed.
+
+NOTE: The exclusion regex now lives in three places: the CEL `expression` of the CustomRule and in its `instructions`, and this policy. When you change one of them, change all three.
+
+---
+
+== Step 2: The Binding
+
+As a second step we need to bind the policy to the namespaces that are affected (all). For the first test we only warn and write audit events. Create the file `02-vapbinding-namespace-ownership-labels.yaml`:
+
+.02-vapbinding-namespace-ownership-labels.yaml
+[source,yaml]
+----
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: namespace-ownership-labels
+spec:
+  policyName: namespace-ownership-labels # <1>
+  validationActions: ["Warn", "Audit"] # <2>
+----
+<1> Reference to the name of the policy.
+<2> `validationActions` tells Kubernetes what to do on a violation: `Warn` returns a warning to the client, `Audit` adds the violation to the API audit log. The other option is `Deny`.
+
+---
+
+== Step 3: Apply the Policy and initial test
+
+Apply both objects:
+
+[source,bash]
+----
+oc apply -f 01-vap-namespace-ownership-labels.yaml
+oc apply -f 02-vapbinding-namespace-ownership-labels.yaml
+----
+
+and check that the API server has accepted the expressions.
+
+[source,bash]
+----
+oc get validatingadmissionpolicy namespace-ownership-labels -o jsonpath='{.status}{"\n"}'
+----
+
+In `Warn` mode, creating a namespace without labels still works, but `oc` shows a warning:
+
+[source,bash]
+----
+oc create namespace app-warn
+----
+
+[source]
+----
+Warning: Validation failed for ValidatingAdmissionPolicy 'namespace-ownership-labels' with binding 'namespace-ownership-labels': Namespace app-warn must carry the label(s) example.com/owner, example.com/cost-centre with a non-empty value.
+namespace/app-warn created
+----
+
+Leave the policy in this mode for a while. Watch the output of your GitOps tools and pipelines as well as the audit log, and fix whoever creates namespaces without labels.
+
+---
+
+== Step 4: Switch to Deny
+
+Once you are confident, switch the binding to `Deny`:
+
+[source,bash]
+----
+oc patch validatingadmissionpolicybinding namespace-ownership-labels --type=merge \
+  -p '{"spec":{"validationActions":["Deny"]}}'
+----
+
+WARNING: Do not combine `Deny` and `Warn` in one binding. `Deny` already returns the message to the client, `Warn` would only duplicate it.
+
+---
+
+== Step 5: Test the Policy
+
+Now let us run some detailed tests. We want to make sure that our policy works and that it does not disrupt any platform namespaces or controllers.
+
+*Create a namespace without labels.* This is rejected, and the message lists the missing labels:
+
+[source,bash]
+----
+oc create namespace team-a
+----
+
+[source]
+----
+The namespaces "team-a" is invalid: : ValidatingAdmissionPolicy 'namespace-ownership-labels' with binding 'namespace-ownership-labels' denied request: Namespace team-a must carry the label(s) example.com/owner, example.com/cost-centre with a non-empty value.
+----
+
+*Create a namespace without labels via the UI.* This is rejected as well, and the message is shown directly as feedback to the user.
+
+image::ValidationAdmissionPolicy-Deny.png?width=520px[Namespace Ownership Labels UI Error]
+
+*Create a namespace with only one of the labels.* This is rejected as well, and this time only `example.com/cost-centre` is mentioned:
+
+[source,bash]
+----
+cat <<'EOF' | oc apply -f -
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: team-a
+  labels:
+    example.com/owner: payments
+EOF
+----
+
+[source]
+----
+The namespaces "team-a" is invalid: : ValidatingAdmissionPolicy 'namespace-ownership-labels' with binding 'namespace-ownership-labels' denied request: Namespace team-a must carry the label(s) example.com/cost-centre with a non-empty value.
+----
+
+*Create the namespace with both labels.* This works — yay:
+
+[source,bash]
+----
+cat <<'EOF' | oc apply -f -
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: team-a
+  labels:
+    example.com/owner: payments
+    example.com/cost-centre: CC-4711
+EOF
+----
+
+*Remove a label or set it to an empty value.* Both are rejected:
+
+[source,bash]
+----
+oc label namespace team-a example.com/owner-
+oc label namespace team-a example.com/owner= --overwrite
+----
+
+[source]
+----
+Error from server (Forbidden): namespaces "team-a" is forbidden: ValidatingAdmissionPolicy 'namespace-ownership-labels' with binding 'namespace-ownership-labels' denied request: The label(s) example.com/owner must not be removed from namespace team-a or set to an empty value.
+----
+
+*Change the value of a label, or add an annotation.* Both are allowed:
+
+[source,bash]
+----
+oc label namespace team-a example.com/owner=shop --overwrite
+oc annotate namespace team-a example.com/comment=hello
+----
+
+*Platform namespaces* are not affected:
+
+[source,bash]
+----
+oc create namespace openshift-demo
+----
+
+*Old namespaces* that were created before the policy existed can still be updated. Once a label has been added, it is protected as well. Here `legacy-app` stands for any namespace that existed before the policy:
+
+[source,bash]
+----
+oc annotate namespace legacy-app example.com/comment=hello      # allowed
+oc label namespace legacy-app example.com/owner=legacy          # allowed
+oc label namespace legacy-app example.com/owner-                # rejected
+----
+
+Clean up:
+
+[source,bash]
+----
+oc delete namespace team-a openshift-demo app-warn
+----
+
+---
+
+== What if I need an emergency exit?
+
+The policy above also applies to cluster administrators. Unlike RBAC, admission policies cannot be bypassed with `cluster-admin`. The labels are protected against accidents, no matter who makes the change.
+
+If you need an emergency exit, you have to build it into the policy yourself, for example with an additional `matchCondition` on `request.userInfo.username` for the break-glass account from the cluster-admin allow-list of the previous article.
+
+On purpose I did not build this into the policy, because I think it is a bad idea to have an emergency exit in the policy. If you need namespaces without such labels, add dummy labels that indicate that the namespace is not an application namespace. At least that's my opinion :)
+
+---
+
+
+== Variant B: Only Namespaces Following a Naming Convention
+
+Many organisations use a naming convention to distinguish "real" application namespaces from sandboxes or personal projects, for example `app-<name>` and `sandbox-<name>`. In that case, copy the policy from Step 1 to `01-vap-namespace-ownership-labels-naming.yaml` and replace the `matchConditions`:
+
+[source,yaml]
+----
+  matchConditions:
+    - name: only-application-namespaces
+      expression: >-
+        object.metadata.name.matches('^app-[a-z0-9-]+$')
+----
+
+We only move from an exclude list to an include list. Everything else stays the same. To test it, we create the following namespaces:
+
+[cols="2,1,3",options="header"]
+|===
+|Namespace|Labels|Result
+
+|`sandbox-test`
+|none
+|allowed (does not follow the convention)
+
+|`application`
+|none
+|allowed (does not start with `app-`)
+
+|`app-shop`
+|none
+|rejected
+
+|`app-shop`
+|both
+|allowed; removing a label afterwards is rejected
+|===
+
+CAUTION: Use *one* of the two variants only. Both policies have the same name, so applying one replaces the other.
+
+NOTE: If you use the naming convention, adapt the `filter()` of the CustomRules from the previous article in the same way, for example `.filter(ns, ns.metadata.name.matches('^app-[a-z0-9-]+$'))`. Otherwise the Compliance Operator reports namespaces that the admission policy deliberately ignores.
+
+---
+
+== OpenShift Specifics: Self-Service Projects
+
+On OpenShift, users usually do not create namespaces directly. They run `oc new-project`, which creates a `ProjectRequest`. The OpenShift API server then processes the project template and creates the project with its own privileged client. The resulting namespace passes the same admission chain, and therefore the same policy.
+
+*A project request cannot pass arbitrary labels*. As a consequence, with Variant A in `Deny` mode, *self-service project requests are rejected*. You have the following options:
+
+. *Disable self-provisioning* (Recommended) and create application namespaces only through your onboarding process (GitOps, a pipeline, a service catalogue). This is what most regulated customers do anyway. Remove the subjects from the cluster role binding `self-provisioners` and prevent the API server from restoring them:
++
+[source,bash]
+----
+oc patch clusterrolebinding.rbac self-provisioners -p '{"subjects": null}'
+oc patch clusterrolebinding.rbac self-provisioners \
+  -p '{"metadata":{"annotations":{"rbac.authorization.kubernetes.io/autoupdate":"false"}}}'
+----
+. *Use Variant B.* Self-service projects that do not follow the naming convention (for example `sandbox-*`) are still possible, while `app-*` namespaces must be created with labels through the official process.
+. *Set labels in the project template.* Labels defined on the `Project` object of the template end up on the namespace. However, the template only knows a few parameters, such as the project name and the requesting user, so it cannot fill in a meaningful cost centre. A static value such as `unassigned` would satisfy the policy, but not the auditor.
+
+
+---
+
+== Summary
+
+With the two objects `ValidatingAdmissionPolicy` and `ValidatingAdmissionPolicyBinding`, the kube-apiserver itself makes sure that every new application namespace is created with its ownership labels and that nobody removes them by accident. No webhook, no additional operator, no extra pods everything here is native Kubernetes. Together with the CustomRule from the previous article, you now have both sides: *prevention* at admission time and *detection* on a schedule, with evidence for the auditor.
+
+The same idea works for the other two guardrails of the previous article. A VAP on `ClusterRoleBindings` could reject new `cluster-admin` bindings for identities that are not on the allow-list. Whether this is a good idea depends on how many operators in your cluster create such bindings themselves, so I highly recommend to start in `Warn` mode there as well.
+
+---
+
+== Thank You
+
+This article would not exist without https://www.linkedin.com/in/mthuring/[Max Thüringer^] and https://www.linkedin.com/in/steffen-l-b0a840249/[Steffen Lützenkirchen^]. After listening to the talk *"More than just Compliance"* at OpenShift User Conference in Vienna, I wanted to see how far the CEL scanner of the Compliance Operator can go. 
+
+Thank you, https://www.linkedin.com/in/mthuring/[Max Thüringer^] and https://www.linkedin.com/in/steffen-l-b0a840249/[Steffen Lützenkirchen^], for sharing your ideas and for the inspiration.
+
+== References
+
+* https://kubernetes.io/docs/reference/access-authn-authz/validating-admission-policy/[Kubernetes Documentation: Validating Admission Policy^]
