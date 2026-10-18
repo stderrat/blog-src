@@ -138,10 +138,13 @@
     <!-- WebP image upgrade for better performance (works with AsciiDoc) -->
     <script src="{{"js/webp-upgrade.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
     <script src="{{"js/highlight.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+    <!-- Opt-in line numbers for code blocks: [source,yaml,role=linenums] -->
+    <script src="{{"js/yaub-linenums.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
     <script src="{{"js/merge-html.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
     <script>
       hljs.configure({ ignoreUnescapedHTML: true });
       hljs.addPlugin(mergeHTMLPlugin);
+      hljs.addPlugin(yaubLineNumbersPlugin); // after mergeHTMLPlugin, so callouts are restored first
       hljs.highlightAll();
     </script>
 
