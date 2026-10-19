@@ -18,6 +18,7 @@ featured_image_position: 50% 50%
 categories:
    - OpenShift
    - GitOps
+   - Advanced Cluster Management
 tags: ["Argo CD", "OpenShift GitOps", "Advanced Cluster Management", "ACM", "RHACM", "Policies", "Multi-Cluster", "OpenShift", "OCP", "GitOps"]
 ---
 
@@ -27,7 +28,7 @@ tags: ["Argo CD", "OpenShift GitOps", "Advanced Cluster Management", "ACM", "RHA
 
 At customer engagements where I support the implementation of a GitOps process, I often hear the question: "_Should we use OpenShift GitOps (Argo CD) or Advanced Cluster Management (Open Cluster Management)_?" The honest answer is: it is the wrong question. Both tools solve different problems, they overlap in one specific area, and in larger environments with numerous clusters they are designed to work together.
 
-This article tries to clear things up. I will try to explain what each tool is (and also what it is not), where they overlap, how they integrate, and I will walk through an example, so that you can decide for yourself which tool fits which job.
+In this article I will try to explain what each tool is (and also what it is not), where they overlap, how they integrate, and I will walk through an example, so that you can decide for yourself which tool fits which job.
 
 <!--more-->
 
@@ -50,15 +51,15 @@ NOTE: While I am using the term "Advanced Cluster Management" in this article, I
 
 Or, in one sentence I like to use with customers: **ACM decides _where_ and checks _compliance_. Argo CD decides _what_ and keeps it _in sync_.**
 
-NOTE: Another features ACM offers are an automated cluster deployment and centralized observability. But these are not the focus of this article.
+TIP: Another features ACM offers are an automated cluster deployment and centralized observability. But these are not the focus of this article.
 
 == What OpenShift GitOps is
 
-OpenShift GitOps is Red Hat's distribution of **Argo CD**, delivered and lifecycle-managed by the OpenShift GitOps Operator. It is included in the OpenShift subscription. At the time of writing, the current version is 1.22, which ships Argo CD 3.5.
+OpenShift GitOps is Red Hat's distribution of **Argo CD**, delivered and lifecycle-managed by the OpenShift GitOps Operator. It is included in the OpenShift subscription. At the time of writing, the current version is 1.22, which ships Argo CD 3.5. New releases and features come quickly, always check the release notes of your version first.
 
-The core job of Argo CD is reconciliation: it renders manifests (plain YAML, Kustomize, Helm, etc.), compares them with the live state of a cluster and syncs differences. Everything else (ApplicationSets, sync waves, hooks, RBAC via AppProjects, the UI) is built around that job.
+The core job of Argo CD is **reconciliation**: it renders manifests (plain YAML, Kustomize, Helm, etc.), compares them with the live state of a cluster and syncs differences. Everything else (ApplicationSets, sync waves, hooks, RBAC via AppProjects, the UI) is built around that job.
 
-NOTE: If you want to dig into the details of the GitOps process link:/gitopscollection/2023-12-11-gitops-intro/[Ep.1] is a good introduction to the topic.
+TIP: If you want to dig into the details of the GitOps process link:/gitopscollection/2023-12-11-gitops-intro/[Ep.1] is a good introduction to the topic.
 
 
 What OpenShift GitOps does **not** do:
@@ -71,22 +72,22 @@ That is perfectly fine. Argo CD was never meant to do any of these things.
 
 == What Advanced Cluster Management is
 
-Red Hat Advanced Cluster Management for Kubernetes is a hub-and-spoke platform. You install it on a **hub** cluster and import or create **managed clusters**. It is a separate subscription, or part of **OpenShift Platform Plus**. At the time of writing, the current version is 2.17, which ships with the multicluster engine operator 2.12. The open source equivalent is called https://open-cluster-management.io[Open Cluster Management^].
+Red Hat Advanced Cluster Management for Kubernetes is a hub-and-spoke platform. You install it on a **hub** cluster and import or create **managed clusters**. It is a separate subscription, or part of **OpenShift Platform Plus**. At the time of writing, the current version is 2.17. The open source equivalent is called https://open-cluster-management.io[Open Cluster Management^].
 
-ACM is built around several pillars:
+ACM is built around five pillars:
 
 [cols="1,3",options="header"]
 |===
 |Pillar|What it does
 
 |**Cluster lifecycle** (multicluster engine)
-|Create, import, upgrade, and destroy clusters: Installer Provided Infrastructure (IPI) on cloud providers, Hosted Control Planes, Assisted/Agent-based installs on bare metal, ROSA/ARO import and so on.
+|Create, import, upgrade, and destroy clusters: Installer Provided Infrastructure (IPI) on cloud providers, Hosted Control Planes, Assisted/Agent-based installs on bare metal, ROSA/ARO, import clusters and so on.
 
 |**Governance**
 |Policies that check (inform) or enforce configuration on managed clusters, with compliance status reported back to the hub. Integrates with Gatekeeper, the Compliance Operator and certificate checks.
 
 |**Application lifecycle**
-|Deploy applications to many clusters. Today that means integration with OpenShift GitOps (Argo CD) using Placements.
+|Deploy applications to many clusters. It uses Argo CD in the background for this task.
 
 |**Observability**
 |Centralized metrics and Grafana dashboards across the fleet.
@@ -102,11 +103,15 @@ The building blocks you will meet everywhere in ACM are:
 * **ManagedClusterSetBinding** – makes a cluster set usable from a namespace on the hub.
 * **Placement** – a dynamic selection of clusters based on labels, etc. It defines the scope of a policy or application.
 
+*Below is a more detailed description of the different objects*
+
 The Placement is the important concept for this series. Argo CD selects clusters by looking at labels on cluster _secrets_ that someone created. ACM selects clusters by looking at the actual fleet, including whether a cluster is available right now.
 
 NOTE: ACM also has its own, older application model based on **Channels** and **Subscriptions** objcts. That model is deprecated and will be removed in a future release.
 
 == Side-by-side comparison
+
+Let's do a side-by-side comparison of the two tools:
 
 [cols="2,3,3",options="header"]
 |===
@@ -126,14 +131,14 @@ NOTE: ACM also has its own, older application model based on **Channels** and **
 
 |**Source of truth**
 |Git (or Helm/OCI repository)
-|The hub cluster. The hub objects themselves can (and should) come from Git
+|The hub cluster. The hub objects themselves can (and should) come from Git, so maybe it is still Git after all.
 
 |**Configuration management**
 |Applications, ApplicationSets
 |Policies (ConfigurationPolicy, OperatorPolicy, ...)
 
 |**"Inform only" / audit mode**
-|Partly (manual sync shows OutOfSync)
+|Partly, shows OutOfSync of managed resources
 |Yes (`remediationAction: inform`)
 
 |**Compliance reporting**
@@ -171,7 +176,7 @@ When both tools are in place, the question is no longer "which one", but "which 
 
 |**Governance / Compliance**
 |Policies (inform/enforce), compliance history
-|Deploys the policies from Git to the hub
+|Deploys the policies from Git to the hub. Can show health status.
 
 |**Cluster configuration**
 |Possible with ConfigurationPolicies
@@ -201,7 +206,7 @@ _"Every production cluster must run the Compliance Operator from the stable chan
 
 === Option 1: Argo CD with an ApplicationSet
 
-Without ACM, Argo CD needs to know the target clusters. That means a cluster secret per cluster, carrying the labels we want to select on:
+Without ACM, Argo CD needs to know the target clusters. That means a cluster secret per cluster, carrying the labels we want to select on and the token to access the cluster:
 
 .Cluster secret for a production cluster
 [source,yaml,role=linenums]
@@ -218,7 +223,7 @@ type: Opaque
 stringData:
   name: prod-eu-01
   server: https://api.prod-eu-01.example.com:6443
-  config: |
+  config: | <3>
     {
       "bearerToken": "<token-of-a-service-account-on-the-spoke>",
       "tlsClientConfig": {
@@ -229,6 +234,7 @@ stringData:
 ----
 <1> Marks this secret as a cluster definition for Argo CD.
 <2> Our own label. The ApplicationSet uses it for the selection.
+<3> Access configuration for the cluster.
 
 The ApplicationSet then uses the **cluster generator** to create one Application per matching cluster:
 
@@ -361,7 +367,7 @@ subjects:
 <5> The Placement can only see clusters of cluster sets that are bound to the namespace `acm-policies` via a ManagedClusterSetBinding (see below).
 <6> The PlacementBinding connects the policy with the Placement.
 
-NOTE: One important difference to Argo CD I maybe should have mentioned earlier: Argo CD can manage objects it knows. It has no concept of "delete an object completely". For example, delete the secret "kubeadmin". ACM is able to do that, you can create a policy that ensures the secret is deleted.
+NOTE: One important difference to Argo CD I maybe should have mentioned earlier: Argo CD can manage objects it knows. It has no concept of "delete an object completely that cannot compare with Git". For example, delete the secret "kubeadmin". ACM is able to do that, you can create a policy that ensures the secret is deleted.
 
 The `ManagedClusterSetBinding` mentioned in callout 5 looks like the following. It binds the cluster set `production` to the namespace `acm-policies`.
 
@@ -379,11 +385,11 @@ spec:
 
 === Object model of ACM together with Argo CD
 
-Even after working with ACM for a while, I still find it difficult to understand the object model.
+Even after working with ACM for a while, I still find it difficult to understand the object model or to explain it to others. Therefore, I tried to create a visual representation of the objects and their relationships here, to help you to understand and to remind myself when I forget. :)
 
 How do these objects play together? The easiest way to understand it is to follow a few clusters through the chain. In the following example, four clusters are imported into ACM. Each step narrows the selection down:
 
-. Every imported cluster is a *ManagedCluster* on the hub. Its labels are what everything else selects on.
+. Every imported cluster is a *ManagedCluster* on the hub. The labels are what everything else selects on.
 . The *ManagedClusterSet* `production` groups clusters. `dev-eu-01` belongs to another cluster set and is ignored.
 . The *ManagedClusterSetBinding* makes the cluster set usable in a namespace, here `openshift-gitops`. Without this binding, a Placement in that namespace does not find a single cluster, which is the most common reason for an empty selection.
 . The *Placement* selects from the bound cluster sets only. It asks for `environment=prod`, so `prod-eu-02` (a test cluster) is ignored as well.
@@ -392,11 +398,11 @@ How do these objects play together? The easiest way to understand it is to follo
 .How ACM selects clusters: from ManagedCluster to PlacementDecision
 image::ep-19/ep19-acm-placement-selection.png?width=1000px[Four example clusters are narrowed down step by step: the cluster set drops dev-eu-01, the Placement drops prod-eu-02, the PlacementDecision lists prod-eu-01 and prod-us-01]
 
-The `PlacementDecision` itself does not deploy anything. It is just a list and the point where it is handed over to the consumers. Other objects in the same namespace read it and act on it:
+The `PlacementDecision` itself does not deploy anything. It is just a list and the point where it is handed over to the consumers (Argo CD). Other objects in the same namespace read it and act on it:
 
-* The *GitOpsCluster* registers the selected clusters in Argo CD by creating a cluster secret for each of them. ACM rotates the tokens automatically, therefore you do not need to take care of that.
+* The *GitOpsCluster* registers the selected managed clusters automatically in Argo CD by creating a cluster secret for each of them. ACM rotates the tokens automatically, therefore you do not need to take care of that.
 * An *ApplicationSet* creates one Application per selected cluster and uses these cluster secrets as destinations.
-* For governance, a *PlacementBinding* connects a Policy with a Placement. ACM then puts a copy of the Policy into the hub namespace of each selected cluster, where the klusterlet picks it up.
+* For governance, a *PlacementBinding* connects a Policy with a Placement. ACM then puts a copy of the Policy into the hub namespace of each selected cluster, where it gets picked up.
 
 Clusters that are not part of the decision receive nothing: no Application, no Policy.
 
@@ -405,16 +411,17 @@ image::ep-19/ep19-acm-placement-consumers.png?width=1000px[GitOpsCluster creates
 
 NOTE: Consumers can only reference a Placement in their own namespace. Policies usually live in a different namespace (for example `acm-policies`), so they need their own ManagedClusterSetBinding and Placement there, typically with the same selection.
 
-
+---
 
 === What is the advantage now?
 
-* No credentials per cluster: the managed clusters are already registered with the hub. The policy is pulled by the policy addon on the spoke and evaluated locally.
+So after all these different objects and relationships, which look rather complex at the beginning, what is the advantage of ACM?
+
+* No extra credentials per cluster: the managed clusters are already registered with the hub. The policy is pulled by the policy addon on the spoke and evaluated locally. ACM takes care of the tokens automatically.
 * The hub does not need to reach the API of the spoke.
-* If the hub is unreachable, the spoke keeps enforcing the last known policy because it is stored locally.
+* If the hub is unreachable, the spoke keeps enforcing the last known policy because it is stored locally. Good for edge clusters with unstable connectivity.
 * A compliance view: _"compliance-operator: 37 compliant, 3 non-compliant"_, with the reason per cluster and a history.
 
-What did we lose? Honestly, for this specific example, nothing much. But policies are not a good replacement for application delivery: no Helm rendering with values files, no sync waves, no resource tree in a UI, no rollback by Git revert of a single application.
 
 === The rule of thumb
 
@@ -427,9 +434,9 @@ What did we lose? Honestly, for this specific example, nothing much. But policie
 
 === The anti-pattern: two controllers, one object
 
-One thing I have seen more than once: Argo CD manages an object with `selfHeal: true`, and an ACM policy enforces the same object with a slightly different value. Each controller "fixes" the drift caused by the other one. The object flips back and forth.
+One thing I have seen more than once: Argo CD manages an object with `selfHeal: true`, and an ACM policy `enforces` the same object with a slightly different value. Each controller "fixes" the drift caused by the other one. The object flips back and forth.
 
-WARNING: Every object must have exactly **one** owner. If an ACM Policy and Argo CD should both care about an object, let Argo CD own it and use the policy in `inform` mode only.
+WARNING: Every object must have exactly **one** owner. If an ACM Policy and Argo CD should both care about an object, let Argo CD own it and use the policy of ACM in `inform` mode only.
 
 == The bootstrap question: who installs Argo CD?
 
@@ -477,7 +484,7 @@ The bridge between the two worlds is the **GitOpsCluster** custom resource. On t
 |A moderate number of clusters, good connectivity from hub to spokes, and you want **one UI with full visibility**.
 
 |**Pull**
-|Applications are created on the hub but not reconciled there. The target cluster pulls it and a local Argo CD instance reconciles it.
+|Applications are created on the hub but not reconciled there. Instead the target cluster pulls it and a local Argo CD instance on the target cluster  reconciles it.
 |Many clusters, outbound-only networks, or the hub must not hold credentials for the spokes.
 
 |**Argo CD Agent**
@@ -491,17 +498,16 @@ The following diagram shows how the three models fit together.
 image::ep-19/ep19-delivery-models.png?width=1000px[Push reconciles on the hub, pull and the Argo CD Agent reconcile on the managed cluster]
 
 
-What each model actually is, how the data flows and how to set it up step by step is the topic of the next part: link:/gitopscollection/2026-10-21-acm-gitops-push-pull-agent/[[Ep.20\] ACM and OpenShift GitOps: push, pull and the Argo CD Agent].
+What each model actually is, how the data flows in which direction and how to set it up step by step is the topic of the next part: link:/gitopscollection/2026-10-21-acm-gitops-push-pull-agent/[[Ep.20\] ACM and OpenShift GitOps: push, pull and the Argo CD Agent].
 
-The other direction works as well: Argo CD deploys ACM policies from Git to the hub, and ACM distributes and evaluates them. That is the pattern I recommend most often, and it is covered in link:/gitopscollection/2026-10-22-acm-policies-with-gitops/[[Ep.21\] Managing ACM Policies with OpenShift GitOps].
 
 ---
 
 == Decision guide
 
-The following are the scenarios I meet in real projects and what I personally recommend. Verify if these fit your situation.
+The following are the scenarios I saw in real projects and what I personally would recommend. Verify if these fit your situation.
 
-A quick summary of the scenarios is shown in the following image (more details below):
+A quick summary of the scenarios is shown in the following slide I was using for a workshop (more details below):
 
 .Decision guide: OpenShift GitOps alone or together with ACM
 image::ep-19/ep19-decision-guide.png?width=1000px[Three questions lead to the scenarios A to E]
@@ -526,7 +532,7 @@ _Example: dev, test, prod in two data centres, installed by the infrastructure t
 
 _Example: clusters per business unit, factory or per tenant, created on demand._
 
-**ACM plus OpenShift GitOps. Push for smaller fleets, pull or agent for larger fleets.** ACM creates the clusters, labels them and adds them to cluster sets. The GitOpsCluster registers them in Argo CD automatically. Applications and complex platform components come via ApplicationSets driven by ACM Placements. A new cluster receives its full configuration without anybody touching Argo CD. Around 20 clusters is also where a single push hub usually needs sharding, and where the "hub holds all the credentials" discussion with the security team starts. The pull model or the Argo CD Agent become serious options here.
+**ACM plus OpenShift GitOps. Push for smaller fleets, pull or agent for larger fleets.** ACM creates the clusters, labels them and adds them to cluster sets. The GitOpsCluster registers them in Argo CD automatically. Applications and complex platform components come via ApplicationSets driven by ACM Placements. A new cluster receives its full configuration without anybody touching Argo CD. Around 20 clusters is also where a single push hub usually needs sharding, and where the "hub holds all the credentials" discussion with the security team starts. **The pull model or the Argo CD Agent become serious options here.**
 
 === Scenario D: regulated environment
 
