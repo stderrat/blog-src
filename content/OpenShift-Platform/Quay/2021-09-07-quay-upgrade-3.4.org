@@ -7,6 +7,7 @@
 #+date: 2021-10-16
 #+list[]: value_1 value_2 value_3
 #+aliases[]: /quay/2021/10/stumbling-into-quay-upgrading-from-3-3-to-3-4-with-the-quay-operator/ /quay/2021-09-07-quay-upgrade-3.4/
+#+eol_note: This article documents upgrading Red Hat Quay from 3.3 to 3.4 with the quay-operator; that upgrade path and operator behaviour are end of life.
 
 We had the task of answering various questions related to upgrading
 Red Hat Quay 3.3 to 3.4 and to 3.5 with the help of the quay-operator.

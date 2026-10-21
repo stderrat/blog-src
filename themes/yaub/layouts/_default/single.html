@@ -5,15 +5,15 @@
 
 {{ partial "header.html" . }}
 
-<p class="tracked article-meta">
+<div class="tracked article-meta">
 {{- if $metaCats -}}
 <span class="article-meta-categories categories">
   {{- range $metaCats -}}
   <a class="category-link no-highlight {{ . | urlize }}" href="{{ "/categories/" | relLangURL }}{{ . | urlize }}">{{ . }}</a>
   {{- end -}}
 </span>
-<span class="divider" aria-hidden="true">·</span>
 {{- end -}}
+<span class="article-meta-details">
 <span class="publish-date" {{ printf `datetime="%s"` (.Date.Format "2006-01-02T15:04:05Z07:00") | safeHTMLAttr }}>
     <i class="fas fa-calendar-alt" aria-hidden="true"></i>
     <strong>{{- .Date.Format "January 2, 2006" -}}</strong>
@@ -59,10 +59,10 @@
     <span class="word-count">({{ $wordCount }} words)</span>
 </span>
 {{ partial "bookmark-button.html" . }}
-</p>
+</span>
+</div>
 
 {{ partial "yaub/outdated-banner.html" . }}
-{{ partial "yaub/tested-with.html" . }}
 
 {{ if $featured_image }}
 {{ if .Params.show_featured_image_article }}

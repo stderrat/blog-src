@@ -8,7 +8,6 @@ doctype: book
 authors: [Toni Schmidbauer]
 type: post
 draft: false
-evergreen: true
 categories:
    - Other
 tags: ["git", "github"]

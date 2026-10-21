@@ -8,6 +8,7 @@ doctype: book
 authors: [Thomas Jungbauer]
 type: post
 draft: false
+eol_note: "This article covers Red Hat Quay 3.3-era Operator installation and configuration, which is end of life. Prefer current Quay Operator docs for supported releases."
 categories:
    - OpenShift
    - Quay

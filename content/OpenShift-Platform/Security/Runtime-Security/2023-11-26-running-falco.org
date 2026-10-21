@@ -9,6 +9,7 @@
 #+hugo_base_dir: ../
 #+OPTIONS: ^:nil
 #+aliases[]: /openshift/2023/11/running-falco-on-openshift-4.12/
+#+eol_note: This article targets Falco on OpenShift 4.12; kernel/driver and chart details for that release are end of life for current clusters.
 
 As mentioned in our [[https://blog.stderr.at/openshift/2023-10-23-openshift-falco/][previous post]] about [[https://falco.org/][Falco]], Falco is a security
 tool to monitor kernel events like system calls or Kubernetes audit
