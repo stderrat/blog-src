@@ -1,6 +1,6 @@
 ---
-title: "[Ep.19] OpenShift GitOps or Advanced Cluster Management? Choosing the right tool"
-description: "A practical comparison of Red Hat OpenShift GitOps and Red Hat Advanced Cluster Management: what each tool does, where they overlap, how they work together and when to use what."
+title: "[Ep.18] OpenShift GitOps or Advanced Cluster Management? Choosing the right tool"
+description: "Compare OpenShift GitOps and Advanced Cluster Management: what each tool does, where they overlap, how they work together and when to choose which."
 date: "2026-10-20"
 doctype: book
 authors: [Thomas Jungbauer]
@@ -8,9 +8,9 @@ type: post
 draft: true
 
 series: "GitOps Episodes"
-series_part: 19
+series_part: 18
 
-featured_image: /gitopscollection/images/logos/ep-19-gitops.png
+featured_image: /gitopscollection/images/logos/ep-18-gitops.png
 show_featured_image_summary: true
 show_featured_image_article: true
 featured_image_position: 50% 50%
@@ -34,7 +34,7 @@ In this article I will try to explain what each tool is (and also what it is not
 
 The topic turned out to be too big for a single article, so I have split it into three parts. This is the first:
 
-. **[Ep.19] OpenShift GitOps or Advanced Cluster Management?** (this article): what each tool does, where they overlap and a decision guide.
+. **[Ep.18] OpenShift GitOps or Advanced Cluster Management?** (this article): what each tool does, where they overlap and a decision guide.
 . link:/gitopscollection/2026-10-21-acm-gitops-push-pull-agent/[[Ep.20\] ACM and OpenShift GitOps: push, pull and the Argo CD Agent]: how ACM registers clusters in Argo CD, and how to set up each of the three delivery models.
 . link:/gitopscollection/2026-10-22-acm-policies-with-gitops/[[Ep.21\] Managing ACM Policies with OpenShift GitOps]: policies as code, the PolicyGenerator, hub templates and bootstrapping Argo CD with a policy.
 
@@ -396,7 +396,7 @@ How do these objects play together? The easiest way to understand it is to follo
 . The *PlacementDecision* is the result: `prod-eu-01` and `prod-us-01`. ACM keeps it up to date when clusters join, leave or change their labels.
 
 .How ACM selects clusters: from ManagedCluster to PlacementDecision
-image::ep-19/ep19-acm-placement-selection.png?width=1000px[Four example clusters are narrowed down step by step: the cluster set drops dev-eu-01, the Placement drops prod-eu-02, the PlacementDecision lists prod-eu-01 and prod-us-01]
+image::ep-18/ep18-acm-placement-selection.png?width=1000px[Four example clusters are narrowed down step by step: the cluster set drops dev-eu-01, the Placement drops prod-eu-02, the PlacementDecision lists prod-eu-01 and prod-us-01]
 
 The `PlacementDecision` itself does not deploy anything. It is just a list and the point where it is handed over to the consumers (Argo CD). Other objects in the same namespace read it and act on it:
 
@@ -407,7 +407,7 @@ The `PlacementDecision` itself does not deploy anything. It is just a list and t
 Clusters that are not part of the decision receive nothing: no Application, no Policy.
 
 .What uses the PlacementDecision
-image::ep-19/ep19-acm-placement-consumers.png?width=1000px[GitOpsCluster creates Argo CD cluster secrets, the ApplicationSet creates one Application per selected cluster, the PlacementBinding propagates the Policy; only the selected clusters receive anything]
+image::ep-18/ep18-acm-placement-consumers.png?width=1000px[GitOpsCluster creates Argo CD cluster secrets, the ApplicationSet creates one Application per selected cluster, the PlacementBinding propagates the Policy; only the selected clusters receive anything]
 
 NOTE: Consumers can only reference a Placement in their own namespace. Policies usually live in a different namespace (for example `acm-policies`), so they need their own ManagedClusterSetBinding and Placement there, typically with the same selection.
 
@@ -495,12 +495,12 @@ The bridge between the two worlds is the **GitOpsCluster** custom resource. On t
 The following diagram shows how the three models fit together.
 
 .Three ways an Argo CD Application reaches a managed cluster
-image::ep-19/ep19-delivery-models.png?width=1000px[Push reconciles on the hub, pull and the Argo CD Agent reconcile on the managed cluster]
+image::ep-18/ep18-delivery-models.png?width=1000px[Push reconciles on the hub, pull and the Argo CD Agent reconcile on the managed cluster]
 
 NOTE: Yes, you have seen right, the version will jump from 2.17 to 5.0 for ACM in the next release, to harmonize with OpenShift versioning.
 
 
-What each model actually is, how the data flows in which direction and how to set it up step by step is the topic of the next part: link:/gitopscollection/2026-10-21-acm-gitops-push-pull-agent/[[Ep.20\] ACM and OpenShift GitOps: push, pull and the Argo CD Agent].
+What each model actually is, how the data flows in which direction and how to set it up step by step is the topic of the next part: link:/gitopscollection/2026-10-21-acm-gitops-push-pull-agent/[[Ep.19\] ACM and OpenShift GitOps: push, pull and the Argo CD Agent].
 
 
 ---
@@ -512,7 +512,7 @@ The following are the scenarios I saw in real projects and what I personally wou
 A quick summary of the scenarios is shown in the following slide I was using for a workshop (more details below):
 
 .Decision guide: OpenShift GitOps alone or together with ACM
-image::ep-19/ep19-decision-guide.png?width=1000px[Three questions lead to the scenarios A to E]
+image::ep-18/ep18-decision-guide.png?width=1000px[Three questions lead to the scenarios A to E]
 
 === Scenario A: one to three clusters, one platform team
 

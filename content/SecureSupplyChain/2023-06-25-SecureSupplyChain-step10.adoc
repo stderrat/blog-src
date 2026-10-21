@@ -1,6 +1,6 @@
 --- 
 title: "Step 10 - The Example Application"
-description: "Step 10 Secure Supply Chain"
+description: "Step 10 of the Secure Supply Chain series: walk through the example application used to demonstrate build, sign, scan and deploy across the remaining steps."
 date: "2023-06-27"
 doctype: book
 
@@ -12,8 +12,8 @@ categories:
 tags: ["OCP", "Tekton", "OpenShift", "Pipelines", "CI/CD", "Supply Chain", "Linting"] 
 
 aliases: [ 
-	 "/openshift/securesupplychain/step10",
-	 "/securesupplychain/2023-06-25-securesupplychain-step10/",
+   "/openshift/securesupplychain/step10",
+   "/securesupplychain/2023-06-25-securesupplychain-step10/",
 ] 
 ---
 

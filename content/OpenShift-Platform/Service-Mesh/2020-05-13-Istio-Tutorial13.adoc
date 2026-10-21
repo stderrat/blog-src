@@ -15,8 +15,8 @@ categories:
 tags: ["Istio", "Service Mesh", "OpenShift", "OCP", "Route"] 
 
 aliases: [ 
-	 "/posts-output/2020-05-13-Istio-Tutorial13/",
-	 "/service-mesh/2020/05/enable-automatic-route-creation/",
+   "/posts-output/2020-05-13-Istio-Tutorial13/",
+   "/service-mesh/2020/05/enable-automatic-route-creation/",
 ] 
 ---
 

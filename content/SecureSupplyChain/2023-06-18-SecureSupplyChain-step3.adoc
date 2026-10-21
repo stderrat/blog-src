@@ -1,6 +1,6 @@
 --- 
 title: "Step 3 - SonarQube"
-description: "Step 3 Secure Supply Chain"
+description: "Step 3 of the Secure Supply Chain series: integrate SonarQube into Tekton to run static analysis and quality gates before an image is built or promoted."
 date: "2023-06-28"
 doctype: book
 
@@ -12,8 +12,8 @@ categories:
 tags: ["OCP", "Tekton", "OpenShift", "Pipelines", "CI/CD", "Supply Chain", "SonarQube"] 
 
 aliases: [ 
-	 "/openshift/securesupplychain/step3",
-	 "/securesupplychain/2023-06-18-securesupplychain-step3/",
+   "/openshift/securesupplychain/step3",
+   "/securesupplychain/2023-06-18-securesupplychain-step3/",
 ] 
 ---
 

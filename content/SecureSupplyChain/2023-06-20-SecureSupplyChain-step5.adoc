@@ -1,6 +1,6 @@
 --- 
 title: "Step 5 - Build and Sign Image"
-description: "Step 5 Secure Supply Chain"
+description: "Step 5 of the Secure Supply Chain series: build container images in Tekton and sign them with cosign/Sigstore before they are pushed to the registry."
 date: "2023-06-28"
 doctype: book
 
@@ -12,8 +12,8 @@ categories:
 tags: ["OCP", "Tekton", "OpenShift", "Pipelines", "CI/CD", "Supply Chain", "Sigstore"] 
 
 aliases: [ 
-	 "/openshift/securesupplychain/step5",
-	 "/securesupplychain/2023-06-20-securesupplychain-step5/",
+   "/openshift/securesupplychain/step5",
+   "/securesupplychain/2023-06-20-securesupplychain-step5/",
 ] 
 ---
 

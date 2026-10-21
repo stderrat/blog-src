@@ -1,0 +1,24 @@
+{{- /*
+  yaub/share-image.html - returns the absolute URL of the image used for
+  og:image, twitter:image and the JSON-LD "image" of a page.
+
+  Fallback order (first match wins):
+    1. the page itself: images[0], featured_image, featuredImage, image
+    2. its series or section image, see yaub/fallback-image.html
+    3. site default: params.defaultShareImage, else images/default-share.png
+
+  Usage: {{ $img := partial "yaub/share-image.html" . }}
+*/ -}}
+{{- $p := . -}}
+{{- $img := "" -}}
+
+{{- with $p.Params.images -}}{{- $img = index . 0 -}}{{- end -}}
+{{- if not $img -}}{{- with $p.Params.featured_image -}}{{- $img = . -}}{{- end -}}{{- end -}}
+{{- if not $img -}}{{- with $p.Params.featuredImage -}}{{- $img = . -}}{{- end -}}{{- end -}}
+{{- if not $img -}}{{- with $p.Params.image -}}{{- $img = . -}}{{- end -}}{{- end -}}
+{{- if not $img -}}{{- $img = partial "yaub/fallback-image.html" $p -}}{{- end -}}
+{{- if not $img -}}{{- $img = site.Params.defaultShareImage | default "images/default-share.png" -}}{{- end -}}
+
+{{- /* featured_image values sometimes carry "?width=..." for the article view */ -}}
+{{- $img = index (split $img "?") 0 -}}
+{{- return ($img | absURL) -}}

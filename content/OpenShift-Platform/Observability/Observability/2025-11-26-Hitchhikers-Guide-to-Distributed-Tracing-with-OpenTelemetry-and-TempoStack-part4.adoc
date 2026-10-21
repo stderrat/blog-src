@@ -1,6 +1,6 @@
 ---
 title: "The Hitchhiker's Guide to Observability - Example Applications - Part 4"
-description: "Deploy Example Applications - Part 4"
+description: "Part 4 of the Hitchhiker’s Guide to Observability: deploy example applications that emit traces into OpenTelemetry and TempoStack on OpenShift."
 date: "2025-11-26"
 doctype: book
 weight: 400
@@ -8,7 +8,7 @@ weight: 400
 series: "The Hitchhiker's Guide to Observability"
 series_part: 4
 
-featured_image: /openshift-platform/observability/images/observability/Logo_observability_3.png
+featured_image: /openshift-platform/observability/images/observability/observability-part4-apps.png
 show_featured_image_summary: true
 show_featured_image_article: true
 disableBreadcrumb: true

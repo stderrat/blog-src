@@ -1,6 +1,6 @@
 --- 
 title: "Introduction to a Secure Supply Chain"
-description: "Introduction to Secure Supply Chain"
+description: "Overview of a secure supply chain on OpenShift: Tekton pipelines, Sigstore signing, ACS scanning, SBOMs and policy checks from commit to production."
 date: "2023-06-28"
 doctype: book
 
@@ -16,8 +16,8 @@ categories:
 tags: ["OCP", "Tekton", "OpenShift", "Pipelines", "CI/CD", "Supply Chain", "Rekor", "cosign", "SBOM", "ACS", "Sigstore"] 
 
 aliases: [ 
-	 "/openshift/securesupplychain/intro",
-	 "/securesupplychain/2023-06-15-securesupplychain-intro/",
+   "/openshift/securesupplychain/intro",
+   "/securesupplychain/2023-06-15-securesupplychain-intro/",
 ] 
 ---
 

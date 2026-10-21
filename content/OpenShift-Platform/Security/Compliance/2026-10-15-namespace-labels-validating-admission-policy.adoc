@@ -1,6 +1,6 @@
 ---
 title: "ValidatingAdmissionPolicy and how to use it"
-description: "Use a CEL-based ValidatingAdmissionPolicy to make sure application namespaces are created with mandatory ownership labels and that these labels cannot be removed later."
+description: "Enforce mandatory ownership labels on OpenShift namespaces with a CEL ValidatingAdmissionPolicy—and block removal of those labels after creation."
 date: "2026-10-15"
 doctype: book
 authors: [Thomas Jungbauer]

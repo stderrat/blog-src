@@ -1,0 +1,17 @@
+{{- /*
+  Full sidebar tree as JSON (one file for the whole site).
+
+  Served at /nav-tree.json — used by yaub.js to lazy-load collapsed
+  sections that were omitted from the per-page HTML.
+*/ -}}
+{{- $root := slice -}}
+{{- $sections := site.Home.Sections.ByWeight -}}
+{{- if eq site.Params.ordersectionsby "title" -}}
+  {{- $sections = site.Home.Sections.ByTitle -}}
+{{- end -}}
+{{- range $sections -}}
+  {{- if not .Params.hidden -}}
+    {{- $root = $root | append (partial "yaub/nav-tree-entry.html" .) -}}
+  {{- end -}}
+{{- end -}}
+{{- dict "nodes" $root | jsonify -}}

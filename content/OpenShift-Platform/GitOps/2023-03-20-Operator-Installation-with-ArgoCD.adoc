@@ -1,6 +1,6 @@
 --- 
 title: "Operator installation with Argo CD"
-description: "Openshift 4.x - Using Argo CD to deploy Operators"
+description: "Install OpenShift Operators with Argo CD: Subscriptions, OperatorGroups and sync waves so operator lifecycle stays declarative and repeatable."
 date: "2023-03-20"
 doctype: book
 
@@ -12,8 +12,8 @@ categories:
 tags: ["oc", "operator", "OpenShift", "OCP", "GitOps", "Argo CD"] 
 
 aliases: [ 
-	 "/posts-output/2023-03-21-operator-installation-with-argocd/",
-	 "/openshift/2023/03/operator-installation-with-argo-cd/",
+   "/posts-output/2023-03-21-operator-installation-with-argocd/",
+   "/openshift/2023/03/operator-installation-with-argo-cd/",
 ] 
 ---
 

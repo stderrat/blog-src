@@ -15,8 +15,8 @@ categories:
 tags: ["Istio", "Service Mesh", "OpenShift", "OCP"] 
 
 aliases: [ 
-	 "/posts-output/2020-03-30-Istio-Tutorial3/",
-	 "/service-mesh/2020/03/ingress-traffic/",
+   "/posts-output/2020-03-30-Istio-Tutorial3/",
+   "/service-mesh/2020/03/ingress-traffic/",
 ] 
 ---
 

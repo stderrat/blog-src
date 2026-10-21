@@ -8,8 +8,9 @@
     If not set, this will search page resources to find an image that contains the word
     "cover", and if found, returns the path to that resource.
 
-    If no featured_image was set, and there's no "cover" image in page resources, then
-    this partial returns an empty string (which evaluates to false).
+    If neither is found, the series or section image is used (see
+    yaub/fallback-image.html). Only if that does not exist either, this partial
+    returns an empty string (which evaluates to false).
 
     @return RelPermalink to featured image, or an empty string if not found.
 
@@ -28,6 +29,12 @@
     {{ with $img }}
         {{ $linkToCover = .RelPermalink }}
     {{ end }}
+{{ end }}
+
+{{/* Still nothing: series or section image (yaub/fallback-image.html).
+     Switch off with params.featuredImageFallback = false */}}
+{{ if and (not $linkToCover) (ne site.Params.featuredImageFallback false) }}
+    {{ $linkToCover = partial "yaub/fallback-image.html" . }}
 {{ end }}
 
 {{/* return either a permalink, or an empty string. Note that partials can only have a single

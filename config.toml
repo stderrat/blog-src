@@ -20,9 +20,15 @@ priority = 0.5
     baseName = "tj-posts"
     isPlainText = true
     notAlternate = true
+  # Full sidebar tree for lazy-loading collapsed nav sections (see menu.html + yaub.js)
+  [outputFormats.NavTree]
+    mediaType = "application/json"
+    baseName = "nav-tree"
+    isPlainText = true
+    notAlternate = true
 
 [outputs]
-home = [ "HTML", "RSS", "JSON", "TJFeed"]
+home = [ "HTML", "RSS", "JSON", "TJFeed", "NavTree"]
 
 [permalinks]
     posts = "/:sections/:year/:month/:slug/"
@@ -39,6 +45,9 @@ home = [ "HTML", "RSS", "JSON", "TJFeed"]
   # "petrol", "indigo" or "slate".
   # Palettes: themes/yaub/static/css/modular/base/accent.css
   accentColor = "blue"
+  # Articles without featured_image show their series/section image
+  # (static/images/share/...) on cards, in the article header and in "See Also".
+  featuredImageFallback = true
   # Enable/disable the right sidebar on homepage (Archive + Recently Updated)
   enableRightSidebar = true
   # Google Search Console verification

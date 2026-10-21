@@ -1,6 +1,6 @@
 --- 
 title: "Step 9 - Linting Kubernetes Manifests"
-description: "Step 9 Secure Supply Chain"
+description: "Step 9 of the Secure Supply Chain series: lint Kubernetes manifests in the pipeline to catch schema and policy issues before they reach the cluster."
 date: "2023-06-28"
 doctype: book
 
@@ -12,8 +12,8 @@ categories:
 tags: ["OCP", "Tekton", "OpenShift", "Pipelines", "CI/CD", "Supply Chain", "Linting"] 
 
 aliases: [ 
-	 "/openshift/securesupplychain/step9",
-	 "/securesupplychain/2023-06-24-securesupplychain-step9/",
+   "/openshift/securesupplychain/step9",
+   "/securesupplychain/2023-06-24-securesupplychain-step9/",
 ] 
 ---
 

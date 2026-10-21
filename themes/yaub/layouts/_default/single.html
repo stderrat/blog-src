@@ -65,7 +65,11 @@
 {{ partial "yaub/outdated-banner.html" . }}
 
 {{ if $featured_image }}
-{{ if .Params.show_featured_image_article }}
+{{- /* pages without their own featured_image show the series/section image,
+       unless they set show_featured_image_article explicitly */ -}}
+{{- $showImage := .Params.show_featured_image_article -}}
+{{- if and (not .Params.featured_image) (not (isset .Params "show_featured_image_article")) -}}{{- $showImage = true -}}{{- end -}}
+{{ if $showImage }}
     <div class="pr3-ns mb4 mb0-ns w-100 featured-img-container">
       <a href="{{.RelPermalink}}">
         {{- partial "responsive-image.html" (dict

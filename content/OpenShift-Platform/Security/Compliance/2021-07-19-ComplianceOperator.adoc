@@ -1,6 +1,6 @@
 ---
 title: "Compliance Operator"
-description: "Hardening OpenShift using the Compliance Operator"
+description: "Harden OpenShift with the Compliance Operator: select profiles, run scans, review results and apply remediations for CIS and other security baselines."
 date: "2021-07-19"
 doctype: book
 

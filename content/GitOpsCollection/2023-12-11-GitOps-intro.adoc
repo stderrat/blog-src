@@ -1,6 +1,6 @@
 --- 
 title: "[Ep.1] Introducing the GitOps Approach"
-description: "Introduction to the GitOps Approach"
+description: "Introduction to the GitOps approach on OpenShift: desired state in Git, continuous reconciliation with Argo CD, and why it improves auditability and rollback."
 date: "2023-12-01"
 doctype: book
 
@@ -21,7 +21,7 @@ categories:
 tags: ["OCP", "GitOps", "OpenShift", "GitOps Approach", "Argo CD", "ArgoCD"] 
 
 aliases: [ 
-	 "/openshift/gitopscollection/intro",
+   "/openshift/gitopscollection/intro",
 ] 
 ---
 

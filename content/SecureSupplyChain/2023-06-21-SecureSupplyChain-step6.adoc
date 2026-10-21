@@ -1,6 +1,6 @@
 --- 
 title: "Step 6 - Scanning with ACS"
-description: "Step 6 Secure Supply Chain"
+description: "Step 6 of the Secure Supply Chain series: scan images with Red Hat Advanced Cluster Security (ACS) and fail the pipeline when policy violations are found."
 date: "2023-06-28"
 doctype: book
 
@@ -12,8 +12,8 @@ categories:
 tags: ["OCP", "Tekton", "OpenShift", "Pipelines", "CI/CD", "Supply Chain", "ACS", "Advanced Cluster Security"] 
 
 aliases: [ 
-	 "/openshift/securesupplychain/step6",
-	 "/securesupplychain/2023-06-21-securesupplychain-step6/",
+   "/openshift/securesupplychain/step6",
+   "/securesupplychain/2023-06-21-securesupplychain-step6/",
 ] 
 ---
 

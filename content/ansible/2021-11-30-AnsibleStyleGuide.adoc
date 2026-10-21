@@ -1,6 +1,6 @@
 ---
 title: "Ansible Style Guide"
-description: "Howto write and debug Ansible playbooks"
+description: "Ansible style guide for idempotent playbooks and roles: structure, naming, variables, error handling and debugging tips for Automation Platform."
 date: "2021-11-30"
 doctype: book
 
@@ -12,8 +12,8 @@ categories:
 tags: ["Ansible", "Controller", "Automation Controller", "Style", "StyleGuide", "Best Practices", "Playbook", "Role"]
 
 aliases: [
-	 "/posts-output/2021-11-30-AnsibleStyleGuide/",
-	 "/ansible/2021/11/ansible-style-guide/",
+   "/posts-output/2021-11-30-AnsibleStyleGuide/",
+   "/ansible/2021/11/ansible-style-guide/",
 ]
 ---
 

@@ -1,6 +1,6 @@
 --- 
 title: "GitOps - Argo CD"
-description: "Using Argo CD to manage OpenShift resources"
+description: "Use Argo CD on OpenShift to manage cluster and application resources from Git, including operator install patterns and day-2 configuration as code."
 date: "2020-08-06"
 doctype: book
 
@@ -14,9 +14,9 @@ categories:
 tags: ["Gitops", "OpenShift", "OCP", "ArgoCD"]
 
 aliases: [ 
-	 "/posts-output/2020-08-06-ArgoCD/",
-	 "/openshift/2020/08/gitops-argo-cd/",
-	 "/openshift/2020-08-06-argocd",
+   "/posts-output/2020-08-06-ArgoCD/",
+   "/openshift/2020/08/gitops-argo-cd/",
+   "/openshift/2020-08-06-argocd",
 ] 
 ---
 

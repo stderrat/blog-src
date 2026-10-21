@@ -1,6 +1,6 @@
 ---
 title: "Home Lab - The Overview"
-description: "Home Lab - The Overview"
+description: "Overview of a practical home lab for OpenShift and GitOps experiments: hardware choices, network layout, and how the lab supports day-2 platform testing."
 date: "2026-01-29"
 doctype: book
 weight: 10

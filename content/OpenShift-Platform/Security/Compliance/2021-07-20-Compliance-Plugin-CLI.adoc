@@ -1,6 +1,6 @@
 ---
 title: "oc compliance command line plugin"
-description: "Using the oc client plugin os-compliance"
+description: "Use the oc-compliance plugin with the OpenShift Compliance Operator to fetch scan results, remediations and reports from the command line."
 date: "2021-07-20"
 doctype: book
 

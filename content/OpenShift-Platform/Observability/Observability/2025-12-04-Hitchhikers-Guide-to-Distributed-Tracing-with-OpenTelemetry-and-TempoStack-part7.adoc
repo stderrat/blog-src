@@ -1,6 +1,6 @@
 ---
 title: "The Hitchhiker's Guide to Observability - Here Comes Grafana - Part 7"
-description: "Here Comes Grafana - Part 7"
+description: "Part 7 of the Hitchhiker’s Guide to Observability: connect Grafana to TempoStack on OpenShift and explore traces with dashboards and TraceQL."
 date: "2025-12-04"
 doctype: book
 weight: 99
@@ -8,7 +8,7 @@ weight: 99
 series: "The Hitchhiker's Guide to Observability"
 series_part: 7
 
-featured_image: /openshift-platform/observability/images/observability/Logo_observability_7.png
+featured_image: /openshift-platform/observability/images/observability/observability-part7-dashboards.png
 show_featured_image_summary: true
 show_featured_image_article: true
 featured_image_position: 50% 35%

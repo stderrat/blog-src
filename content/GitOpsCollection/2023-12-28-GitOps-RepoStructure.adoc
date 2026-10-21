@@ -20,7 +20,7 @@ categories:
 tags: ["OCP", "GitOps", "OpenShift", "GitOps Approach", "Argo CD", "ArgoCD"] 
 
 aliases: [ 
-	 "/openshift/gitopscollection/gitops-structure",
+   "/openshift/gitopscollection/gitops-structure",
 ] 
 ---
 

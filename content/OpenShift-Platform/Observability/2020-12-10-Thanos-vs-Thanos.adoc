@@ -13,8 +13,8 @@ categories:
 tags: ["Grafana", "Thanos", "OpenShift", "OCP"]
 
 aliases: [ 
-	 "/posts-output/2020-12-10-Thanos-vs-Thanos/",
-	 "/openshift/2020/12/thanos-querier-vs-thanos-querier/",
+   "/posts-output/2020-12-10-Thanos-vs-Thanos/",
+   "/openshift/2020/12/thanos-querier-vs-thanos-querier/",
 ] 
 
 ---

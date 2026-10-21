@@ -1,6 +1,6 @@
 ---
 title: "Pod Affinity/Anti-Affinity"
-description: "Placeing Pods Using the Affinity rules"
+description: "Use pod affinity and anti-affinity on OpenShift to co-locate or spread workloads across nodes based on labels and topology keys."
 date: "2021-08-26"
 doctype: book
 

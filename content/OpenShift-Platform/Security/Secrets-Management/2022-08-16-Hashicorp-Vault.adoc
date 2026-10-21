@@ -1,6 +1,6 @@
 --- 
 title: "Secrets Management - Vault on OpenShift"
-description: "Secrets Management with HashiCorp Vault"
+description: "Manage secrets on OpenShift with HashiCorp Vault: authentication, policies and patterns for injecting credentials without baking them into images."
 date: "2022-08-16"
 doctype: book
 

@@ -1,6 +1,6 @@
 --- 
 title: "Understanding RWO block device handling in OpenShift"
-description: "A basic introduction into block device usage"
+description: "A practical introduction to block devices on OpenShift and Linux hosts: volumes, filesystems and how persistent storage shows up to containers."
 date: "2021-02-27"
 doctype: book
 
@@ -13,8 +13,8 @@ categories:
 tags: ["Storage", "OpenShift", "OCP", "Block devices"]
 
 aliases: [ 
-	 "/posts-output/2021-02-27-understanding-block-devices/",
-	 "/openshift/2021/02/understanding-rwo-block-device-handling-in-openshift/",
+   "/posts-output/2021-02-27-understanding-block-devices/",
+   "/openshift/2021/02/understanding-rwo-block-device-handling-in-openshift/",
 ] 
 ---
 

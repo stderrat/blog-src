@@ -12,7 +12,7 @@ categories:
 tags: ["oc", "OpenShift", "OCP", "SSL", "Certificates", "Cert Manager"] 
 
 aliases: [ 
-	 "/posts-output/2023-02-16-ssl-certificate-manager/",
+   "/posts-output/2023-02-16-ssl-certificate-manager/",
    "/openshift/2023/02/ssl-certificate-management-for-openshift-on-aws/",
 ] 
 ---

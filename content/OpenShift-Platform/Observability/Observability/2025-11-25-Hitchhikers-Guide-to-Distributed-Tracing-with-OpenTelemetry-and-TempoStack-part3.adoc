@@ -1,6 +1,6 @@
 ---
 title: "The Hitchhiker's Guide to Observability - Central Collector - Part 3"
-description: "Deploy Central Collector - Part 3"
+description: "Part 3 of the Hitchhiker’s Guide to Observability: deploy a central OpenTelemetry Collector on OpenShift to receive, process and export traces."
 date: "2025-11-25"
 doctype: book
 weight: 300
@@ -8,7 +8,7 @@ weight: 300
 series: "The Hitchhiker's Guide to Observability"
 series_part: 3
 
-featured_image: /openshift-platform/observability/images/observability/Logo_OTEL.png?width=420px
+featured_image: /openshift-platform/observability/images/observability/observability-part3-collector.png
 show_featured_image_summary: true
 show_featured_image_article: true
 disableBreadcrumb: true

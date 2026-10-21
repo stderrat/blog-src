@@ -1,6 +1,6 @@
 ---
 title: "Topology Spread Constraints"
-description: "Placeing Pods Using Topology Spread Constraints"
+description: "Spread OpenShift pods evenly with topology spread constraints across zones, regions or nodes to improve availability and reduce hotspots."
 date: "2021-08-26"
 doctype: book
 

@@ -14,19 +14,9 @@
 <meta property="og:description" content="{{ with .Description }}{{ . }}{{ else }}{{ .Site.Params.description }}{{ end }}">
 <meta property="og:type" content="{{ if .IsPage }}article{{ else }}website{{ end }}">
 <meta property="og:url" content="{{ .Permalink }}">
-{{- with .Params.images -}}
-<meta property="og:image" content="{{ index . 0 | absURL }}">
-{{- else -}}
-{{- with .Params.featured_image -}}
-<meta property="og:image" content="{{ . | absURL }}">
-{{- else -}}
-{{- with .Params.featuredImage -}}
-<meta property="og:image" content="{{ . | absURL }}">
-{{- else -}}
-<meta property="og:image" content="{{ "images/default-share.png" | absURL }}">
-{{- end -}}
-{{- end -}}
-{{- end -}}
+{{- /* image fallback chain: page -> series -> section -> default, see yaub/share-image.html */}}
+{{- $shareImage := partial "yaub/share-image.html" . }}
+<meta property="og:image" content="{{ $shareImage }}">
 {{ if .IsPage }}
 <meta property="article:published_time" content="{{ .Date.Format "2006-01-02T15:04:05Z07:00" }}">
 <meta property="article:modified_time" content="{{ .Lastmod.Format "2006-01-02T15:04:05Z07:00" }}">
@@ -38,16 +28,4 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{{ .Title }}">
 <meta name="twitter:description" content="{{ with .Description }}{{ . }}{{ else }}{{ .Site.Params.description }}{{ end }}">
-{{- with .Params.images -}}
-<meta name="twitter:image" content="{{ index . 0 | absURL }}">
-{{- else -}}
-{{- with .Params.featured_image -}}
-<meta name="twitter:image" content="{{ . | absURL }}">
-{{- else -}}
-{{- with .Params.featuredImage -}}
-<meta name="twitter:image" content="{{ . | absURL }}">
-{{- else -}}
-<meta name="twitter:image" content="{{ "images/default-share.png" | absURL }}">
-{{- end -}}
-{{- end -}}
-{{- end -}}
+<meta name="twitter:image" content="{{ $shareImage }}">

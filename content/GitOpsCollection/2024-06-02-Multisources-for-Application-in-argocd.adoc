@@ -16,7 +16,7 @@ categories:
 tags: ["Application", "OpenShift", "OCP", "GitOps", "Argo CD", "ApplicationSet", "Multiple Sources"] 
 
 aliases: [ 
-	 "/posts-output/2024-06-01-multiple-sources-for-application/",
+   "/posts-output/2024-06-01-multiple-sources-for-application/",
 ] 
 ---
 

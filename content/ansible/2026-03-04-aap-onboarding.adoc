@@ -1,6 +1,6 @@
 ---
 title: "Onboarding to Ansible Automation Platform with Configuration as Code"
-description: "A detailed walkthrough of our presentation on onboarding application teams to Ansible Automation Platform using a Configuration as Code approach, presented at the 2nd Ansible Anwendertreffen in Austria."
+description: "Onboard application teams to Ansible Automation Platform with Configuration as Code—from our talk at the 2nd Ansible Anwendertreffen in Austria."
 date: "2026-03-04"
 doctype: book
 weight: 10

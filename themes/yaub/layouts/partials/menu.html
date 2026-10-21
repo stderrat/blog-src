@@ -152,20 +152,30 @@
  {{with .sect}}
   {{if and .IsSection (or (not .Params.hidden) $.showhidden)}}
     {{safeHTML .Params.head}}
+    {{- /*
+      Perf: only embed children in HTML when this section is on the path to
+      the current page (ancestor / self / alwaysopen). Other branches stay
+      as a single <li>; yaub.js loads their children from /nav-tree.json
+      when the user opens the chevron.
+    */ -}}
+    {{- $isAncestor := .IsAncestor $currentNode -}}
+    {{- $isSelf := eq .File.UniqueID $currentFileUniqueID -}}
+    {{- $alwaysOpen := .Params.alwaysopen -}}
+    {{- $renderChildren := or $isAncestor $isSelf $alwaysOpen -}}
+    {{- $numberOfPages := (add (len ( where .Pages "Params.hidden" "ne" true )) (len ( where .Sections "Params.hidden" "ne" true ))) -}}
     <li data-nav-id="{{.RelPermalink}}" title="{{.Title}}" class="dd-item
-        {{if .IsAncestor $currentNode }}parent{{end}}
-        {{if eq .File.UniqueID $currentFileUniqueID}}active{{end}}
-        {{if .Params.alwaysopen}}parent{{end}}
+        {{if $isAncestor }}parent{{end}}
+        {{if $isSelf }}active{{end}}
+        {{if $alwaysOpen }}parent{{end}}
         {{if .Params.divider_before}}divider-before{{end}}
-        ">
-      {{ $numberOfPages := (add (len ( where .Pages "Params.hidden" "ne" true )) (len ( where .Sections "Params.hidden" "ne" true ))) }}
+        "{{ if and (not $renderChildren) (ne $numberOfPages 0) }} data-nav-lazy="true"{{ end }}>
       <a href="{{ with .Params.external_url }}{{ . }}{{ else }}{{ .RelPermalink }}{{ end }}" class="{{ if ne $numberOfPages 0 }}has-children{{ end }}"{{ with .Params.external_url }} target="_blank" rel="noopener noreferrer"{{ end }}>
           <span class="menu-title">{{safeHTML .Params.Pre}}{{or .Params.menuTitle .LinkTitle .Title}}{{safeHTML .Params.Post}}</span>
           {{ if ne $numberOfPages 0 }}
           <i class="fas fa-chevron-right menu-chevron"></i>
           {{ end }}
       </a>
-      {{ if ne $numberOfPages 0 }}
+      {{ if and (ne $numberOfPages 0) $renderChildren }}
         <ul>
           {{ $currentNode.Scratch.Set "pages" .Pages }}
           {{ if .Sections}}

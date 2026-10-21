@@ -6,7 +6,7 @@
   Changes compared to the current output:
   - author: one Person per author (with url) instead of one combined name
   - publisher: params.siteName (YAUB) plus logo instead of the description text
-  - image (featured_image / images / image), mainEntityOfPage, keywords, wordCount
+  - image (via yaub/share-image.html: page, series, section, default), mainEntityOfPage, keywords, wordCount
   - isPartOf: the series (section listed in site.Params.seriesSections)
   - BreadcrumbList as separate JSON-LD (replaces microdata on #breadcrumbs)
 
@@ -38,12 +38,8 @@
       "inLanguage" site.Language.Locale
       "wordCount" $p.WordCount
   -}}
-  {{- $img := "" -}}
-  {{- with $p.Params.images -}}{{- $img = index . 0 -}}{{- end -}}
-  {{- if not $img -}}{{- with $p.Params.featured_image -}}{{- $img = . -}}{{- end -}}{{- end -}}
-  {{- if not $img -}}{{- with $p.Params.featuredImage -}}{{- $img = . -}}{{- end -}}{{- end -}}
-  {{- if not $img -}}{{- with $p.Params.image -}}{{- $img = . -}}{{- end -}}{{- end -}}
-  {{- with $img -}}{{- $ld = merge $ld (dict "image" (. | absURL)) -}}{{- end -}}
+  {{- /* same fallback chain as og:image: page -> series -> section -> default */ -}}
+  {{- $ld = merge $ld (dict "image" (partial "yaub/share-image.html" $p)) -}}
   {{- with $p.Params.tags -}}{{- $ld = merge $ld (dict "keywords" (delimit . ", ")) -}}{{- end -}}
   {{- with $p.Params.categories -}}{{- $ld = merge $ld (dict "about" .) -}}{{- end -}}
   {{- with $p.Params.tested_with -}}

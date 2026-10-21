@@ -13,7 +13,7 @@ categories:
 tags: ["OpenShift", "OCP", "ODF", "OpenShift Data Foundation", "Noobaa", "Bucket", "Lifecycle"] 
 
 aliases: [ 
-	 "/posts-output/2024-11-12-odf-bucket-data-retention/",
+   "/posts-output/2024-11-12-odf-bucket-data-retention/",
    "/openshift/2024/02/openshift-data-foundation-noobaa-bucket-data-retention-lifecycle/",
 ] 
 ---

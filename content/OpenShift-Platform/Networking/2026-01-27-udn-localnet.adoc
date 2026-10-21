@@ -1,6 +1,6 @@
 ---
 title: "OpenShift User Defined Networking - UDN localnet"
-description: "OpenShift User Defined Networking - UDN localnet"
+description: "Configure OpenShift User Defined Networks (UDN) with localnet to attach workloads to secondary physical networks outside the default pod network."
 date: "2026-03-05"
 doctype: book
 

@@ -1,6 +1,6 @@
 --- 
 title: "Step 2 - Pipelines"
-description: "Step 2 Secure Supply Chain"
+description: "Step 2 of the Secure Supply Chain series: design Tekton Pipelines and PipelineRuns from source checkout through build, scan and deploy stages."
 date: "2023-06-28"
 doctype: book
 
@@ -12,8 +12,8 @@ categories:
 tags: ["OCP", "Tekton", "OpenShift", "Pipelines", "CI/CD", "Supply Chain"] 
 
 aliases: [ 
-	 "/openshift/securesupplychain/step2",
-	 "/securesupplychain/2023-06-17-securesupplychain-step2/",
+   "/openshift/securesupplychain/step2",
+   "/securesupplychain/2023-06-17-securesupplychain-step2/",
 ] 
 ---
 

@@ -15,8 +15,8 @@ categories:
 tags: ["Istio", "Service Mesh", "OpenShift", "OCP", "JWT"] 
 
 aliases: [ 
-	 "/posts-output/2020-04-09-Istio-Tutorial10/",
-	 "/service-mesh/2020/04/authentication-jwt/",
+   "/posts-output/2020-04-09-Istio-Tutorial10/",
+   "/service-mesh/2020/04/authentication-jwt/",
 ] 
 ---
 

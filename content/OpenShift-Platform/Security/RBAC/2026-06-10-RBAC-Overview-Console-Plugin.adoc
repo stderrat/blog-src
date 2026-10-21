@@ -1,6 +1,6 @@
 ---
 title: "RBAC Overview — an OpenShift Console plugin"
-description: "Install and use the RBAC Overview dynamic console plugin to inspect cluster admins, namespace access, subjects, who-can queries, and SCC authorisations from the OpenShift web console."
+description: "Install the RBAC Overview console plugin to inspect OpenShift cluster admins, namespace access, subjects, who-can queries and SCC authorisations in the UI."
 date: "2026-06-10"
 doctype: book
 

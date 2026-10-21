@@ -1,6 +1,6 @@
 ---
 title: "Using Descheduler"
-description: "Evicting pods using the Descheduler"
+description: "Use the Kubernetes Descheduler on OpenShift to evict pods that violate placement policies and let the scheduler place them again correctly."
 date: "2021-08-26"
 doctype: book
 

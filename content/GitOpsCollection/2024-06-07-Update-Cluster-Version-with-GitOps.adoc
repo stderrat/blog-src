@@ -16,7 +16,7 @@ categories:
 tags: ["Application", "OpenShift", "OCP", "GitOps", "Argo CD", "ApplicationSet", "Multiple Sources", "Cluster Update"] 
 
 aliases: [ 
-	 "/posts-output/2024-06-07-update-clusterversion/",
+   "/posts-output/2024-06-07-update-clusterversion/",
 ] 
 ---
 

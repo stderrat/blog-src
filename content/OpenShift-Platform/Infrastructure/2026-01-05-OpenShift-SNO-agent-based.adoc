@@ -1,6 +1,6 @@
 ---
 title: "OpenShift Single Node with Agent Based Installer "
-description: "OpenShift Single Node with Agent Based Installer "
+description: "Install OpenShift Single Node (SNO) with the Agent-Based Installer: generate the ISO, boot the host and bring up a compact cluster for lab or edge use."
 date: "2026-01-05"
 doctype: book
 weight: 10

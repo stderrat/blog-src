@@ -1,6 +1,6 @@
 --- 
 title: "[Ep.11] Managing Certificates"
-description: "Managing Certificates using a GitOps approach."
+description: "Manage TLS certificates with a GitOps approach on OpenShift: cert-manager issuers, Certificate resources and keeping renewals under Argo CD control."
 date: "2024-07-04"
 doctype: book
 
@@ -16,7 +16,7 @@ categories:
 tags: ["Application", "OpenShift", "OCP", "GitOps", "Argo CD", "ApplicationSet", "Cert-Manager", "Certificates", "Route53"] 
 
 aliases: [ 
-	 "/posts-output/2024-07-04-manage-certificate/",
+   "/posts-output/2024-07-04-manage-certificate/",
 ] 
 ---
 

@@ -1,6 +1,6 @@
 --- 
 title: "Step 13 - Bring it to Production"
-description: "Step 13 Secure Supply Chain"
+description: "Step 13 of the Secure Supply Chain series: bring the signed, scanned and attested pipeline into a production-ready OpenShift GitOps workflow."
 date: "2023-06-27"
 doctype: book
 
@@ -12,8 +12,8 @@ categories:
 tags: ["OCP", "Tekton", "OpenShift", "Pipelines", "CI/CD", "Supply Chain", "Rekor"] 
 
 aliases: [ 
-	 "/openshift/securesupplychain/step13",
-	 "/securesupplychain/2023-06-28-securesupplychain-step13/",
+   "/openshift/securesupplychain/step13",
+   "/securesupplychain/2023-06-28-securesupplychain-step13/",
 ] 
 ---
 

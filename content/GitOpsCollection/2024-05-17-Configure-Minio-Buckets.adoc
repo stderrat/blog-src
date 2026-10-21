@@ -16,7 +16,7 @@ categories:
 tags: ["MinIO", "OpenShift", "OCP", "GitOps", "Argo CD", "Storage", "S3", "Object Storage"] 
 
 aliases: [ 
-	 "/posts-output/2024-05-17-configure-minio-bucket/",
+   "/posts-output/2024-05-17-configure-minio-bucket/",
 ] 
 ---
 

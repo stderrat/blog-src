@@ -1,6 +1,6 @@
 --- 
 title: "[Ep.3] Setup OpenShift GitOps/Argo CD"
-description: "Openshift 4.x - Install GitOps to the cluster"
+description: "Install OpenShift GitOps (Argo CD) on a cluster: operator deployment, initial ArgoCD instance settings and first steps toward an app-of-apps layout."
 date: "2024-02-02"
 doctype: book
 
@@ -16,7 +16,7 @@ categories:
 tags: ["oc", "kubectl", "OpenShift", "OCP", "GitOps", "Argo CD"] 
 
 aliases: [ 
-	 "/posts-output/2024-02-02-setup-argocd/",
+   "/posts-output/2024-02-02-setup-argocd/",
 ] 
 ---
 

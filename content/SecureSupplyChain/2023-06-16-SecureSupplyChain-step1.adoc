@@ -1,6 +1,6 @@
 --- 
 title: "Step 1 - Listen to Events"
-description: "Step 1 Secure Supply Chain"
+description: "Step 1 of the Secure Supply Chain series: use Tekton Triggers to listen for Git and image events so pipelines start automatically when code or artefacts change."
 date: "2023-06-28"
 doctype: book
 
@@ -12,8 +12,8 @@ categories:
 tags: ["OCP", "Tekton", "OpenShift", "Pipelines", "CI/CD", "Supply Chain"] 
 
 aliases: [ 
-	 "/openshift/securesupplychain/step1",
-	 "/securesupplychain/2023-06-16-securesupplychain-step1/",
+   "/openshift/securesupplychain/step1",
+   "/securesupplychain/2023-06-16-securesupplychain-step1/",
 ] 
 ---
 

@@ -1,6 +1,6 @@
 --- 
 title: "Using ServerSideApply with ArgoCD"
-description: "Using ServerSideApply with ArgoCD"
+description: "Use Kubernetes Server-Side Apply with Argo CD on OpenShift to reduce field-manager conflicts and keep large or shared resources reconciliable under GitOps."
 date: "2022-11-04"
 doctype: book
 
@@ -13,8 +13,8 @@ categories:
 tags: ["oc", "kubectl", "OpenShift", "OCP", "GitOps", "Argo CD"] 
 
 aliases: [ 
-	 "/posts-output/2022-11-04-serversideapply-with-argocd/",
-	 "/openshift/2022/11/using-serversideapply-with-argocd/",
+   "/posts-output/2022-11-04-serversideapply-with-argocd/",
+   "/openshift/2022/11/using-serversideapply-with-argocd/",
 ] 
 ---
 

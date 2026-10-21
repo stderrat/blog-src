@@ -1,6 +1,6 @@
 --- 
 title: "Red Hat Satellite Cheat Sheet"
-description: "Cheat sheet for Red Hat Satellite"
+description: "Cheat sheet for day-to-day Red Hat Satellite administration: useful hammer commands, content views, activation keys and troubleshooting shortcuts for operators."
 date: "2020-04-15"
 doctype: book
 
@@ -13,9 +13,9 @@ categories:
 tags: ["Satellite"]
 
 aliases: [ 
-	 "/posts-output/2020-04-15-satellite-cheatsheet/",
-	 "/general/2020/04/satellite-cheatsheet/",
-	 "/general/2020/04/red-hat-satellite-cheat-sheet/",
+   "/posts-output/2020-04-15-satellite-cheatsheet/",
+   "/general/2020/04/satellite-cheatsheet/",
+   "/general/2020/04/red-hat-satellite-cheat-sheet/",
 ] 
 ---
 

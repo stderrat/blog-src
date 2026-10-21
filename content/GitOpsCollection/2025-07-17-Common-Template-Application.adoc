@@ -1,6 +1,6 @@
 --- 
 title: "[Ep.14] Reusable Argo CD Application Template"
-description: "Reusable Argo CD Application Helm Template"
+description: "Build a reusable Argo CD Application Helm template for OpenShift GitOps so teams share one pattern for sync waves, hooks and project defaults."
 date: "2025-07-17"
 doctype: book
 
@@ -16,7 +16,7 @@ categories:
 tags: ["Application", "OpenShift", "OCP", "GitOps", "Argo CD", "Helm", "ApplicationSet", "Generator", "Matrix", "Git"] 
 
 aliases: [ 
-	 "/posts-output/2025-07-17-reusable-argocd-application-helm-template/",
+   "/posts-output/2025-07-17-reusable-argocd-application-helm-template/",
 ] 
 ---
 

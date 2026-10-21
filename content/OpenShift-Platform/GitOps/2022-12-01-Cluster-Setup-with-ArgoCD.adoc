@@ -12,7 +12,7 @@ categories:
 tags: ["oc", "kubectl", "OpenShift", "OCP", "GitOps", "Argo CD"] 
 
 aliases: [ 
-	 "/posts-output/2022-09-27-cluster-setup-with-argocd/",
+   "/posts-output/2022-09-27-cluster-setup-with-argocd/",
 ] 
 ---
 

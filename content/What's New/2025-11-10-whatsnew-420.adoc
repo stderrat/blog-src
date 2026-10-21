@@ -1,6 +1,6 @@
 ---
 title: "What's new in OpenShift, 4.20 Edition"
-description: "News in OCP 4.20 that tickles our fancy"
+description: "Highlights from OpenShift Container Platform 4.20 that matter for platform teams: networking, GitOps, virtualisation, security and day-2 operations updates."
 date: "2025-11-10"
 doctype: book
 

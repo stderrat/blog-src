@@ -1,6 +1,6 @@
 --- 
 title: "Step 8 - Updating Kubernetes Manifests"
-description: "Step 8 Secure Supply Chain"
+description: "Step 8 of the Secure Supply Chain series: update Kubernetes manifests with the new image digest from CI so GitOps deploys exactly what was built and signed."
 date: "2023-06-28"
 doctype: book
 
@@ -12,8 +12,8 @@ categories:
 tags: ["OCP", "Tekton", "OpenShift", "Pipelines", "CI/CD", "Supply Chain"] 
 
 aliases: [ 
-	 "/openshift/securesupplychain/step8",
-	 "/securesupplychain/2023-06-23-securesupplychain-step8/",
+   "/openshift/securesupplychain/step8",
+   "/securesupplychain/2023-06-23-securesupplychain-step8/",
 ] 
 ---
 

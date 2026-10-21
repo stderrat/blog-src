@@ -15,8 +15,8 @@ categories:
 tags: ["Istio", "Service Mesh", "OpenShift", "OCP"] 
 
 aliases: [ 
-	 "/posts-output/2020-03-29-Istio-Tutorial2/",
-	 "/service-mesh/2020/03/deploy-microservices/",
+   "/posts-output/2020-03-29-Istio-Tutorial2/",
+   "/service-mesh/2020/03/deploy-microservices/",
 ] 
 ---
 

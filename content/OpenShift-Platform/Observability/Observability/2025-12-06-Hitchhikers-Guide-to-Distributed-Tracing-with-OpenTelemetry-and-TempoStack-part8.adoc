@@ -1,6 +1,6 @@
 ---
 title: "The Hitchhiker's Guide to Observability - Limit Read Access to Traces - Part 8"
-description: "Limit Read Access to Traces - Part 8"
+description: "Part 8 of the Hitchhiker’s Guide to Observability: limit who can read traces in TempoStack with OpenShift RBAC and tenant-aware access controls."
 date: "2025-12-06"
 doctype: book
 weight: 98
@@ -8,7 +8,7 @@ weight: 98
 series: "The Hitchhiker's Guide to Observability"
 series_part: 8
 
-featured_image: /openshift-platform/observability/images/observability/Logo_observability_8.png
+featured_image: /openshift-platform/observability/images/observability/observability-part8-access.png
 show_featured_image_summary: true
 show_featured_image_article: true
 featured_image_position: 25% 35%

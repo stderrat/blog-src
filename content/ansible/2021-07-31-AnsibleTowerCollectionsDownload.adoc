@@ -13,8 +13,8 @@ tags: ["Ansible", "Ansible Tower"]
 
 aliases: [
     "/posts-output/2020-07-31-AnsibleTowerCollectionsdownload/",
-	 "/posts-output/2021-07-31-AnsibleTowerCollectionsDownload/",
-	 "/ansible/2021/07/ansible-tower-and-downloading-collections/",
+   "/posts-output/2021-07-31-AnsibleTowerCollectionsDownload/",
+   "/ansible/2021/07/ansible-tower-and-downloading-collections/",
 ]
 ---
 

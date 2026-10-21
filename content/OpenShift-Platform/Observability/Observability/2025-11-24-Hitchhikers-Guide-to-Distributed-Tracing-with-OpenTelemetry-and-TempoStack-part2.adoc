@@ -1,6 +1,6 @@
 ---
 title: "The Hitchhiker's Guide to Observability - Grafana Tempo - Part 2"
-description: "Deploy Grafana Tempo and TempoStack - Part 2"
+description: "Part 2 of the Hitchhiker’s Guide to Observability: deploy Grafana Tempo and TempoStack on OpenShift for scalable distributed tracing storage."
 date: "2025-11-24"
 doctype: book
 weight: 200
@@ -8,7 +8,7 @@ weight: 200
 series: "The Hitchhiker's Guide to Observability"
 series_part: 2
 
-featured_image: /openshift-platform/observability/images/observability/Logo_observability_2.png?width=420px
+featured_image: /openshift-platform/observability/images/observability/observability-part2-tempo.png
 show_featured_image_summary: true
 show_featured_image_article: true
 disableBreadcrumb: true

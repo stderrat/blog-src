@@ -1,6 +1,6 @@
 ---
 title: "Advanced br-ex Configuration with Bonding on OpenShift"
-description: "Learn how to configure or migrate the br-ex bridge to NMState with network bonding (active-backup or LACP) for high availability and increased throughput on OpenShift clusters using MachineConfig."
+description: "Configure or migrate the OpenShift br-ex bridge to NMState with bonding (active-backup or LACP) via MachineConfig for higher availability and throughput."
 date: "2026-02-05"
 doctype: book
 
@@ -19,7 +19,7 @@ categories:
 tags: ["OpenShift", "OCP", "Networking", "br-ex", "Bonding", "OVN-Kubernetes", "NMState", "High Availability", "LACP", "MachineConfig", "Failover", "Network Redundancy"]
 
 aliases: [
-	 "/posts-output/2026-01-29-advanced-br-ex-bonding/",
+   "/posts-output/2026-01-29-advanced-br-ex-bonding/",
 ]
 ---
 

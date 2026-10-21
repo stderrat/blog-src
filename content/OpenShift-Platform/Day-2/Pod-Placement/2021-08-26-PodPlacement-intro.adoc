@@ -1,6 +1,6 @@
 ---
 title: "Introduction"
-description: "Introduction to Pod Placement"
+description: "Introduction to OpenShift pod placement with nodeSelector, affinity, taints, tolerations, topology spread and the Descheduler."
 date: "2021-08-26"
 doctype: book
 

@@ -1,6 +1,6 @@
 --- 
 title: "Step 11 - ACS Deployment Check"
-description: "Step 11 Secure Supply Chain"
+description: "Step 11 of the Secure Supply Chain series: run ACS deployment checks against manifests so risky workloads are blocked before they are applied to OpenShift."
 date: "2023-06-27"
 doctype: book
 
@@ -12,8 +12,8 @@ categories:
 tags: ["OCP", "Tekton", "OpenShift", "Pipelines", "CI/CD", "Supply Chain", "ACS"] 
 
 aliases: [ 
-	 "/openshift/securesupplychain/step11",
-	 "/securesupplychain/2023-06-26-securesupplychain-step11/",
+   "/openshift/securesupplychain/step11",
+   "/securesupplychain/2023-06-26-securesupplychain-step11/",
 ] 
 ---
 

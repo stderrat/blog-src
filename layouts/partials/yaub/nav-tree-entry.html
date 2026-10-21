@@ -1,0 +1,37 @@
+{{- /*
+  yaub/nav-tree-entry.html
+  Returns one nav node (dict) for the NavTree JSON.
+
+  Input: page (section or regular page)
+  Output: dict with url, title, pre, post, divider_before, children
+*/ -}}
+{{- $p := . -}}
+{{- $children := slice -}}
+{{- if $p.IsSection -}}
+  {{- $pages := $p.Pages -}}
+  {{- if $p.Sections -}}
+    {{- $pages = $pages | union $p.Sections -}}
+  {{- end -}}
+  {{- /* Same ordering as menu.html section-tree-nav */ -}}
+  {{- $seriesPages := where $pages "Params.series" "!=" nil -}}
+  {{- $nonSeriesPages := where $pages "Params.series" nil -}}
+  {{- range $nonSeriesPages.ByWeight -}}
+    {{- if not .Params.hidden -}}
+      {{- $children = $children | append (partial "yaub/nav-tree-entry.html" .) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- range (sort $seriesPages "Params.series_part" "asc") -}}
+    {{- if not .Params.hidden -}}
+      {{- $children = $children | append (partial "yaub/nav-tree-entry.html" .) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- $node := dict
+  "url" $p.RelPermalink
+  "title" (or $p.Params.menuTitle $p.LinkTitle $p.Title)
+  "pre" ($p.Params.Pre | default "")
+  "post" ($p.Params.Post | default "")
+  "divider_before" ($p.Params.divider_before | default false)
+  "children" $children
+-}}
+{{- return $node -}}

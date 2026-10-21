@@ -1,6 +1,6 @@
 --- 
 title: "Step 7 - Generating a SBOM"
-description: "Step 7 Secure Supply Chain"
+description: "Step 7 of the Secure Supply Chain series: generate a Software Bill of Materials (SBOM) during the build and attach it to the signed container image."
 date: "2023-06-28"
 doctype: book
 
@@ -12,8 +12,8 @@ categories:
 tags: ["OCP", "Tekton", "OpenShift", "Pipelines", "CI/CD", "Supply Chain", "SBOM"] 
 
 aliases: [ 
-	 "/openshift/securesupplychain/step7",
-	 "/securesupplychain/2023-06-22-securesupplychain-step7/",
+   "/openshift/securesupplychain/step7",
+   "/securesupplychain/2023-06-22-securesupplychain-step7/",
 ] 
 ---
 

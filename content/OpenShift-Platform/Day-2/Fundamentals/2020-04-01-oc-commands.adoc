@@ -13,8 +13,8 @@ categories:
 tags: ["oc", "kubectl", "OpenShift", "OCP"] 
 
 aliases: [ 
-	 "/posts-output/2020-04-01-oc-commands/",
-	 "/openshift/2020/04/helpful-oc-/-kubectl-commands/",
+   "/posts-output/2020-04-01-oc-commands/",
+   "/openshift/2020/04/helpful-oc-/-kubectl-commands/",
 ] 
 ---
 

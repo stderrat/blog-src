@@ -1,6 +1,6 @@
 ---
-title: "[Ep.20] ACM and OpenShift GitOps: push, pull and the Argo CD Agent"
-description: "How Advanced Cluster Management registers clusters in OpenShift GitOps, what the push model, the pull model and the Argo CD Agent add-on actually are, and how to set up each of them step by step."
+title: "[Ep.19] ACM and OpenShift GitOps: push, pull and the Argo CD Agent"
+description: "How ACM registers clusters in OpenShift GitOps: push model, pull model and the Argo CD Agent add-on, with a step-by-step setup for each approach."
 date: "2026-10-21"
 doctype: book
 authors: [Thomas Jungbauer]
@@ -8,9 +8,9 @@ type: post
 draft: true
 
 series: "GitOps Episodes"
-series_part: 20
+series_part: 19
 
-featured_image: /gitopscollection/images/logos/ep-20-gitops.png
+featured_image: /gitopscollection/images/logos/ep-19-gitops.png
 show_featured_image_summary: true
 show_featured_image_article: true
 featured_image_position: 50% 50%
@@ -25,7 +25,7 @@ tags: ["Argo CD", "OpenShift GitOps", "Advanced Cluster Management", "ACM", "RHA
 :icons: font
 :toc:
 
-In link:/gitopscollection/2026-10-20-openshift-gitops-vs-acm/[[Ep.19\]] I compared OpenShift GitOps and Advanced Cluster Management and ended with the statement that they are layers, not competitors. ACM knows the fleet, Argo CD delivers the content. This part is about the glue between the two: how ACM registers its clusters in Argo CD, and the three ways an Argo CD Application can reach a managed cluster: the **push model**, the **pull model** and the **Argo CD Agent**.
+In link:/gitopscollection/2026-10-20-openshift-gitops-vs-acm/[[Ep.18\]] I compared OpenShift GitOps and Advanced Cluster Management and ended with the statement that they are layers, not competitors. ACM knows the fleet, Argo CD delivers the content. This part is about the glue between the two: how ACM registers its clusters in Argo CD, and the three ways an Argo CD Application can reach a managed cluster: the **push model**, the **pull model** and the **Argo CD Agent**.
 
 For each of them I will explain what it actually is, how the data flows, and how to set it up step by step.
 
@@ -452,7 +452,7 @@ oc get pods -n openshift-gitops
 
 ==== Option B: your own policy
 
-If you want full control over the operator version, or you need the push model as well, install OpenShift GitOps with your own policy. This is the same OperatorPolicy pattern as in Ep.19:
+If you want full control over the operator version, or you need the push model as well, install OpenShift GitOps with your own policy. This is the same OperatorPolicy pattern as in Ep.18:
 
 .Policy that installs OpenShift GitOps on the managed clusters
 [source,yaml]

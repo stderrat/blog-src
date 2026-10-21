@@ -1,6 +1,6 @@
 --- 
 title: "Step 12 - Verify TLog Signature"
-description: "Step 12 Secure Supply Chain"
+description: "Step 12 of the Secure Supply Chain series: verify Sigstore transparency-log (Rekor) signatures at deploy time so only attested images are allowed to run."
 date: "2023-06-27"
 doctype: book
 
@@ -12,8 +12,8 @@ categories:
 tags: ["OCP", "Tekton", "OpenShift", "Pipelines", "CI/CD", "Supply Chain", "Rekor"] 
 
 aliases: [ 
-	 "/openshift/securesupplychain/step12",
-	 "/securesupplychain/2023-06-27-securesupplychain-step12/",
+   "/openshift/securesupplychain/step12",
+   "/securesupplychain/2023-06-27-securesupplychain-step12/",
 ] 
 ---
 

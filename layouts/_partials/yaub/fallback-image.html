@@ -1,0 +1,53 @@
+{{- /*
+  yaub/fallback-image.html - returns the series or section image of a page,
+  or "" if there is none. Used when a page has no featured_image of its own.
+
+  Lookup order (first match wins):
+    1. series:   static/images/share/series/<urlized series name>.png
+                 e.g. series "Pod Placement" -> series/pod-placement.png
+    2. sections, nearest first, up to the top-level section:
+       a) share_image in the section's _index front matter
+       b) static/images/share/sections/<section URL path>.png
+          e.g. /openshift-platform/security/compliance/
+            -> sections/openshift-platform/security/compliance.png
+            -> sections/openshift-platform/security.png
+            -> sections/openshift-platform.png
+
+  Note: "hugo server" does not notice new files in static/images/share/
+  while it is running - restart it after adding images.
+
+  Returns a site-relative path such as /images/share/series/pod-placement.png
+  Usage: {{ $img := partial "yaub/fallback-image.html" . }}
+*/ -}}
+{{- $p := . -}}
+{{- $img := "" -}}
+
+{{- /* 1. series (string or list; the first entry counts) */ -}}
+{{- with $p.Params.series -}}
+  {{- $name := . -}}
+  {{- if reflect.IsSlice . -}}{{- $name = index . 0 -}}{{- end -}}
+  {{- $file := printf "images/share/series/%s.png" (urlize $name) -}}
+  {{- if fileExists (path.Join "static" $file) -}}{{- $img = printf "/%s" $file -}}{{- end -}}
+{{- end -}}
+
+{{- /* 2. sections, nearest first */ -}}
+{{- if and (not $img) $p.CurrentSection -}}
+  {{- $sections := slice $p.CurrentSection -}}
+  {{- range $p.CurrentSection.Ancestors -}}
+    {{- if not .IsHome -}}{{- $sections = $sections | append . -}}{{- end -}}
+  {{- end -}}
+  {{- range $sections -}}
+    {{- if not $img -}}
+      {{- with .Params.share_image -}}
+        {{- $img = . -}}
+      {{- else -}}
+        {{- with strings.Trim .RelPermalink "/" -}}
+          {{- $file := printf "images/share/sections/%s.png" . -}}
+          {{- if fileExists (path.Join "static" $file) -}}{{- $img = printf "/%s" $file -}}{{- end -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- return $img -}}

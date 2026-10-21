@@ -13,8 +13,8 @@ categories:
 tags: ["Ansible", "Azure"]
 
 aliases: [ 
-	 "/posts-output/2020-04-27-AnsibleAzureResourceManager/",
-	 "/ansible/2020/04/ansible-azure-resource-manager-example/",
+   "/posts-output/2020-04-27-AnsibleAzureResourceManager/",
+   "/ansible/2020/04/ansible-azure-resource-manager-example/",
 ] 
 ---
 

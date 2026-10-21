@@ -1,6 +1,6 @@
 ---
 title: "Hosted Control Planes behind a Proxy"
-description: "Hosted Control Planes behind a Proxy"
+description: "Run OpenShift Hosted Control Planes behind an HTTP proxy: configure the management cluster and Hypershift so spoke clusters can pull images and reach APIs."
 date: "2025-12-15"
 weight: 98
 doctype: book

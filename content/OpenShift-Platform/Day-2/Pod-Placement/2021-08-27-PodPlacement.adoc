@@ -1,6 +1,6 @@
 ---
 title: "NodeSelector"
-description: "Placeing Pods Using the NodeSelector"
+description: "Place OpenShift pods with nodeSelector: label worker nodes and constrain workloads to matching nodes for simple, predictable scheduling."
 date: "2021-08-26"
 doctype: book
 

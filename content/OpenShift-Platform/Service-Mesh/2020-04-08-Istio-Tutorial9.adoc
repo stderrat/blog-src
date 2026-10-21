@@ -15,8 +15,8 @@ categories:
 tags: ["Istio", "Service Mesh", "OpenShift", "OCP", "mTLS"] 
 
 aliases: [ 
-	 "/posts-output/2020-04-08-Istio-Tutorial9/",
-	 "/service-mesh/2020/04/mutual-tls-authentication/",
+   "/posts-output/2020-04-08-Istio-Tutorial9/",
+   "/service-mesh/2020/04/mutual-tls-authentication/",
 ] 
 ---
 

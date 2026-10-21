@@ -15,8 +15,8 @@ categories:
 tags: ["Istio", "Service Mesh", "OpenShift", "OCP", "Bookinfo", "Example"] 
 
 aliases: [ 
-	 "/posts-output/2020-04-30-Istio-Tutorial11/",
-	 "/service-mesh/2020/04/deploy-example-bookinfo-application/",
+   "/posts-output/2020-04-30-Istio-Tutorial11/",
+   "/service-mesh/2020/04/deploy-example-bookinfo-application/",
 ] 
 ---
 

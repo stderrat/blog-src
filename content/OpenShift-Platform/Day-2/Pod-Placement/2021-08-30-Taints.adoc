@@ -1,6 +1,6 @@
 ---
 title: "Taints and Tolerations"
-description: "Placeing Pods Using Taints and Tolerations"
+description: "Control OpenShift scheduling with taints and tolerations: reserve nodes for special workloads and keep ordinary pods from landing there."
 date: "2021-08-26"
 doctype: book
 

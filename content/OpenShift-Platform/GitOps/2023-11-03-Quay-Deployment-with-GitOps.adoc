@@ -13,7 +13,7 @@ categories:
 tags: ["OpenShift", "OCP", "GitOps", "Argo CD", "Quay"] 
 
 aliases: [ 
-	 "/posts-output/2023-11-03-quay-with-gitops/",
+   "/posts-output/2023-11-03-quay-with-gitops/",
    "/openshift/2023/11/quay-deployment-and-configuration-using-gitops/",
 ] 
 ---

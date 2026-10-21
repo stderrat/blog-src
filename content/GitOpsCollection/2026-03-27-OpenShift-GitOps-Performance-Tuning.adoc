@@ -1,6 +1,6 @@
 --- 
 title: "[Ep.16] Tuning OpenShift GitOps for performance at scale"
-description: "Performance tuning for OpenShift GitOps at scale: application controller (reconcile interval and jitter, processors, sharding, kubectl limits, Kubernetes client QPS/burst), repo server (Git, cache, parallelism, timeouts), and how the ArgoCD custom resource maps to upstream Argo CD settings—including cmd-params and extraConfig."
+description: "Performance tuning for OpenShift GitOps at scale: controller reconcile settings, sharding, repo-server cache and how the ArgoCD CR maps upstream."
 date: "2026-04-15"
 doctype: book
 weight: 100

@@ -1,6 +1,6 @@
 ---
 title: "The Hitchhiker's Guide to Observability - Adding A New Tenant - Part 6"
-description: "Adding A New Tenant - Part 6"
+description: "Part 6 of the Hitchhiker’s Guide to Observability: add a new TempoStack tenant on OpenShift for isolated trace storage and multi-team access."
 date: "2025-11-28"
 doctype: book
 weight: 600
@@ -8,7 +8,7 @@ weight: 600
 series: "The Hitchhiker's Guide to Observability"
 series_part: 6
 
-featured_image: /openshift-platform/observability/images/observability/Logo_observability_6.png
+featured_image: /openshift-platform/observability/images/observability/observability-part6-tenant.png
 show_featured_image_summary: true
 show_featured_image_article: true
 disableBreadcrumb: true

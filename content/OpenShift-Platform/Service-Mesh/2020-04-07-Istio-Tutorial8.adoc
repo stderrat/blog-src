@@ -15,8 +15,8 @@ categories:
 tags: ["Istio", "Service Mesh", "OpenShift", "OCP", "Fault Injection"] 
 
 aliases: [ 
-	 "/posts-output/2020-04-07-Istio-Tutorial8/",
-	 "/service-mesh/2020/04/fault-injection/",
+   "/posts-output/2020-04-07-Istio-Tutorial8/",
+   "/service-mesh/2020/04/fault-injection/",
 ] 
 ---
 

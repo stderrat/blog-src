@@ -16,7 +16,7 @@ categories:
 tags: ["Application", "OpenShift", "OCP", "GitOps", "Argo CD", "Helm", "ApplicationSet", "Generator", "Matrix", "Git"] 
 
 aliases: [ 
-	 "/posts-output/2025-04-17-applicationsets-and-namespaces/",
+   "/posts-output/2025-04-17-applicationsets-and-namespaces/",
 ] 
 ---
 

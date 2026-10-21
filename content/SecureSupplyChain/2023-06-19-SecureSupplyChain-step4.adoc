@@ -1,6 +1,6 @@
 --- 
 title: "Step 4 - Verify Git Commit"
-description: "Step 4 Secure Supply Chain"
+description: "Step 4 of the Secure Supply Chain series: verify Git commit signatures in the pipeline so only trusted, signed source changes continue through the supply chain."
 date: "2023-06-28"
 doctype: book
 
@@ -12,8 +12,8 @@ categories:
 tags: ["OCP", "Tekton", "OpenShift", "Pipelines", "CI/CD", "Supply Chain"] 
 
 aliases: [ 
-	 "/openshift/securesupplychain/step4",
-	 "/securesupplychain/2023-06-19-securesupplychain-step4/",
+   "/openshift/securesupplychain/step4",
+   "/securesupplychain/2023-06-19-securesupplychain-step4/",
 ] 
 ---
 

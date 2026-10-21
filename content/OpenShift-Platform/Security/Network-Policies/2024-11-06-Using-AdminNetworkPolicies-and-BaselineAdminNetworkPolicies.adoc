@@ -1,6 +1,6 @@
 ---
 title: "Introducing AdminNetworkPolicies"
-description: "Introducing AdminNetworkPolicies"
+description: "Introduce AdminNetworkPolicy and BaselineAdminNetworkPolicy on OpenShift: cluster-scoped network rules that sit above namespace NetworkPolicies."
 date: "2024-11-06"
 doctype: book
 

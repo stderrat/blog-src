@@ -15,8 +15,8 @@ categories:
 tags: ["Istio", "Service Mesh", "OpenShift", "OCP", "Egress"] 
 
 aliases: [ 
-	 "/posts-output/2020-04-06-Istio-Tutorial7/",
-	 "/service-mesh/2020/04/limit-egress/external-traffic/",
+   "/posts-output/2020-04-06-Istio-Tutorial7/",
+   "/service-mesh/2020/04/limit-egress/external-traffic/",
 ] 
 ---
 

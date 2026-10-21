@@ -1,6 +1,6 @@
 ---
 title: "Node Affinity"
-description: "Placeing Pods Using the Node Affinity rules"
+description: "Schedule OpenShift pods with node affinity rules: required and preferred matches against node labels for finer control than nodeSelector alone."
 date: "2021-08-26"
 doctype: book
 

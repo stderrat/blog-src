@@ -15,8 +15,8 @@ categories:
 tags: ["Istio", "Service Mesh", "OpenShift", "OCP", "Authorization", "Security"] 
 
 aliases: [ 
-	 "/posts-output/2020-05-12-Istio-Tutorial12/",
-	 "/service-mesh/2020/05/authorization-rbac/",
+   "/posts-output/2020-05-12-Istio-Tutorial12/",
+   "/service-mesh/2020/05/authorization-rbac/",
 ] 
 ---
 

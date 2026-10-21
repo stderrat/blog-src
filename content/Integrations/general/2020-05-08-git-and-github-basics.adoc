@@ -13,8 +13,8 @@ categories:
 tags: ["git", "github"]
 
 aliases: [ 
-	 "/posts-output/2020-05-08-git-and-github-basics/",
-	 "/general/2020/05/git-and-github-basics/",
+   "/posts-output/2020-05-08-git-and-github-basics/",
+   "/general/2020/05/git-and-github-basics/",
    "/general/2020/05/basic-usage-of-git/",
 ] 
 ---

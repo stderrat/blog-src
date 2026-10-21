@@ -9,7 +9,10 @@
 
         {{/* Featured image on top */}}
         {{ if $featured_image }}
-        {{ if .Params.show_featured_image_summary }}
+        {{- /* same rule as in single.html for the series/section fallback image */ -}}
+        {{- $showImage := .Params.show_featured_image_summary -}}
+        {{- if and (not .Params.featured_image) (not (isset .Params "show_featured_image_summary")) -}}{{- $showImage = true -}}{{- end -}}
+        {{ if $showImage }}
           <div class="mb3 w-100 article-card-image">
             <a href="{{.RelPermalink}}">
               {{- partial "responsive-image.html" (dict

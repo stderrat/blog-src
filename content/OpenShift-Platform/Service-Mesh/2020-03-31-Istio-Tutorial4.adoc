@@ -15,8 +15,8 @@ categories:
 tags: ["Istio", "Service Mesh", "OpenShift", "OCP"] 
 
 aliases: [ 
-	 "/posts-output/2020-03-31-Istio-Tutorial4/",
-	 "/service-mesh/2020/03/ingress-with-custom-domain/",
+   "/posts-output/2020-03-31-Istio-Tutorial4/",
+   "/service-mesh/2020/03/ingress-with-custom-domain/",
 ] 
 ---
 

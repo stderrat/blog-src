@@ -1,6 +1,6 @@
 --- 
 title: "Service Mesh 1.1 released"
-description: "OpenShift 4.x Service Mesh Update."
+description: "Notes on the OpenShift Service Mesh 1.1 release: what changed for Istio, Kiali and Jaeger on OpenShift 4—and why this line is now end of life."
 date: "2020-04-10"
 doctype: book
 
@@ -15,8 +15,8 @@ categories:
 tags: ["Istio", "Service Mesh", "OpenShift", "OCP"] 
 
 aliases: [ 
-	 "/posts-output/2020-04-10-Istio-Update/",
-	 "/service-mesh/2020/04/service-mesh-1.1-released/",
+   "/posts-output/2020-04-10-Istio-Update/",
+   "/service-mesh/2020/04/service-mesh-1.1-released/",
 ] 
 ---
 

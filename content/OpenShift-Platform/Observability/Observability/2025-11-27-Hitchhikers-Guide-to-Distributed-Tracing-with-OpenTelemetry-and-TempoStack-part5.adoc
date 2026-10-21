@@ -1,6 +1,6 @@
 ---
 title: "The Hitchhiker's Guide to Observability - Understanding Traces - Part 5"
-description: "Understanding Traces - Part 5"
+description: "Part 5 of the Hitchhiker’s Guide to Observability: read and understand distributed traces in Tempo—spans, services, latency and error paths."
 date: "2025-11-27"
 doctype: book
 weight: 500
@@ -8,7 +8,7 @@ weight: 500
 series: "The Hitchhiker's Guide to Observability"
 series_part: 5
 
-featured_image: /openshift-platform/observability/images/observability/Logo_observability_5.png
+featured_image: /openshift-platform/observability/images/observability/observability-part5-spans.png
 show_featured_image_summary: true
 show_featured_image_article: true
 disableBreadcrumb: true

@@ -15,8 +15,8 @@ categories:
 tags: ["Istio", "Service Mesh", "OpenShift", "OCP", "Grayscale", "Canary", "DestinationRule"] 
 
 aliases: [ 
-	 "/posts-output/2020-04-01-Istio-Tutorial5/",
-	 "/service-mesh/2020/04/routing-example/",
+   "/posts-output/2020-04-01-Istio-Tutorial5/",
+   "/service-mesh/2020/04/routing-example/",
 ] 
 ---
 
