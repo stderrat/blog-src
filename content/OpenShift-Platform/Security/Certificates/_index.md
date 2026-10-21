@@ -5,7 +5,7 @@ chapter: true
 layout: summary
 pre: "<i class='fas fa-certificate'></i> "
 
-tags: ["OpenShift", "Security", "Certificates", "SSL", "TLS", "Cert-Manager"]
+tags: ["OpenShift", "Security", "Certificates", "SSL", "TLS", "cert-manager"]
 
 aliases:
   - /certificates/

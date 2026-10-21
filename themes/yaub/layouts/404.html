@@ -1,287 +1,225 @@
-{{ define "main" }}
-<!-- This is intentionally left empty as we handle everything in baseof -->
-{{ end }}
+{{ partial "header.html" . }}
 
-<!DOCTYPE html>
-<html lang="{{ .Site.Language.Lang }}" data-accent="{{ partial "accent.html" . }}">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Page Not Found - {{ .Site.Title }}</title>
-    <link rel="icon" href="{{ "images/favicon.ico" | relURL }}">
-    <link rel="stylesheet" href="{{ "css/fontawesome-all.min.css" | relURL }}">
-    <link rel="stylesheet" href="{{ "css/modular/base/accent.css" | relURL }}">
-    <style>
-        :root {
-            --bg-color: #282a36;
-            --card-bg: #323443;
-            --text-color: #f8f8f2;
-            --text-muted: #9ca3af;
-            --accent-color: var(--ACCENT-mid, #4f7aa4);
-            --accent-hover: var(--ACCENT-mid-hover, #6b9bc3);
-            --border-color: #444;
-        }
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--bg-color);
-            color: var(--text-color);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 2rem;
-        }
-        
-        .container {
-            max-width: 600px;
-            text-align: center;
-        }
-        
-        .error-code {
-            font-size: 8rem;
-            font-weight: 700;
-            color: var(--accent-color);
-            line-height: 1;
-            margin-bottom: 0.5rem;
-            text-shadow: 0 4px 20px rgba(var(--ACCENT-mid-rgb, 79,122,164), 0.3);
-        }
-        
-        .error-title {
-            font-size: 1.75rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            color: var(--text-color);
-        }
-        
-        .error-message {
-            font-size: 1.1rem;
-            color: var(--text-muted);
-            margin-bottom: 2rem;
-            line-height: 1.6;
-        }
-        
-        .search-box {
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 2rem;
-            max-width: 400px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-        
-        .search-input {
-            flex: 1;
-            padding: 0.75rem 1rem;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            background: var(--card-bg);
-            color: var(--text-color);
-            font-size: 1rem;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-        
-        .search-input:focus {
-            border-color: var(--accent-color);
-        }
-        
-        .search-input::placeholder {
-            color: var(--text-muted);
-        }
-        
-        .search-btn {
-            padding: 0.75rem 1.25rem;
-            background: var(--accent-color);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 1rem;
-            transition: background 0.2s;
-        }
-        
-        .search-btn:hover {
-            background: var(--accent-hover);
-        }
-        
-        .quick-links {
-            margin-bottom: 2.5rem;
-        }
-        
-        .quick-links h3 {
-            font-size: 0.9rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 1rem;
-        }
-        
-        .links-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.75rem;
-            justify-content: center;
-        }
-        
-        .link-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.6rem 1rem;
-            background: var(--card-bg);
-            color: var(--text-color);
-            text-decoration: none;
-            border-radius: 6px;
-            border: 1px solid var(--border-color);
-            font-size: 0.9rem;
-            transition: all 0.2s;
-        }
-        
-        .link-btn:hover {
-            border-color: var(--accent-color);
-            color: var(--accent-color);
-            transform: translateY(-2px);
-        }
-        
-        .link-btn i {
-            font-size: 0.85rem;
-        }
-        
-        .recent-posts {
-            text-align: left;
-            background: var(--card-bg);
-            border-radius: 8px;
-            padding: 1.5rem;
-            border: 1px solid var(--border-color);
-        }
-        
-        .recent-posts h3 {
-            font-size: 0.9rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        
-        .recent-posts ul {
-            list-style: none;
-        }
-        
-        .recent-posts li {
-            padding: 0.6rem 0;
-            border-bottom: 1px solid var(--border-color);
-        }
-        
-        .recent-posts li:last-child {
-            border-bottom: none;
-            padding-bottom: 0;
-        }
-        
-        .recent-posts a {
-            color: var(--text-color);
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            transition: color 0.2s;
-        }
-        
-        .recent-posts a:hover {
-            color: var(--accent-color);
-        }
-        
-        .recent-posts .post-icon {
-            color: var(--accent-color);
-            font-size: 0.8rem;
-        }
-        
-        .recent-posts .post-date {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            margin-left: auto;
-            white-space: nowrap;
-        }
-        
-        @media (max-width: 480px) {
-            .error-code {
-                font-size: 5rem;
-            }
-            
-            .error-title {
-                font-size: 1.4rem;
-            }
-            
-            .search-box {
-                flex-direction: column;
-            }
-            
-            .recent-posts .post-date {
-                display: none;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="error-code">404</div>
-        <h1 class="error-title">Oops! Page not found</h1>
-        <p class="error-message">
-            The page you're looking for doesn't exist or has been moved.<br>
-            Try searching or check out the links below.
-        </p>
-        
-        <form class="search-box" action="{{ "search/" | relURL }}" method="get">
-            <input type="text" name="q" class="search-input" placeholder="Search articles..." aria-label="Search">
-            <button type="submit" class="search-btn">
-                <i class="fas fa-search"></i>
-            </button>
-        </form>
-        
-        <div class="quick-links">
-            <h3>Quick Links</h3>
-            <div class="links-row">
-                <a href="{{ "/" | relURL }}" class="link-btn">
-                    <i class="fas fa-home"></i> Home
-                </a>
-                <a href="{{ "gitopscollection/" | relURL }}" class="link-btn">
-                    <i class="fas fa-code-branch"></i> GitOps
-                </a>
-                <a href="{{ "day-2/observability/" | relURL }}" class="link-btn">
-                    <i class="fas fa-chart-line"></i> Observability
-                </a>
-                <a href="{{ "day-2/" | relURL }}" class="link-btn">
-                    <i class="fas fa-cogs"></i> Day-2 Ops
-                </a>
-                <a href="{{ "helm-charts/" | relURL }}" class="link-btn">
-                    <i class="fas fa-dharmachakra"></i> Helm Charts
-                </a>
-            </div>
-        </div>
-        
-        <div class="recent-posts">
-            <h3><i class="fas fa-clock"></i> Recent Articles</h3>
-            <ul>
-                {{ range first 5 .Site.RegularPages.ByDate.Reverse }}
-                <li>
-                    <a href="{{ .RelPermalink }}">
-                        <i class="fas fa-file-alt post-icon"></i>
-                        <span>{{ .Title | truncate 50 }}</span>
-                        <span class="post-date">{{ .Date.Format "Jan 2" }}</span>
-                    </a>
-                </li>
-                {{ end }}
-            </ul>
+<style>
+/* 404: use theme tokens only (Red Hat via body; light/dark via data-theme) */
+body:has(.yaub-404) #toc-field,
+body:has(.yaub-404) #navigation,
+body:has(.yaub-404) #navigation-bottom {
+    display: none !important;
+}
+
+.yaub-404 {
+    max-width: min(100%, 40rem);
+    margin: 2rem auto 3rem;
+    text-align: center;
+}
+
+.yaub-404 .error-code {
+    font-family: "RedHatDisplay", "RedHatText", sans-serif;
+    font-size: clamp(4.5rem, 12vw, 7rem);
+    font-weight: 700;
+    line-height: 1;
+    margin: 0 0 0.35rem;
+    color: var(--MAIN-LINK-color);
+}
+
+.yaub-404 .error-title {
+    font-family: "RedHatDisplay", "RedHatText", sans-serif;
+    font-size: 1.65rem;
+    font-weight: 700;
+    margin: 0 0 0.75rem;
+    color: var(--MAIN-TITLES-TEXT-color, var(--MAIN-TEXT-color));
+}
+
+.yaub-404 .error-message {
+    margin: 0 0 1.75rem;
+    line-height: 1.65;
+    color: var(--META-TEXT-color, var(--MAIN-TEXT-color));
+}
+
+.yaub-404 .search-box {
+    display: flex;
+    gap: 0.5rem;
+    max-width: 22rem;
+    margin: 0 auto 2rem;
+}
+
+.yaub-404 .search-input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.65rem 0.9rem;
+    border: 1px solid var(--INPUT-BORDER, var(--CARD-BORDER-color, #444));
+    border-radius: 6px;
+    background: var(--INPUT-BG, var(--MENU-SEARCH-BG-color, transparent));
+    color: var(--INPUT-TEXT, var(--MAIN-TEXT-color));
+    font: inherit;
+}
+
+.yaub-404 .search-input:focus {
+    outline: 2px solid var(--MAIN-LINK-color);
+    outline-offset: 1px;
+    border-color: var(--MAIN-LINK-color);
+}
+
+.yaub-404 .search-input::placeholder {
+    color: var(--META-TEXT-color);
+}
+
+.yaub-404 .search-btn {
+    padding: 0.65rem 1.1rem;
+    border: 1px solid var(--MAIN-LINK-color);
+    border-radius: 6px;
+    background: var(--MAIN-LINK-color);
+    color: var(--MAIN-BG-color, #fff);
+    cursor: pointer;
+    font: inherit;
+}
+
+.yaub-404 .search-btn:hover {
+    filter: brightness(1.08);
+}
+
+.yaub-404 .quick-links h3,
+.yaub-404 .recent-posts h3 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--META-TEXT-color);
+    margin: 0 0 0.85rem;
+}
+
+.yaub-404 .links-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    justify-content: center;
+    margin-bottom: 2rem;
+}
+
+.yaub-404 .link-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.5rem 0.9rem;
+    border-radius: 6px;
+    border: 1px solid var(--CARD-BORDER-color, var(--BUTTON-BORDER-color, #444));
+    background: var(--CARD-BG-color, var(--MENU-SECTIONS-BG-color, transparent));
+    color: var(--MAIN-TEXT-color);
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+
+.yaub-404 .link-btn:hover {
+    border-color: var(--MAIN-LINK-color);
+    color: var(--MAIN-LINK-color);
+}
+
+.yaub-404 .recent-posts {
+    text-align: left;
+    padding: 1.25rem 1.35rem;
+    border-radius: 8px;
+    border: 1px solid var(--CARD-BORDER-color, var(--BUTTON-BORDER-color, #444));
+    background: var(--CARD-BG-color, var(--MENU-SECTIONS-BG-color, transparent));
+}
+
+.yaub-404 .recent-posts h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.yaub-404 .recent-posts ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.yaub-404 .recent-posts li {
+    padding: 0.55rem 0;
+    border-bottom: 1px solid var(--CARD-BORDER-color, rgba(127, 127, 127, 0.25));
+}
+
+.yaub-404 .recent-posts li:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.yaub-404 .recent-posts a {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    color: var(--MAIN-TEXT-color);
+    text-decoration: none;
+}
+
+.yaub-404 .recent-posts a:hover {
+    color: var(--MAIN-LINK-color);
+}
+
+.yaub-404 .post-icon {
+    color: var(--MAIN-LINK-color);
+    font-size: 0.8rem;
+    flex-shrink: 0;
+}
+
+.yaub-404 .post-date {
+    margin-left: auto;
+    font-size: 0.8rem;
+    color: var(--META-TEXT-color);
+    white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+    .yaub-404 .search-box {
+        flex-direction: column;
+    }
+    .yaub-404 .post-date {
+        display: none;
+    }
+}
+</style>
+
+<div class="yaub-404">
+    <p class="error-code" aria-hidden="true">404</p>
+    <h1 class="error-title">Page not found</h1>
+    <p class="error-message">
+        The page you are looking for does not exist or has been moved.<br>
+        Try search, or use one of the links below.
+    </p>
+
+    <form class="search-box" action="{{ "search/" | relURL }}" method="get" role="search">
+        <input type="search" name="q" class="search-input" placeholder="Search articles..." aria-label="Search articles" autocomplete="off">
+        <button type="submit" class="search-btn" aria-label="Search">
+            <i class="fas fa-search" aria-hidden="true"></i>
+        </button>
+    </form>
+
+    <div class="quick-links">
+        <h3>Quick links</h3>
+        <div class="links-row">
+            <a href="{{ "/" | relURL }}" class="link-btn"><i class="fas fa-home" aria-hidden="true"></i> Home</a>
+            <a href="{{ "gitopscollection/" | relURL }}" class="link-btn"><i class="fas fa-code-branch" aria-hidden="true"></i> GitOps</a>
+            <a href="{{ "openshift-platform/observability/" | relURL }}" class="link-btn"><i class="fas fa-chart-line" aria-hidden="true"></i> Observability</a>
+            <a href="{{ "openshift-platform/day-2/" | relURL }}" class="link-btn"><i class="fas fa-cogs" aria-hidden="true"></i> Day-2 Ops</a>
+            <a href="{{ "helm-charts/" | relURL }}" class="link-btn"><i class="fas fa-dharmachakra" aria-hidden="true"></i> Helm Charts</a>
         </div>
     </div>
-</body>
-</html>
+
+    <div class="recent-posts">
+        <h3><i class="fas fa-clock" aria-hidden="true"></i> Recent articles</h3>
+        <ul>
+            {{ range first 5 .Site.RegularPages.ByDate.Reverse }}
+            <li>
+                <a href="{{ .RelPermalink }}">
+                    <i class="fas fa-file-alt post-icon" aria-hidden="true"></i>
+                    <span>{{ .Title | truncate 50 }}</span>
+                    <span class="post-date">{{ .Date.Format "Jan 2" }}</span>
+                </a>
+            </li>
+            {{ end }}
+        </ul>
+    </div>
+</div>
+
+{{ partial "footer.html" . }}

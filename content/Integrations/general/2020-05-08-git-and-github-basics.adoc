@@ -10,7 +10,7 @@ type: post
 draft: false
 categories:
    - Other
-tags: ["git", "github"]
+tags: ["Git", "github"]
 
 aliases: [ 
    "/posts-output/2020-05-08-git-and-github-basics/",

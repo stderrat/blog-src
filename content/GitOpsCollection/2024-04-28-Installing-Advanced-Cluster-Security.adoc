@@ -166,7 +166,7 @@ helper-status-checker:
 
 NOTE: Verify the READMEs at https://github.com/tjungbauer/helm-charts/tree/main/charts/helper-operator[Helper Operator^] and https://github.com/tjungbauer/helm-charts/tree/main/charts/helper-status-checker[Helper Operator Status Checker^] to find additional possible configurations.
 
-NOTE: Also verify the separate article https://blog.stderr.at/openshift/2023-03-20-operator-installation-with-argocd/[Operator Installation with Argo CD] to understand why I am verifying the status of the Operator installation.
+NOTE: Also verify the separate article https://blog.stderr.at/openshift-platform/gitops/2023-03-20-operator-installation-with-argocd/[Operator Installation with Argo CD] to understand why I am verifying the status of the Operator installation.
 
 === Configuring Advanced Cluster Security
 

@@ -6,7 +6,7 @@ weight: 51
 doctype: book
 chapter: false
 pre: "<i class='fas fa-th'></i> "
-tags: ["OCP", "GitOps", "OpenShift", "GitOps Approach", "Argo CD", "ArgoCD", "Catalog"]
+tags: ["OCP", "GitOps", "OpenShift", "GitOps Approach", "Argo CD", "Catalog"]
 
 featured_image: /gitops-catalog/images/Logo_GitOps-Catalog.png
 show_featured_image_summary: true

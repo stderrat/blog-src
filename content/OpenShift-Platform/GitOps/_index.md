@@ -5,7 +5,7 @@ chapter: true
 layout: summary
 pre: "<i class='fas fa-code-branch'></i> "
 
-tags: ["OpenShift", "GitOps", "ArgoCD", "Argo CD", "Continuous Deployment"]
+tags: ["OpenShift", "GitOps", "Argo CD", "Continuous Deployment"]
 
 aliases:
   - /gitops/

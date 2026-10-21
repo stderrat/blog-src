@@ -11,7 +11,7 @@ draft: false
 categories:
    - OpenShift
    - GitOps
-tags: ["Gitops", "OpenShift", "OCP", "ArgoCD"]
+tags: ["GitOps", "OpenShift", "OCP", "Argo CD"]
 
 aliases: [ 
    "/posts-output/2020-08-06-ArgoCD/",

@@ -18,7 +18,7 @@ draft: false
 categories:
    - OpenShift
    - GitOps
-tags: ["OCP", "GitOps", "OpenShift", "GitOps Approach", "Argo CD", "ArgoCD"] 
+tags: ["OCP", "GitOps", "OpenShift", "GitOps Approach", "Argo CD"] 
 
 aliases: [ 
    "/openshift/gitopscollection/intro",

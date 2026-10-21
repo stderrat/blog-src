@@ -1,0 +1,28 @@
+{{- /*
+  Stable cache-bust id for the whole site (same on every page of a build).
+
+  Priority:
+    1. params.assetsVersion (manual pin)
+    2. content hash of key theme JS + all modular CSS
+    3. "1"
+
+  Note: Hugo < 0.166 allows only one return at the end of a partial.
+*/ -}}
+{{- $id := "1" -}}
+{{- if site.Params.assetsVersion -}}
+  {{- $id = site.Params.assetsVersion -}}
+{{- else -}}
+  {{- $parts := slice -}}
+  {{- range slice "js/yaub.js" "css/theme-yaub-modular.css" -}}
+    {{- with resources.Get . -}}
+      {{- $parts = $parts | append (. | fingerprint).Data.Integrity -}}
+    {{- end -}}
+  {{- end -}}
+  {{- range resources.Match "css/modular/**/*.css" -}}
+    {{- $parts = $parts | append (. | fingerprint).Data.Integrity -}}
+  {{- end -}}
+  {{- if $parts -}}
+    {{- $id = slicestr (md5 (delimit $parts "|")) 0 12 -}}
+  {{- end -}}
+{{- end -}}
+{{- return $id -}}

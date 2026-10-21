@@ -2,11 +2,19 @@ baseURL = "https://blog.stderr.at/"
 locale = "en-us"
 title = "TechBlog about OpenShift/Ansible/Satellite and much more"
 theme = ["yaub"]
+# Keep GitInfo available, but do NOT use Git author dates for .Lastmod.
+# Front-matter-only lastmod (then date) so bulk metadata commits do not
+# flood "Recently Updated" / "Updated …" with today's date.
 enableGitInfo = true
 copyright = "Toni Schmidbauer & Thomas Jungbauer"
 enableRobotsTXT = true
 rssLimit = 50
 timeZone = "Europe/Vienna"
+
+[frontmatter]
+  # Default Hugo order starts with :git when enableGitInfo is true.
+  # Prefer explicit lastmod / modified; otherwise fall back to date.
+  lastmod = ["lastmod", "modified", "date", "publishDate"]
 
 [sitemap]
 changefreq = 'monthly'
@@ -45,6 +53,12 @@ home = [ "HTML", "RSS", "JSON", "TJFeed", "NavTree"]
   # "petrol", "indigo" or "slate".
   # Palettes: themes/yaub/static/css/modular/base/accent.css
   accentColor = "blue"
+  # Font Awesome: subset (~10 kB woff2) vs full (~300 kB). Rollback: set false
+  # (full CSS + webfonts stay in place; backup also under static/_font-backups/).
+  useFontAwesomeSubset = true
+  # Asset cache-busting: fingerprint via Hugo Pipes (see layouts/partials/yaub/asset-url.html).
+  # Optional manual pin if fingerprint is unavailable: assetsVersion = "2026-10-21"
+  # disableAssetsBusting = true
   # Articles without featured_image show their series/section image
   # (static/images/share/...) on cards, in the article header and in "See Also".
   featuredImageFallback = true
@@ -336,6 +350,16 @@ staticDir = ['themes/hugo-theme-learn/static', 'static']
   [[module.mounts]]
     source = "static"
     target = "static"
+  # Theme JS/CSS/Mermaid → assets pipeline for fingerprinting (cache bust)
+  [[module.mounts]]
+    source = "themes/yaub/static/js"
+    target = "assets/js"
+  [[module.mounts]]
+    source = "themes/yaub/static/css"
+    target = "assets/css"
+  [[module.mounts]]
+    source = "themes/yaub/static/mermaid"
+    target = "assets/mermaid"
   [[module.mounts]]
     source = "content"
     target = "assets/imgproc/content"

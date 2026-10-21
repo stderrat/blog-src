@@ -17,7 +17,7 @@ type: post
 categories:
   - Other
   - Virtualization
-tags: ["Other", "Home Lab", "RHEL", "Image builder", "bootc", RHEL10, image-builder]
+tags: ["Other", "Home Lab", "RHEL", "Image Builder", "bootc", "RHEL10"]
 
 aliases: []
 ---

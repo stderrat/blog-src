@@ -202,7 +202,7 @@ After Argo CD creates the subscription and operatorgroup resources (and namespac
 
 Therefore, I created a mechanism to verify if an Operator is ready or not. 
 
-NOTE: Also verify the separate article https://blog.stderr.at/openshift/2023-03-20-operator-installation-with-argocd/[Operator Installation with Argo CD] that addresses the problem in more detail.
+NOTE: Also verify the separate article https://blog.stderr.at/openshift-platform/gitops/2023-03-20-operator-installation-with-argocd/[Operator Installation with Argo CD] that addresses the problem in more detail.
 
 All it does is to start a small Job inside OpenShift and to verify the status of the Operator installation. If everything is fine, the Job will end successfully and Argo CD will continue with the next syncwave. Argo CD Hook and syncwaves are required here. The Job should be started _after_ the Subscription/OperatorGroup resources have been created, which means any syncwave after "0".
 

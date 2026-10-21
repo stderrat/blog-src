@@ -13,7 +13,7 @@ draft: false
 categories:
    - OpenShift
    - GitOps
-tags: ["Application", "OpenShift", "OCP", "GitOps", "Argo CD", "ApplicationSet", "Cert-Manager", "Certificates", "Route53"] 
+tags: ["Application", "OpenShift", "OCP", "GitOps", "Argo CD", "ApplicationSet", "cert-manager", "Certificates", "Route53"] 
 
 aliases: [ 
    "/posts-output/2024-07-04-manage-certificate/",

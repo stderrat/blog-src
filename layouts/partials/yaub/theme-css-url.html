@@ -1,0 +1,18 @@
+{{- /*
+  Fingerprinted theme entry CSS with @import cache-bust aligned to the
+  same stable id (so modular/*.css imports are invalidated together).
+*/ -}}
+{{- $variant := . | default "yaub" -}}
+{{- $path := printf "css/theme-%s-modular.css" $variant -}}
+{{- $url := $path | relURL -}}
+{{- if not site.Params.disableAssetsBusting -}}
+  {{- $bust := partialCached "yaub/cache-bust-id.html" "id" -}}
+  {{- with resources.Get $path -}}
+    {{- $css := replaceRE `\?v=[^"'\s]+` (printf "?v=%s" $bust) .Content -}}
+    {{- $res := resources.FromString (printf "css/theme-%s-modular.gen.css" $variant) $css -}}
+    {{- $url = ($res | fingerprint).RelPermalink -}}
+  {{- else -}}
+    {{- $url = printf "%s?v=%s" ($path | relURL) $bust -}}
+  {{- end -}}
+{{- end -}}
+{{- return $url -}}

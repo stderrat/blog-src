@@ -1,36 +1,49 @@
 {{/* Sidebar Widgets - Archive Overview & Recently Updated Articles */}}
 <aside class="sidebar-widgets" aria-label="Sidebar">
     
-    {{/* Recently Updated Articles Widget */}}
+    {{/*
+      Prefer articles with an explicit lastmod > date (real revisions).
+      If none exist, fall back to the newest posts by publish date so the
+      sidebar never looks empty / inactive.
+    */}}
+    {{ $recentlyUpdated := slice }}
+    {{ range .Site.RegularPages.ByLastmod.Reverse }}
+        {{ $daysDiff := div (sub .Lastmod.Unix .Date.Unix) 86400 }}
+        {{ if and (gt $daysDiff 1) (lt (len $recentlyUpdated) 5) }}
+            {{ $recentlyUpdated = $recentlyUpdated | append . }}
+        {{ end }}
+    {{ end }}
+    {{ $showUpdates := gt (len $recentlyUpdated) 0 }}
+    {{ $list := $recentlyUpdated }}
+    {{ if not $showUpdates }}
+        {{ $list = first 5 .Site.RegularPages.ByDate.Reverse }}
+    {{ end }}
+
     <div class="sidebar-widget updated-widget" style="animation-delay: 0.05s;">
         <h3 class="widget-title">
-            <i class="fas fa-sync-alt"></i> Recently Updated
+            {{ if $showUpdates }}
+            <i class="fas fa-sync-alt" aria-hidden="true"></i> Recently Updated
+            {{ else }}
+            <i class="fas fa-newspaper" aria-hidden="true"></i> Latest Posts
+            {{ end }}
         </h3>
         <div class="widget-content">
             <ul class="updated-articles-list">
-                {{/* Get pages sorted by last modification date, exclude those where lastmod equals date */}}
-                {{ $recentlyUpdated := slice }}
-                {{ range .Site.RegularPages.ByLastmod.Reverse }}
-                    {{/* Only include if Lastmod is significantly different from Date (more than 1 day) */}}
-                    {{ $daysDiff := div (sub .Lastmod.Unix .Date.Unix) 86400 }}
-                    {{ if and (gt $daysDiff 1) (lt (len $recentlyUpdated) 5) }}
-                        {{ $recentlyUpdated = $recentlyUpdated | append . }}
-                    {{ end }}
-                {{ end }}
-                
-                {{ if $recentlyUpdated }}
-                    {{ range $recentlyUpdated }}
-                    <li class="updated-article-item">
-                        <a href="{{ .Permalink }}" class="updated-article-link">
-                            <span class="updated-article-title">{{ .Title | truncate 50 }}</span>
-                            <span class="updated-article-date" title="Last updated on {{ .Lastmod.Format "January 2, 2006" }}">
-                                <i class="far fa-clock"></i> {{ .Lastmod.Format "Jan 2" }}
-                            </span>
-                        </a>
-                    </li>
-                    {{ end }}
-                {{ else }}
-                    <li class="no-updates">No recent updates</li>
+                {{ range $list }}
+                <li class="updated-article-item">
+                    <a href="{{ .Permalink }}" class="updated-article-link">
+                        <span class="updated-article-title">{{ .Title | truncate 50 }}</span>
+                        {{ if $showUpdates }}
+                        <span class="updated-article-date" title="Last updated on {{ .Lastmod.Format "January 2, 2006" }}">
+                            <i class="far fa-clock" aria-hidden="true"></i> {{ .Lastmod.Format "Jan 2" }}
+                        </span>
+                        {{ else }}
+                        <span class="updated-article-date" title="Published {{ .Date.Format "January 2, 2006" }}">
+                            <i class="far fa-calendar-alt" aria-hidden="true"></i> {{ .Date.Format "Jan 2" }}
+                        </span>
+                        {{ end }}
+                    </a>
+                </li>
                 {{ end }}
             </ul>
         </div>

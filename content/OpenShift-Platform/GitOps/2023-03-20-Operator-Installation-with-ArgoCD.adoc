@@ -9,11 +9,12 @@ type: post
 draft: false
 categories:
    - OpenShift
-tags: ["oc", "operator", "OpenShift", "OCP", "GitOps", "Argo CD"] 
+tags: ["oc", "Operator", "OpenShift", "OCP", "GitOps", "Argo CD"] 
 
 aliases: [ 
    "/posts-output/2023-03-21-operator-installation-with-argocd/",
    "/openshift/2023/03/operator-installation-with-argo-cd/",
+   "/openshift/2023-03-20-operator-installation-with-argocd/",
 ] 
 ---
 

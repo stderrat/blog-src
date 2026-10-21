@@ -14,7 +14,7 @@ draft: false
 categories:
   - OpenShift
   - Security
-tags: ["OpenShift", "OCP", "Security", "Cert-Manager", "Certificate", "CertificateRequestPolicy", "Approver Policy"]
+tags: ["OpenShift", "OCP", "Security", "cert-manager", "Certificate", "CertificateRequestPolicy", "Approver Policy"]
 
 aliases: ["/posts-output/2025-06-03-cert-manager-approver-policy/", "/openshift/2025/06/cert-manager-approver-policy", "/openshift/2025/06/cert-manager-policy-approver-in-openshift/"]
 ---

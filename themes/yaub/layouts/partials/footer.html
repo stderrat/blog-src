@@ -131,53 +131,54 @@
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="{{"js/clipboard.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
-    <script src="{{"js/perfect-scrollbar.jquery.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
-    <script src="{{"js/featherlight.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+    {{/* defer: download in parallel, run in order after parse (before DOMContentLoaded) */}}
+    <script defer src="{{ partialCached "yaub/asset-url.html" "js/clipboard.min.js" "js/clipboard.min.js" }}"></script>
+    <script defer src="{{ partialCached "yaub/asset-url.html" "js/perfect-scrollbar.jquery.min.js" "js/perfect-scrollbar.jquery.min.js" }}"></script>
+    <script defer src="{{ partialCached "yaub/asset-url.html" "js/featherlight.min.js" "js/featherlight.min.js" }}"></script>
     
-    <script src="{{"js/highlight.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+    <script defer src="{{ partialCached "yaub/asset-url.html" "js/highlight.min.js" "js/highlight.min.js" }}"></script>
     <!-- Opt-in line numbers for code blocks: [source,yaml,role=linenums] -->
-    <script src="{{"js/yaub-linenums.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
-    <script src="{{"js/merge-html.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+    <script defer src="{{ partialCached "yaub/asset-url.html" "js/yaub-linenums.js" "js/yaub-linenums.js" }}"></script>
+    <script defer src="{{ partialCached "yaub/asset-url.html" "js/merge-html.js" "js/merge-html.js" }}"></script>
     <script>
-      hljs.configure({ ignoreUnescapedHTML: true });
-      hljs.addPlugin(mergeHTMLPlugin);
-      hljs.addPlugin(yaubLineNumbersPlugin); // after mergeHTMLPlugin, so callouts are restored first
-      hljs.highlightAll();
+      // Runs after deferred scripts above (DOMContentLoaded waits for defer)
+      document.addEventListener('DOMContentLoaded', function () {
+        if (typeof hljs === 'undefined') return;
+        hljs.configure({ ignoreUnescapedHTML: true });
+        if (typeof mergeHTMLPlugin !== 'undefined') hljs.addPlugin(mergeHTMLPlugin);
+        if (typeof yaubLineNumbersPlugin !== 'undefined') hljs.addPlugin(yaubLineNumbersPlugin);
+        hljs.highlightAll();
+      });
     </script>
 
-    <!-- Modernizr removed - replaced with inline JS in header.html -->
-    <script src="{{"js/learn.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
-    <script src="{{"js/yaub.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
-    <script src="{{"js/reader-mode.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+    <script defer src="{{ partialCached "yaub/asset-url.html" "js/learn.js" "js/learn.js" }}"></script>
+    <script defer src="{{ partialCached "yaub/asset-url.html" "js/yaub.js" "js/yaub.js" }}"></script>
+    <script defer src="{{ partialCached "yaub/asset-url.html" "js/reader-mode.js" "js/reader-mode.js" }}"></script>
     {{- if not .Site.Params.disableThemeToggle }}
-    <script src="{{"js/theme-toggle.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+    <script defer src="{{ partialCached "yaub/asset-url.html" "js/theme-toggle.js" "js/theme-toggle.js" }}"></script>
     {{- end }}
     
     <!-- Search Modal (Cmd/Ctrl+K) -->
     <link href="/pagefind/pagefind-ui.css" rel="stylesheet">
-    <script src="/pagefind/pagefind-ui.js"></script>
-    <script src="{{"js/search-modal.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+    <script defer src="/pagefind/pagefind-ui.js"></script>
+    <script defer src="{{ partialCached "yaub/asset-url.html" "js/search-modal.js" "js/search-modal.js" }}"></script>
     
     <!-- Keyboard Shortcuts Help Modal (?) -->
-    <script src="{{"js/shortcuts-modal.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+    <script defer src="{{ partialCached "yaub/asset-url.html" "js/shortcuts-modal.js" "js/shortcuts-modal.js" }}"></script>
     <script>
         function topFunction() {
           document.body.scrollTop = 0; // For Safari
           document.documentElement.scrollTop = 0; // For Chrome, Firefox, IE and Opera
         }
 
-        $(".article-box").click(function(event) {
-//            window.location = $(this).find("a").attr("href");
-            window.location = $(this).attr('href');
-            // stopPropagation is required, since there are multiple links inside the DIV
+        document.addEventListener('DOMContentLoaded', function () {
+          if (typeof jQuery === 'undefined') return;
+          jQuery(".article-box").click(function(event) {
+            window.location = jQuery(this).attr('href');
             event.stopPropagation();
             return false;
-            
-
-
-
           });
+        });
     </script>
 
     {{/* Mermaid (~2.7 MB) + d3/js-yaml: load only when the page needs diagrams.
@@ -195,49 +196,46 @@
     {{ end }}
     {{ if $useMermaid }}
         <!-- JS-YAML for mermaid frontmatter parsing -->
-        <script src="{{"js/js-yaml/js-yaml.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+        <script defer src="{{ partialCached "yaub/asset-url.html" "js/js-yaml/js-yaml.min.js" "js/js-yaml/js-yaml.min.js" }}"></script>
         
         <!-- D3 libraries for Mermaid zoom functionality -->
-        <script src="{{"js/d3/d3-color.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
-        <script src="{{"js/d3/d3-dispatch.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
-        <script src="{{"js/d3/d3-drag.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
-        <script src="{{"js/d3/d3-ease.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
-        <script src="{{"js/d3/d3-interpolate.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
-        <script src="{{"js/d3/d3-selection.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
-        <script src="{{"js/d3/d3-timer.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
-        <script src="{{"js/d3/d3-transition.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
-        <script src="{{"js/d3/d3-zoom.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+        <script defer src="{{ partialCached "yaub/asset-url.html" "js/d3/d3-color.min.js" "js/d3/d3-color.min.js" }}"></script>
+        <script defer src="{{ partialCached "yaub/asset-url.html" "js/d3/d3-dispatch.min.js" "js/d3/d3-dispatch.min.js" }}"></script>
+        <script defer src="{{ partialCached "yaub/asset-url.html" "js/d3/d3-drag.min.js" "js/d3/d3-drag.min.js" }}"></script>
+        <script defer src="{{ partialCached "yaub/asset-url.html" "js/d3/d3-ease.min.js" "js/d3/d3-ease.min.js" }}"></script>
+        <script defer src="{{ partialCached "yaub/asset-url.html" "js/d3/d3-interpolate.min.js" "js/d3/d3-interpolate.min.js" }}"></script>
+        <script defer src="{{ partialCached "yaub/asset-url.html" "js/d3/d3-selection.min.js" "js/d3/d3-selection.min.js" }}"></script>
+        <script defer src="{{ partialCached "yaub/asset-url.html" "js/d3/d3-timer.min.js" "js/d3/d3-timer.min.js" }}"></script>
+        <script defer src="{{ partialCached "yaub/asset-url.html" "js/d3/d3-transition.min.js" "js/d3/d3-transition.min.js" }}"></script>
+        <script defer src="{{ partialCached "yaub/asset-url.html" "js/d3/d3-zoom.min.js" "js/d3/d3-zoom.min.js" }}"></script>
         
         {{ if isset .Params "customMermaidURL" }}
-            <script src="{{ .Params.customMermaidURL }}"></script>
+            <script defer src="{{ .Params.customMermaidURL }}"></script>
         {{ else if isset .Site.Params "customMermaidURL" }}
-            <script src="{{ .Site.Params.customMermaidURL }}"></script>
+            <script defer src="{{ .Site.Params.customMermaidURL }}"></script>
         {{ else }}
-            <script src="{{"mermaid/mermaid.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+            <script defer src="{{ partialCached "yaub/asset-url.html" "mermaid/mermaid.js" "mermaid/mermaid.js" }}"></script>
         {{ end }}
         <script>
-            // Initialize window.relearn for zoom functionality
+            {{/* Flag must be sync so yaub.js $(document).ready can see it.
+                 mermaid.initialize waits for DOMContentLoaded (after deferred mermaid.js). */}}
             window.relearn = window.relearn || {};
             window.relearn.themeUseMermaid = true;
             window.relearn.mermaidConfig = { securityLevel: 'antiscript' };
-            
-            // Translation strings for mermaid zoom
             window.T_Reset_view = 'Reset view';
             window.T_View_reset = 'View reset';
-            
-            // Toast notification function (simple fallback)
             window.showToast = window.showToast || function(msg) {
                 console.log('Toast:', msg);
             };
-            
-            // Initialize mermaid. antiscript keeps HTML labels such as <br/> and strips script.
-            if (typeof mermaid !== 'undefined') {
-                mermaid.initialize({ 
-                    startOnLoad: false,  // We'll manually trigger it
-                    securityLevel: 'antiscript',
-                    theme: 'default'
-                });
-            }
+            document.addEventListener('DOMContentLoaded', function () {
+                if (typeof mermaid !== 'undefined') {
+                    mermaid.initialize({
+                        startOnLoad: false,
+                        securityLevel: 'antiscript',
+                        theme: 'default'
+                    });
+                }
+            });
         </script>
     {{ end }}
 

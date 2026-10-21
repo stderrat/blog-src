@@ -21,7 +21,7 @@ categories:
    - GitOps
    - OpenShift
 
-tags: ["Argo CD", "Argo CD Operator", "OpenShift GitOps", "OpenShift", "GitOps", "Multi-cluster", "Hub and Spoke", "Kubernetes", "Helm", "Kustomize", "Git", "Performance", "Reconcile", "Sharding"]
+tags: ["Argo CD", "Argo CD Operator", "OpenShift GitOps", "OpenShift", "GitOps", "Multi-Cluster", "Hub and Spoke", "Kubernetes", "Helm", "Kustomize", "Git", "Performance", "Reconcile", "Sharding"]
 
 aliases: []
 ---

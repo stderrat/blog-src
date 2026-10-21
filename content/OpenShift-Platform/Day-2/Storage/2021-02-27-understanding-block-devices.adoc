@@ -10,7 +10,7 @@ type: post
 draft: false
 categories:
    - OpenShift
-tags: ["Storage", "OpenShift", "OCP", "Block devices"]
+tags: ["Storage", "OpenShift", "OCP", "Block Devices"]
 
 aliases: [ 
    "/posts-output/2021-02-27-understanding-block-devices/",

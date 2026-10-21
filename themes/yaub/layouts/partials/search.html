@@ -1,16 +1,15 @@
 <div class="searchbox">
-    <label for="search-by"><i class="fas fa-search"></i></label>
-    <input data-search-input id="search-by" type="search" placeholder="{{T "Search-placeholder"}}">
-    <span data-search-clear=""><i class="fas fa-times"></i></span>
+    <label for="search-by"><i class="fas fa-search" aria-hidden="true"></i><span class="sr-only">Search</span></label>
+    <input data-search-input id="search-by" type="search" placeholder="{{T "Search-placeholder"}}" aria-label="Search articles">
+    <button type="button" data-search-clear="" aria-label="Clear search"><i class="fas fa-times" aria-hidden="true"></i></button>
 </div>
-{{ $assetBusting := not .Site.Params.disableAssetsBusting }}
-<script type="text/javascript" src="{{"js/lunr.min.js" | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}"></script>
-<script type="text/javascript" src="{{"js/auto-complete.js" | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}"></script>
-<script type="text/javascript">
+<script defer src="{{ partialCached "yaub/asset-url.html" "js/lunr.min.js" "js/lunr.min.js" }}"></script>
+<script defer src="{{ partialCached "yaub/asset-url.html" "js/auto-complete.js" "js/auto-complete.js" }}"></script>
+<script>
     {{ if hugo.IsMultilingual }}
         var baseurl = "{{.Site.BaseURL}}{{.Site.LanguagePrefix}}";
     {{ else }}
         var baseurl = "{{.Site.BaseURL}}";
     {{ end }}
 </script>
-<script type="text/javascript" src="{{"js/search.js" | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}"></script>
+<script defer src="{{ partialCached "yaub/asset-url.html" "js/search.js" "js/search.js" }}"></script>

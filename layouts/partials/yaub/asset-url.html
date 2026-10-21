@@ -1,0 +1,31 @@
+{{- /*
+  yaub/asset-url.html — cache-friendly asset URL
+
+  Usage:
+    {{ partialCached "yaub/asset-url.html" "js/yaub.js" "js/yaub.js" }}
+
+  Prefer partialCached with the path as cache key so each asset is
+  fingerprinted once per build.
+
+  When busting is enabled (default):
+    - Prefer Hugo Pipes fingerprint (content hash in the filename)
+    - Large assets (mermaid): stable ?v=<id> only (avoid hashing ~2.7 MB)
+    - Fallback: ?v=<stable id> (never now.Unix)
+
+  When params.disableAssetsBusting = true: plain relURL.
+*/ -}}
+{{- $path := . -}}
+{{- $url := $path | relURL -}}
+{{- if not site.Params.disableAssetsBusting -}}
+  {{- $v := partialCached "yaub/cache-bust-id.html" "id" -}}
+  {{- if hasPrefix $path "mermaid/" -}}
+    {{- $url = printf "%s?v=%s" ($path | relURL) $v -}}
+  {{- else -}}
+    {{- with resources.Get $path -}}
+      {{- $url = (. | fingerprint).RelPermalink -}}
+    {{- else -}}
+      {{- $url = printf "%s?v=%s" ($path | relURL) $v -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- return $url -}}

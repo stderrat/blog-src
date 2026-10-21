@@ -18,8 +18,10 @@
     padding: 4px 12px;
     font-size: 11px;
     font-weight: 600;
-    background: rgba(255, 255, 255, 0.1) !important;
-    color: rgba(255, 255, 255, 0.7) !important;
+    /* Sit on page chrome above the dark <pre> — use code-block colours so
+       light mode keeps readable contrast (was ~1:1 white-on-white). */
+    background: #282c34 !important;
+    color: #d0d4db !important;
     border-radius: 5px 5px 0 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     margin-bottom: -1px;
@@ -149,21 +151,30 @@
         wrapPre(pre, detectLanguage(pre.querySelector('code')), skipLangBadge);
     });
 
-    /* Keyboard: overflowed code blocks must be focusable to scroll (axe scrollable-region-focusable) */
-    document.querySelectorAll('#body-inner pre, .highlightable pre, article pre').forEach(function(pre) {
-        if (pre.querySelector('code.language-mermaid, code.mermaid')) return;
-        if (pre.closest && pre.closest('.mermaid, .mermaid-container')) return;
-        if (!pre.hasAttribute('tabindex')) {
+    /* Keyboard: overflowed code blocks must be focusable to scroll (axe scrollable-region-focusable).
+       Run after hljs (DOMContentLoaded) so highlight wrappers do not drop attributes. */
+    function makeCodeBlocksFocusable() {
+        document.querySelectorAll('#body-inner pre, .highlightable pre, article pre, .listingblock pre').forEach(function(pre) {
+            if (pre.querySelector('code.language-mermaid, code.mermaid')) return;
+            if (pre.closest && pre.closest('.mermaid, .mermaid-container')) return;
             pre.setAttribute('tabindex', '0');
-        }
-        if (!pre.getAttribute('role')) {
-            pre.setAttribute('role', 'region');
-        }
-        if (!pre.getAttribute('aria-label')) {
-            var lang = detectLanguage(pre.querySelector('code'));
-            pre.setAttribute('aria-label', lang ? ('Code block: ' + lang) : 'Code block');
-        }
-    });
+            if (!pre.getAttribute('role')) {
+                pre.setAttribute('role', 'region');
+            }
+            if (!pre.getAttribute('aria-label')) {
+                var lang = detectLanguage(pre.querySelector('code'));
+                pre.setAttribute('aria-label', lang ? ('Code block: ' + lang) : 'Code block');
+            }
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', makeCodeBlocksFocusable);
+    } else {
+        makeCodeBlocksFocusable();
+    }
+    // hljs.highlightAll also binds DOMContentLoaded; run once more after it
+    window.addEventListener('load', makeCodeBlocksFocusable);
 })();
 </script>
 

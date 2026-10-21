@@ -11,7 +11,7 @@ draft: false
 categories:
   - OpenShift
   - Security
-tags: ["Hardening", "OpenShift", "OCP", "security", "compliance", "Compliance Operator"]
+tags: ["Hardening", "OpenShift", "OCP", "Security", "Compliance", "Compliance Operator"]
 
 aliases: ["/posts-output/2021-07-19-ComplianceOperator/", "/compliance/2021/07/compliance-operator/", "/compliance/2021/07/compliance-operator/"]
 ---

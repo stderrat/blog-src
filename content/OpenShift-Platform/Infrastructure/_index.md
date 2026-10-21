@@ -5,7 +5,7 @@ chapter: true
 layout: summary
 pre: "<i class='fas fa-industry'></i> "
 
-tags: ["OpenShift", "Infrastructure", "Setup", "SNO", "Single Node", "OKD", "disconnected"]
+tags: ["OpenShift", "Infrastructure", "Setup", "SNO", "Single Node", "OKD", "Disconnected"]
 
 aliases:
   - /infrastructure/

@@ -5,7 +5,7 @@ date: 2025-12-22
 weight: 24
 doctype: book
 chapter: true
-tags: ["OCP", "GitOps", "OpenShift", "GitOps Approach", "Argo CD", "ArgoCD", "Catalog"]
+tags: ["OCP", "GitOps", "OpenShift", "GitOps Approach", "Argo CD", "Catalog"]
 
 featured_image: /gitops-catalog/images/Logo_GitOps-Catalog.png
 show_featured_image_summary: true

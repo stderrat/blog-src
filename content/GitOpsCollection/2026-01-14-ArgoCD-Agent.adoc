@@ -21,7 +21,7 @@ categories:
    - GitOps
    - OpenShift
 
-tags: ["Argo CD", "Argo CD Agent", "OpenShift GitOps", "OpenShift", "OCP", "GitOps", "Multi-cluster", "Hub and Spoke", "Kubernetes", "Helm", "mTLS", "Application", "ApplicationSet"]
+tags: ["Argo CD", "Argo CD Agent", "OpenShift GitOps", "OpenShift", "OCP", "GitOps", "Multi-Cluster", "Hub and Spoke", "Kubernetes", "Helm", "mTLS", "Application", "ApplicationSet"]
 
 aliases: []
 ---

@@ -5,6 +5,6 @@ chapter: true
 layout: summary
 pre: "<i class='fas fa-robot'></i> "
 
-tags: ["Ansible", "Automation", "Tower", "Controller", "AAP", "YAML", "CICD", "Azure", "Style Guide", "AAP", "Ansible Automation Platform"] 
+tags: ["Ansible", "Automation", "Tower", "Controller", "AAP", "YAML", "CICD", "Azure", "Style Guide", "Ansible Automation Platform"] 
 
 ---

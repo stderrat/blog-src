@@ -9,7 +9,7 @@ type: post
 draft: false
 categories:
    - OpenShift
-tags: ["oc", "OpenShift", "OCP", "SSL", "Certificates", "Cert Manager"] 
+tags: ["oc", "OpenShift", "OCP", "SSL", "Certificates", "cert-manager"] 
 
 aliases: [ 
    "/posts-output/2023-02-16-ssl-certificate-manager/",

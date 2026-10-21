@@ -9,6 +9,7 @@ tags: ["OpenShift", "Observability", "Monitoring", "Logging", "Tracing"]
 
 aliases:
   - /observability/
+  - /day-2/observability/
 ---
 
 
