@@ -35,7 +35,15 @@
 	{{ $path := printf "/%s/%s" "authors" ($name | urlize) }}
 	{{ with $.Site.GetPage $path }}
 	  <a href="{{ "/authors/" | relLangURL }}{{ .Params.name  | urlize }}">
-		<img class="avatar" src="/img{{ $path }}.png" alt="{{ .Params.name }}" width="35" height="35"/> 
+		{{- partial "responsive-image.html" (dict
+		  "src" (printf "/img%s.png" $path)
+		  "alt" .Params.name
+		  "class" "avatar"
+		  "page" $
+		  "loading" "lazy"
+		  "sizes" "35px"
+		  "style" "width:35px;height:35px;object-fit:cover;"
+		) -}} 
 		{{ .Params.name }}
 	  </a>
 	{{ end }}
@@ -80,7 +88,7 @@
 {{ end }}
 
 
-{{ .Content }}
+{{ partial "enhance-content-images.html" (dict "content" .Content "page" .) | safeHTML }}
 
 {{ partial "series-nav.html" . }}
 

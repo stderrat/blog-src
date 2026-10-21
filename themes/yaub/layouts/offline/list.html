@@ -1,16 +1,17 @@
 <!DOCTYPE html>
-<html lang="{{ .Site.Language.Lang }}">
+<html lang="{{ .Site.Language.Lang }}" data-accent="{{ partial "accent.html" . }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>You're Offline - {{ .Site.Title }}</title>
     <link rel="manifest" href="/manifest.json">
     {{ partial "favicon.html" . }}
+    <link rel="stylesheet" href="{{ "css/modular/base/accent.css" | relURL }}">
     <style>
         :root {
             --bg-color: #282a36;
             --text-color: #f8f8f2;
-            --accent-color: #a3d0f5;
+            --accent-color: var(--ACCENT-link, #a3d0f5);
             --secondary-color: #6272a4;
         }
         
@@ -106,7 +107,7 @@
         
         .retry-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(163, 208, 245, 0.3);
+            box-shadow: 0 4px 12px rgba(var(--ACCENT-link-rgb, 163,208,245), 0.3);
         }
         
         .home-link {

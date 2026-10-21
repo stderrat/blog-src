@@ -16,6 +16,7 @@ disableBreadcrumb: true
 authors: [Thomas Jungbauer]
 type: post
 draft: false
+mermaid: true
 categories:
   - OpenShift
   - Security

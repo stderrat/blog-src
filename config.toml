@@ -35,6 +35,10 @@ home = [ "HTML", "RSS", "JSON", "TJFeed"]
 
 [params]
   themeVariant = "yaub"
+  # Accent colour palette: "violet" (default), "blue" (original colours),
+  # "petrol", "indigo" or "slate".
+  # Palettes: themes/yaub/static/css/modular/base/accent.css
+  accentColor = "blue"
   # Enable/disable the right sidebar on homepage (Archive + Recently Updated)
   enableRightSidebar = true
   # Google Search Console verification
@@ -48,6 +52,8 @@ home = [ "HTML", "RSS", "JSON", "TJFeed"]
   # Hide the root/first breadcrumb (typically "YAUB Yet Another Useless Blog")
   disableRootBreadcrumb = true
   disableNextPrev = false
+  # Hard-disable Mermaid site-wide. When false, Mermaid (~2.7 MB) loads only on
+  # pages with front matter mermaid: true or detected ```mermaid / language-mermaid.
   disableMermaid = false
   titleSeparator = "::"
   # Top-level content sections (Hugo .Section names). Legacy flat names removed.

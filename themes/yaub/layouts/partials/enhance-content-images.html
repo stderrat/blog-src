@@ -1,0 +1,52 @@
+{{/*
+  enhance-content-images — rewrite bare <img src="*.png|jpg"> in HTML to
+  build-time <picture> via responsive-image.html (AsciiDoc bypasses Goldmark
+  render hooks). Skips already-upgraded images, SVGs, and external URLs.
+
+  Params: content (HTML string), page (page context)
+  Returns: HTML string
+*/}}
+{{- $content := .content | default "" -}}
+{{- $page := .page -}}
+{{- if $content -}}
+  {{- $tags := findRE `(?is)<img\b[^>]*>` $content -}}
+  {{- range $tags -}}
+    {{- $tag := . -}}
+    {{- if and (not (findRE `data-webp-upgraded` $tag)) (findRE `(?i)\.(?:png|jpe?g)(?:\?|["'\s>]|$)` $tag) -}}
+      {{- $src := "" -}}
+      {{- if findRE `(?i)\bsrc=["'][^"']+["']` $tag -}}
+        {{- $src = replaceRE `(?is).*?\bsrc=["']([^"']+)["'].*` `$1` $tag -}}
+      {{- end -}}
+      {{- $isLocal := and $src (not (hasPrefix $src "data:")) (not (hasPrefix $src "//")) (not (hasPrefix $src "http://")) (not (hasPrefix $src "https://")) -}}
+      {{- if $isLocal -}}
+        {{- $alt := "" -}}
+        {{- if findRE `(?i)\balt=["']` $tag -}}
+          {{- $alt = replaceRE `(?is).*?\balt=["']([^"']*)["'].*` `$1` $tag -}}
+        {{- end -}}
+        {{- $class := "" -}}
+        {{- if findRE `(?i)\bclass=["']` $tag -}}
+          {{- $class = replaceRE `(?is).*?\bclass=["']([^"']*)["'].*` `$1` $tag -}}
+        {{- end -}}
+        {{- $style := "" -}}
+        {{- if findRE `(?i)\bstyle=["']` $tag -}}
+          {{- $style = replaceRE `(?is).*?\bstyle=["']([^"']*)["'].*` `$1` $tag -}}
+        {{- end -}}
+        {{- $loading := "lazy" -}}
+        {{- if findRE `(?i)\bloading=["']eager["']` $tag -}}
+          {{- $loading = "eager" -}}
+        {{- end -}}
+        {{- $replacement := partial "responsive-image.html" (dict
+          "src" $src
+          "alt" $alt
+          "class" $class
+          "page" $page
+          "loading" $loading
+          "sizes" "(max-width: 768px) 100vw, 720px"
+          "style" $style
+        ) -}}
+        {{- $content = replace $content $tag $replacement 1 -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- return $content -}}

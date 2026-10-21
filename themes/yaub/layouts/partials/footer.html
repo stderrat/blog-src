@@ -135,8 +135,6 @@
     <script src="{{"js/perfect-scrollbar.jquery.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
     <script src="{{"js/featherlight.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
     
-    <!-- WebP image upgrade for better performance (works with AsciiDoc) -->
-    <script src="{{"js/webp-upgrade.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
     <script src="{{"js/highlight.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
     <!-- Opt-in line numbers for code blocks: [source,yaml,role=linenums] -->
     <script src="{{"js/yaub-linenums.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
@@ -182,7 +180,20 @@
           });
     </script>
 
-    {{ if (or (and (ne .Params.disableMermaid nil) (not .Params.disableMermaid)) (not .Site.Params.disableMermaid)) }}
+    {{/* Mermaid (~2.7 MB) + d3/js-yaml: load only when the page needs diagrams.
+         Opt-in: front matter mermaid: true, or auto-detect ```mermaid / language-mermaid.
+         Site/page disableMermaid: true hard-disables loading. */}}
+    {{ $useMermaid := false }}
+    {{ if and (not .Site.Params.disableMermaid) (not .Params.disableMermaid) }}
+      {{ if .Params.mermaid }}
+        {{ $useMermaid = true }}
+      {{ else if findRE "(?m)^```mermaid\\b" .RawContent 1 }}
+        {{ $useMermaid = true }}
+      {{ else if findRE `(?i)(?:class=["'][^"']*\blanguage-mermaid\b|class=["'][^"']*\bmermaid\b|<div[^>]*\bmermaid\b)` .Content 1 }}
+        {{ $useMermaid = true }}
+      {{ end }}
+    {{ end }}
+    {{ if $useMermaid }}
         <!-- JS-YAML for mermaid frontmatter parsing -->
         <script src="{{"js/js-yaml/js-yaml.min.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
         

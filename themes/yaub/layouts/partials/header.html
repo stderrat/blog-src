@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="{{ .Page.Language | default "en" }}" class="no-js">
+{{- $accent := partial "accent.html" . }}
+<html lang="{{ .Page.Language | default "en" }}" class="no-js" data-accent="{{ $accent }}">
   <head>
     <script>
       document.documentElement.className = document.documentElement.className.replace('no-js', 'js');
@@ -100,7 +101,8 @@
     <link rel="preload" href="{{ "webfonts/fa-regular-400.woff2" | relURL }}" as="font" type="font/woff2" crossorigin="anonymous">
 
     {{ $assetBusting := not .Site.Params.disableAssetsBusting }}
-    <meta name="theme-color" content="#317EFB"/>
+    {{- /* browser UI colour on mobile, per accent palette */}}
+    <meta name="theme-color" content="{{ index (dict "violet" "#7a5fc0" "blue" "#317EFB" "petrol" "#3c8080" "indigo" "#6b71a6" "slate" "#6b7884") $accent }}"/>
 
     <!-- Preload critical CSS for faster First Contentful Paint -->
     {{with .Site.Params.themeVariant}}

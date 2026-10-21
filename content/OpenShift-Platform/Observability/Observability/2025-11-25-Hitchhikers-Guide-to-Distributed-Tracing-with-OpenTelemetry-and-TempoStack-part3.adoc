@@ -15,6 +15,7 @@ disableBreadcrumb: true
 
 authors: [Thomas Jungbauer]
 type: post
+mermaid: true
 categories:
   - OpenShift
   - Observability

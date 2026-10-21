@@ -497,6 +497,8 @@ The following diagram shows how the three models fit together.
 .Three ways an Argo CD Application reaches a managed cluster
 image::ep-19/ep19-delivery-models.png?width=1000px[Push reconciles on the hub, pull and the Argo CD Agent reconcile on the managed cluster]
 
+NOTE: Yes, you have seen right, the version will jump from 2.17 to 5.0 for ACM in the next release, to harmonize with OpenShift versioning.
+
 
 What each model actually is, how the data flows in which direction and how to set it up step by step is the topic of the next part: link:/gitopscollection/2026-10-21-acm-gitops-push-pull-agent/[[Ep.20\] ACM and OpenShift GitOps: push, pull and the Argo CD Agent].
 

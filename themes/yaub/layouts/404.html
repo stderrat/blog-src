@@ -3,21 +3,22 @@
 {{ end }}
 
 <!DOCTYPE html>
-<html lang="{{ .Site.Language.Lang }}">
+<html lang="{{ .Site.Language.Lang }}" data-accent="{{ partial "accent.html" . }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Page Not Found - {{ .Site.Title }}</title>
     <link rel="icon" href="{{ "images/favicon.ico" | relURL }}">
     <link rel="stylesheet" href="{{ "css/fontawesome-all.min.css" | relURL }}">
+    <link rel="stylesheet" href="{{ "css/modular/base/accent.css" | relURL }}">
     <style>
         :root {
             --bg-color: #282a36;
             --card-bg: #323443;
             --text-color: #f8f8f2;
             --text-muted: #9ca3af;
-            --accent-color: #4f7aa4;
-            --accent-hover: #6b9bc3;
+            --accent-color: var(--ACCENT-mid, #4f7aa4);
+            --accent-hover: var(--ACCENT-mid-hover, #6b9bc3);
             --border-color: #444;
         }
         
@@ -49,7 +50,7 @@
             color: var(--accent-color);
             line-height: 1;
             margin-bottom: 0.5rem;
-            text-shadow: 0 4px 20px rgba(79, 122, 164, 0.3);
+            text-shadow: 0 4px 20px rgba(var(--ACCENT-mid-rgb, 79,122,164), 0.3);
         }
         
         .error-title {

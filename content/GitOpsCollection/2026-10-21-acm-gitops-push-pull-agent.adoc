@@ -31,7 +31,7 @@ For each of them I will explain what it actually is, how the data flows, and how
 
 <!--more-->
 
-NOTE: Written against **OpenShift GitOps 1.22** and **ACM 2.17**. The Argo CD Agent integration in ACM is **Technology Preview** in 2.17.
+NOTE: Written against **OpenShift GitOps 1.22** and **ACM 2.17**. The Argo CD Agent integration in ACM is **GA** in 5.0.
 
 == The bridge: GitOpsCluster
 

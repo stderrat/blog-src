@@ -20,3 +20,6 @@ pom.xml.asc
 
 # Hugo image processing cache
 /resources/
+
+# Local originals from scripts/optimize-oversized-images.sh (do not commit)
+/backups/

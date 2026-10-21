@@ -11,7 +11,15 @@
 
 <div class="container">
 	<div class="avatar">
-		<img class="avatar-big" src="/img{{ $path }}.png" alt="{{ $name }}" width="200" height="200" loading="lazy" decoding="async"/>
+		{{- partial "responsive-image.html" (dict
+		  "src" (printf "/img%s.png" $path)
+		  "alt" $name
+		  "class" "avatar-big"
+		  "page" $author
+		  "loading" "lazy"
+		  "sizes" "200px"
+		  "style" "width:200px;height:200px;object-fit:cover;"
+		) -}}
 	</div>
 	<div class="authorinfo">
 		<h1 class="authors">

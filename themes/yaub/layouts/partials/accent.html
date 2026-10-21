@@ -1,0 +1,16 @@
+{{- /*
+  accent.html - returns the configured accent palette name.
+
+  config.toml:  [params]  accentColor = "violet"   # violet | blue | petrol | indigo | slate
+
+  Unknown or missing values fall back to "violet". The palettes themselves
+  live in static/css/modular/base/accent.css (html[data-accent="..."]).
+  Usage:  {{ $accent := partial "accent.html" . }}
+*/ -}}
+{{- $known := slice "violet" "blue" "petrol" "indigo" "slate" -}}
+{{- $accent := lower (site.Params.accentColor | default "violet") -}}
+{{- if not (in $known $accent) -}}
+  {{- warnf "params.accentColor %q is unknown, using \"violet\" (known: %s)" $accent (delimit $known ", ") -}}
+  {{- $accent = "violet" -}}
+{{- end -}}
+{{- return $accent -}}

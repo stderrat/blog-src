@@ -21,7 +21,7 @@
 	  </div>
 	{{ end }}
 	{{ end }}
-	{{ .Content }}
+	{{ partial "enhance-content-images.html" (dict "content" .Content "page" .) | safeHTML }}
 {{end}}
 
 <!-- Print summary page for categories -->

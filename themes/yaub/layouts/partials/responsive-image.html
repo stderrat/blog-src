@@ -84,13 +84,12 @@
   </picture>
 
 {{- else -}}
-  {{- /* Keep original URL working — WebP sibling when present */ -}}
-  {{- $webpSrc := replace $cleanSrc ".png" ".webp" | replace ".jpg" ".webp" | replace ".jpeg" ".webp" | replace ".PNG" ".webp" | replace ".JPG" ".webp" | replace ".JPEG" ".webp" -}}
-  {{- $webpRes := partial "func/ResolveImageResource.html" (dict "src" $webpSrc "page" $page) -}}
-  {{- $hasWebp := and (ne $webpSrc $cleanSrc) (or $webpRes (fileExists (printf "static%s" $webpSrc))) -}}
-  {{- if $hasWebp -}}
+  {{- /* Non-processable (path quirks e.g. section dirs with spaces): emit <picture> with
+         WebP sibling URL for local PNG/JPEG — same contract as the old client-side upgrade. */ -}}
+  {{- $webpSrc := $cleanSrc | replaceRE `(?i)\.(png|jpe?g)$` ".webp" -}}
+  {{- if ne $webpSrc $cleanSrc -}}
   <picture{{ with $pictureClass }} class="{{ . }}"{{ end }}>
-    <source srcset="{{ with $webpRes }}{{ .RelPermalink }}{{ else }}{{ $webpSrc | relURL }}{{ end }}" type="image/webp">
+    <source srcset="{{ $webpSrc | relURL }}" type="image/webp">
     <img src="{{ $cleanSrc | relURL }}" alt="{{ $alt }}" {{ with $class }}class="{{ . }}"{{ end }}
          loading="{{ $loading }}" decoding="{{ $decoding }}" {{ with $fetchpriority }}fetchpriority="{{ . }}"{{ end }}
          data-webp-upgraded="true" style="max-width:100%;height:auto;{{ $style | safeCSS }}">
