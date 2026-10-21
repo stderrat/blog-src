@@ -1,33 +1,31 @@
 {{ $featured_image := partial "func/GetFeaturedImage.html" . }}
-
+{{ $categories := .Params.categories | default slice }}
+{{ $metaCats := first 4 $categories }}
+{{ $footerCats := after 4 $categories }}
 
 {{ partial "header.html" . }}
 
-{{ if .Params.categories }}
-
-<div class="categories tracked">    
-  {{range .Params.categories}}
-	  <a id="textElement" class="category-link no-highlight {{ . | urlize }}" href="{{ "/categories/" | relLangURL }}{{ . | urlize }}">{{ . }}</a>
-	{{end}}
-</div>
-{{end}}
-
 <p class="tracked article-meta">
+{{- if $metaCats -}}
+<span class="article-meta-categories categories">
+  {{- range $metaCats -}}
+  <a class="category-link no-highlight {{ . | urlize }}" href="{{ "/categories/" | relLangURL }}{{ . | urlize }}">{{ . }}</a>
+  {{- end -}}
+</span>
+<span class="divider" aria-hidden="true">·</span>
+{{- end -}}
 <span class="publish-date" {{ printf `datetime="%s"` (.Date.Format "2006-01-02T15:04:05Z07:00") | safeHTMLAttr }}>
-    <i class="fas fa-calendar-alt"></i>
+    <i class="fas fa-calendar-alt" aria-hidden="true"></i>
     <strong>{{- .Date.Format "January 2, 2006" -}}</strong>
-    {{/* Only show "Updated" if Lastmod is different from Date (more than 1 day apart) */}}
     {{ $daysDiff := div (sub .Lastmod.Unix .Date.Unix) 86400 }}
     {{ if gt $daysDiff 0 }}
     <span class="updated-date" title="Last updated on {{ .Lastmod.Format "January 2, 2006" }}">
-        <i class="fas fa-sync-alt"></i> Updated {{ .Lastmod.Format "Jan 2, 2006" }}
+        <i class="fas fa-sync-alt" aria-hidden="true"></i> Updated {{ .Lastmod.Format "Jan 2, 2006" }}
     </span>
     {{ end }}
 </span>
 
-<span class="divider">
-	-
-</span>
+<span class="divider" aria-hidden="true">·</span>
 
 <span class="author">
 	{{ range .Param "authors" }}
@@ -43,22 +41,20 @@
 		  "loading" "lazy"
 		  "sizes" "35px"
 		  "style" "width:35px;height:35px;object-fit:cover;"
-		) -}} 
+		) -}}
 		{{ .Params.name }}
 	  </a>
 	{{ end }}
     {{ end }}
 </span>
 
-<span class="divider">
-	-
-</span>
+<span class="divider" aria-hidden="true">·</span>
 
 {{- $wordCount := countwords .Content -}}
 {{- $readingTime := math.Round (div $wordCount 200.0) -}}
 {{- if lt $readingTime 1 }}{{ $readingTime = 1 }}{{ end -}}
 <span class="readtime" title="{{ $wordCount }} words">
-    <i class="fas fa-clock"></i>
+    <i class="fas fa-clock" aria-hidden="true"></i>
     <strong>{{ $readingTime }} min read</strong>
     <span class="word-count">({{ $wordCount }} words)</span>
 </span>
@@ -87,15 +83,27 @@
 {{ end }}
 {{ end }}
 
-
 {{ partial "enhance-content-images.html" (dict "content" .Content "page" .) | safeHTML }}
+
+{{ $hasFooterTax := or .Params.tags (gt (len $footerCats) 0) }}
+{{ if $hasFooterTax }}
+<aside class="article-taxonomies" aria-label="Categories and tags">
+  {{ if gt (len $footerCats) 0 }}
+  <div class="categories article-taxonomies-categories">
+    {{ range $footerCats }}
+    <a class="category-link no-highlight {{ . | urlize }}" href="{{ "/categories/" | relLangURL }}{{ . | urlize }}">{{ . }}</a>
+    {{ end }}
+  </div>
+  {{ end }}
+  {{ partial "tags.html" . }}
+</aside>
+{{ end }}
 
 {{ partial "series-nav.html" . }}
 
 {{ partial "related.html" . }}
 
 {{ partial "custom-comments.html" . }}
-
 
 <footer class="footline">
 	{{with .Params.LastModifierDisplayName}}

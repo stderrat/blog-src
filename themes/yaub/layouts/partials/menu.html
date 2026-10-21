@@ -139,9 +139,9 @@
     {{ end }}
     <section id="footer">
     </section>
+    {{/* Stats scroll with the menu — avoids overlapping entries when fixed to the viewport */}}
+    {{ partial "menu-footer.html" . }}
   </div>
-  {{/* Statistics fixed at bottom of sidebar */}}
-  {{ partial "menu-footer.html" . }}
 </nav>
 
 <!-- templates -->

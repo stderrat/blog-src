@@ -43,16 +43,17 @@
         if (isHintsDismissed()) {
             hintsEl.style.display = 'none';
         } else {
-            // Show after 2 seconds on first visit
+            // Show once after 2 seconds, then remember permanently
             setTimeout(function() {
                 hintsEl.classList.add('show');
                 
-                // Auto-hide after 8 seconds
                 setTimeout(function() {
-                    if (!isHintsDismissed()) {
-                        hintsEl.classList.remove('show');
-                        hintsEl.classList.add('fade-out');
-                    }
+                    localStorage.setItem(STORAGE_KEY, 'true');
+                    hintsEl.classList.remove('show');
+                    hintsEl.classList.add('fade-out');
+                    setTimeout(function() {
+                        hintsEl.style.display = 'none';
+                    }, 300);
                 }, 8000);
             }, 2000);
         }

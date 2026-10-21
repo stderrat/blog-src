@@ -92,10 +92,13 @@
     <link rel="dns-prefetch" href="https://giscus.app">
     <link rel="preconnect" href="https://giscus.app" crossorigin>
     
-    <!-- Preload critical fonts for better LCP - RedHatText is the primary body font -->
+    <!-- Preload critical fonts for better LCP - body + article H1 -->
     <!-- Note: crossorigin="anonymous" is required for font preloads even for same-origin -->
     <link rel="preload" href="{{ "fonts/RedHatText-Regular.woff" | relURL }}" as="font" type="font/woff" crossorigin="anonymous">
     <link rel="preload" href="{{ "fonts/RedHatText-Medium.woff" | relURL }}" as="font" type="font/woff" crossorigin="anonymous">
+    {{ if and (eq .Kind "page") (not .IsHome) }}
+    <link rel="preload" href="{{ "fonts/RedHatDisplay-Bold.woff" | relURL }}" as="font" type="font/woff" crossorigin="anonymous">
+    {{ end }}
     <link rel="preload" href="{{ "webfonts/fa-solid-900.woff2" | relURL }}" as="font" type="font/woff2" crossorigin="anonymous">
     <link rel="preload" href="{{ "webfonts/fa-brands-400.woff2" | relURL }}" as="font" type="font/woff2" crossorigin="anonymous">
     <link rel="preload" href="{{ "webfonts/fa-regular-400.woff2" | relURL }}" as="font" type="font/woff2" crossorigin="anonymous">
@@ -118,6 +121,20 @@
     {{ range .Site.Params.custom_css -}}
     <link href="{{(printf "%s" .) | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" rel="stylesheet">
     {{- end }}
+
+    {{- /* Force article measure/size even if a cached @import of layout.css is stale */ -}}
+    {{ if and (eq .Kind "page") (not .IsHome) }}
+    <style id="yaub-article-prose">
+      body.article-page #body .padding { padding: 2rem 1.5rem 3rem !important; }
+      body.article-page #body-inner {
+        max-width: min(100%, 96ch) !important;
+        margin-inline: auto !important;
+        font-size: 1.125rem !important;
+        line-height: 1.7 !important;
+        font-weight: 400 !important;
+      }
+    </style>
+    {{ end }}
 
 {{/* Unique RSS alternate titles — see yaub/alternate-feeds.html */}}
 {{ partial "yaub/alternate-feeds.html" . }}
@@ -339,13 +356,13 @@
 
           {{ partial "top-navigation.html" . }} 
      
+            {{/* Article tags render below content (single.html) so the first
+                 viewport starts with the title — not a chip stack. */}}
+            {{ if and (not .Sections) (ne .Kind "page") }}
             <div id="head-tags">
-            <!-- Do not show on home page -->
-            {{ if .Sections}}
-            {{else}}
               {{ partial "tags.html" . }}
-            {{end}}
             </div>
+            {{ end }}
         {{ if .Params.chapter }}
           <div id="chapter">
         {{ end }}
