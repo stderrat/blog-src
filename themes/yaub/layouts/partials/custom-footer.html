@@ -148,6 +148,22 @@
         var skipLangBadge = listingblock.classList.contains('nolangbadge');
         wrapPre(pre, detectLanguage(pre.querySelector('code')), skipLangBadge);
     });
+
+    /* Keyboard: overflowed code blocks must be focusable to scroll (axe scrollable-region-focusable) */
+    document.querySelectorAll('#body-inner pre, .highlightable pre, article pre').forEach(function(pre) {
+        if (pre.querySelector('code.language-mermaid, code.mermaid')) return;
+        if (pre.closest && pre.closest('.mermaid, .mermaid-container')) return;
+        if (!pre.hasAttribute('tabindex')) {
+            pre.setAttribute('tabindex', '0');
+        }
+        if (!pre.getAttribute('role')) {
+            pre.setAttribute('role', 'region');
+        }
+        if (!pre.getAttribute('aria-label')) {
+            var lang = detectLanguage(pre.querySelector('code'));
+            pre.setAttribute('aria-label', lang ? ('Code block: ' + lang) : 'Code block');
+        }
+    });
 })();
 </script>
 
