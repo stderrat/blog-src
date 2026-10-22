@@ -332,4 +332,4 @@ changes we did are marked with number and explain below the XML file):
 </image>
 ----------
 <1> We would like to increase the disk size to 100GB (default is 24GB)
-<2> We added cloud-init to the to profiles mentioning KVM
+<2> We added cloud-init to profiles mentioning KVM
