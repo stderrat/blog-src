@@ -39,12 +39,15 @@ cubes
 database
 dharmachakra
 ellipsis-h
+exclamation-circle
 exclamation-triangle
 external-link
 eye
 file-alt
+fire
 fire-alt
 flask
+lightbulb
 folder
 github
 globe
@@ -66,6 +69,7 @@ minus
 moon
 network-wired
 newspaper
+opensuse
 paperclip
 plug
 plus
