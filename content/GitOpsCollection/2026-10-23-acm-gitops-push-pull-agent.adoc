@@ -1,11 +1,11 @@
 ---
 title: "[Ep.19] ACM and OpenShift GitOps: push, pull and the Argo CD Agent"
 description: "How ACM registers clusters in OpenShift GitOps: push model, pull model and the Argo CD Agent add-on, with a step-by-step setup for each approach."
-date: "2026-10-21"
+date: "2026-10-23"
 doctype: book
 authors: [Thomas Jungbauer]
 type: post
-draft: true
+draft: false
 
 series: "GitOps Episodes"
 series_part: 19
@@ -31,7 +31,16 @@ For each of them I will explain what it actually is, how the data flows, and how
 
 <!--more-->
 
-NOTE: Written against **OpenShift GitOps 1.22** and **ACM 2.17**. The Argo CD Agent integration in ACM is **GA** in 5.0.
+
+The topic turned out to be too big for a single article, so I have split it into multiple parts and maybe I should have split into even more. This is the second part:
+
+. link:/gitopscollection/2026-10-20-openshift-gitops-vs-acm/[[Ep.18\] OpenShift GitOps or Advanced Cluster Management? Choosing the right tool] What each tool does, where they overlap and a decision guide.
+. **[Ep.19] ACM and OpenShift GitOps: push, pull and the Argo CD Agent** (this article): how ACM registers clusters in Argo CD, and how to set up each of the three delivery models.
+. link:/gitopscollection/2026-10-24-acm-policies-with-gitops/[[Ep.20\] Managing ACM Policies with OpenShift GitOps]: policies as code, the PolicyGenerator, hub templates and bootstrapping Argo CD with a policy.
+
+NOTE: Everything in this series was written against **OpenShift GitOps 1.22** (Argo CD 3.5) and **Advanced Cluster Management 2.17** (Open Cluster Management). Technology Preview and GA states move quickly in both products, so check the release notes of your versions before you commit to a design.
+
+NOTE: While I am using the term "Advanced Cluster Management" in this article, I am referring to the product formerly known as Open Cluster Management. Same counts for Argo CD and OpenShift GitOps.
 
 == The setup
 
@@ -39,7 +48,7 @@ Before we dig into the models, let's talk about my lab setup.
 
 * There are 3 clusters:
 ** `hub` is the ACM hub with openshift-gitops installed.
-** `bm` a bare metal cluster with a single node.
+** `bm` is a bare metal cluster with a single node.
 ** `sno` a single node cluster.
 
 The `hub` cluster is the starting point. Argo CD on the hub currently knows one cluster: `in-cluster`. This entity is automatically added during installation of Argo CD and it is the cluster Argo CD is hosted on.
@@ -180,7 +189,7 @@ spec:
       operator: Exists
 ----
 <1> The same namespace as the GitOpsCluster that will reference it.
-<2> Represent the ManagedClusterSets from which the ManagedClusters are selected
+<2> Represents the ManagedClusterSets from which the ManagedClusters are selected.
 <3> The predicate to select only OpenShift clusters.
 <4> By default a Placement drops clusters that are unreachable. For GitOps we want to keep them, so that a short network hiccup does not remove the cluster secret and, worst case, the generated Applications.
 
@@ -238,7 +247,7 @@ What happens under the hood (the numbers refer to the diagram above):
 
 . The **Placement** selects managed clusters, the result is stored in a **PlacementDecision**.
 . The **GitOpsCluster** controller reads the PlacementDecision and creates one Argo CD cluster secret per cluster in the Argo CD namespace, named `<cluster-name>-application-manager-cluster-secret`.
-. The token in the secret belongs to the **ManagedServiceAccount** `application-manager`. ACM rotates it automatically for you, and the cluster secret on the hub is updated when the token changes. **No long-living  tokens**.
+. The token in the secret belongs to the **ManagedServiceAccount** `application-manager`. ACM rotates it automatically for you, and the cluster secret on the hub is updated when the token changes. **No long-lived tokens**.
 . The server URL in the cluster secret points to the **cluster proxy** of the multicluster engine. This is the default, because the `cluster-proxy` add-on is always enabled. Only if the cluster proxy is unavailable does ACM fall back to the API server URL of the managed cluster (OpenShift clusters only).
 . The **ApplicationSet** with the `clusterDecisionResource` generator creates one Application per cluster. **The application-controller of the hub Argo CD reconciles all of them**.
 
@@ -303,7 +312,7 @@ The API URL is the cluster proxy URL:
 .GitOpsCluster cluster secrets
 image::ep-19/gitopscluster-cluster-secrets.png[GitOpsCluster cluster secrets]
 
-NOTE: The connection status is unknown because the cluster has not Argo CD Applications yet,
+NOTE: The connection status is unknown because the cluster has no Argo CD Applications yet.
 
 === Step 2: The ApplicationSet
 
@@ -366,7 +375,7 @@ spec:
 <2> The name of our Placement.
 <3> How often the generator re-reads the PlacementDecision (in seconds).
 <4> Create the name for the Application based on the cluster name.
-<5> The path to the Compliance Operator setup in the Git repository. each cluster has its own path in the Git repository.
+<5> The path to the Compliance Operator setup in the Git repository. Each cluster has its own path in the Git repository.
 <6> The server URL from the cluster secret, usually the cluster proxy URL.
 <7> Automated sync policy for the Application.
 <8> If a cluster leaves the Placement, the generated Application is removed. With this setting, the deployed resources on that cluster are kept.
@@ -375,15 +384,15 @@ spec:
 
 In Argo CD we can see the ApplicationSet which automatically created two Applications, one for each (selected) cluster: 
 
-.Applicationset Applications in Argo CD
-image::ep-19/argocd-applicationset-compliance-operator.png[Applicationset Applications]
+.ApplicationSet Applications in Argo CD
+image::ep-19/argocd-applicationset-compliance-operator.png[ApplicationSet Applications]
 
 The Applications have been automatically synced by the hub Argo CD (because we configured it to do so).
 
-.Applicationset Applications synced in Argo CD
-image::ep-19/argocd-applications-compliance-operator.png[Applicationset Applications synced]
+.ApplicationSet Applications synced in Argo CD
+image::ep-19/argocd-applications-compliance-operator.png[ApplicationSet Applications synced]
 
-TIP: The ApplicationSet created the Applications which immediately synced by the hub Argo CD. They installed and configured the Compliance Operator on the two managed clusters: `bm` and `sno`.
+TIP: The ApplicationSet created the Applications which were immediately synced by the hub Argo CD. They installed and configured the Compliance Operator on the two managed clusters: `bm` and `sno`.
 
 === Why is this nice?
 
@@ -395,7 +404,7 @@ CAUTION: Think about `prune: true` together with dynamic Placements. Without `pr
 
 === Least privilege: a customised service account
 
-For platform configuration, the `application-manager` with cluster-admin is often acceptable: the Argo CD instance _is_ the cluster administrator. For application teams it is too much. ACM lets you replace it with your own **ManagedServiceAccount** and grant it exactly the permissions you want with a **ClusterPermission**. Both resources are created in the namespace of the managed cluster on the hub:
+For platform configuration, the ServiceAccount `application-manager` with cluster-admin is often acceptable: the Argo CD instance _is_ the cluster administrator. For application teams it is too much. ACM lets you replace it with your own **ManagedServiceAccount** and grant it exactly the permissions you want with a **ClusterPermission**. Both resources are created in the namespace of the managed cluster on the hub:
 
 .ManagedServiceAccount and ClusterPermission for one managed cluster
 [source,yaml,role=linenums]
@@ -468,14 +477,20 @@ spec:
 ----
 <1> Use this ManagedServiceAccount instead of `application-manager`. The cluster secrets are now named `<cluster-name>-argocd-deployer-cluster-secret`.
 
-The ManagedServiceAccount and the ClusterPermission must exist for **every** cluster of the Placement. Creating them by hand does not scale. The ACM documentation shows a policy that loops over the PlacementDecision with a hub template and creates both objects in every cluster namespace (chapter _Creating a customized service account for Argo CD push model_). That way, a new cluster in the Placement automatically gets its service account.
+The `ManagedServiceAccount` and the `ClusterPermission` must exist for **every** cluster of the Placement. Creating them by hand does not scale and is not GitOps-like. 
+
+---
 
 == The pull model
 
 === What it actually is
 
-The pull model turns the direction around. The Application is still _defined_ on the hub, but the hub does not reconcile it. Instead, ACM transports the Application object itself to the managed cluster, where a **local Argo CD instance** does the actual work.
+The **pull model** turns the direction around. The Application is still _defined_ on the hub, but the hub does not reconcile it. Instead, ACM transports the Application object itself to the managed cluster, where a **local Argo CD instance** does the actual work.
 
+pass:[{{< animated-svg src="ep-19/pull-model-animated.svg" title="Pull model: the hub ships the Application, the local Argo CD reconciles it" >}}]
+
+////
+ASCII version of the pull model diagram (replaced by pull-model-animated.svg)
 [source,text]
 ----
                      HUB                                          MANAGED CLUSTER
@@ -491,14 +506,15 @@ The pull model turns the direction around. The Application is still _defined_ on
  │   ──▶ MulticlusterApplicationSetReport      │          │   ──▶ local kube-apiserver    │
  └─────────────────────────────────────────────┘          └───────────────────────────────┘
 ----
+////
 
 What happens under the hood:
 
 . The ApplicationSet on the hub generates an Application per cluster, just as in the push model.
 . The generated Application carries the label `apps.open-cluster-management.io/pull-to-ocm-managed-cluster: "true"` and the annotation `argocd.argoproj.io/skip-reconcile: "true"`. The latter tells the hub Argo CD to ignore it.
-. The **propagation controller** on the hub picks up every Application with the annotation `apps.open-cluster-management.io/ocm-managed-cluster`. It wraps the Application into a **ManifestWork** in the namespace of the target cluster.
+. The **propagation controller** on the hub picks up every Application with the annotation `apps.open-cluster-management.io/ocm-managed-cluster`. It wraps the Application into a **ManifestWork** in the namespace of the target cluster. We are still on the hub cluster at this point.
 . The **work agent** on the managed cluster (part of the regular ACM klusterlet) pulls the ManifestWork and creates the Application in the `openshift-gitops` namespace of the managed cluster.
-. The **local Argo CD** on the managed cluster pulls Git and reconciles the Application against its own API server.
+. The **local Argo CD on the managed cluster** pulls Git and reconciles the Application against its own API server.
 . The status travels back in two ways: the ManifestWork reports the status of the Application object, and the **resource sync controller** queries the ACM search component on each managed cluster for the resource list and error messages. The **aggregation controller** combines both into a **MulticlusterApplicationSetReport** per ApplicationSet.
 
 All three controllers run as containers in the `multicluster-integrations` pod in the `open-cluster-management` namespace on the hub. The resource sync and aggregation controllers run every 10 seconds.
@@ -506,7 +522,7 @@ All three controllers run as containers in the `multicluster-integrations` pod i
 The consequences:
 
 * **The spokes do the work.** The hub only creates ManifestWorks, which scales much better than one controller watching every cluster.
-* **The hub never connects to the spoke APIs.** All connections are initiated by the managed cluster (the klusterlet does that anyway). Perfect for firewalls that only allow outbound traffic from the spoke.
+* **The hub never connects to the spoke APIs.** All connections are initiated by the managed cluster (the klusterlet of ACM does that anyway). Perfect for firewalls that only allow outbound traffic from the spoke.
 * **No hub, still reconciliation.** If the hub goes away, the local Argo CD keeps self-healing with the last known Application.
 * **Limited visibility.** The status on the hub is not real-time and not complete. Resources that failed to deploy are not part of the resource list, only the error messages show them. For details, you have to look at the Argo CD of the spoke.
 * **An Argo CD per cluster.** Every managed cluster runs a full OpenShift GitOps instance, needs access to Git and its own repository credentials, and must be installed, updated and given the right permissions.
@@ -517,7 +533,7 @@ The ACM documentation lists the requirements for the pull model:
 * OpenShift GitOps on the hub in version 1.9.0 or later, and **equal to or newer than** the version on the managed clusters.
 * A cluster secret per managed cluster on the hub, created by a GitOpsCluster. The ApplicationSet generator matches the PlacementDecision against these secrets, even if the hub never uses them to deploy.
 
-So the GitOpsCluster and the Placement from the push model are needed here as well.
+WARNING: So the GitOpsCluster and the Placement from the push model are needed here as well.
 
 === Step 1: OpenShift GitOps on the managed clusters
 
@@ -525,10 +541,10 @@ There are two ways to get a local Argo CD onto every spoke.
 
 ==== Option A: the GitOps add-on in Basic mode
 
-The GitOpsCluster can install OpenShift GitOps for you. Simply enable the add-on:
+The GitOpsCluster can install OpenShift GitOps automatically for you. Simply enable the add-on:
 
 .GitOpsCluster with the GitOps add-on in Basic mode
-[source,yaml]
+[source,yaml,role=linenums]
 ----
 apiVersion: apps.open-cluster-management.io/v1beta1
 kind: GitOpsCluster
@@ -545,17 +561,20 @@ spec:
     namespace: openshift-gitops
   gitopsAddon:
     enabled: true <1>
+    overrideExistingConfigs: false <2>
 ----
 <1> Basic mode: deploys the OpenShift GitOps Operator into `openshift-gitops-operator` and an Argo CD instance into `openshift-gitops` on every selected cluster.
+<2> Safety feature: do not overwrite existing Argo CD configurations on the managed clusters.
 
-For every managed cluster, the controller creates an `AddOnDeploymentConfig` and a `ManagedClusterAddOn` in the cluster namespace on the hub. In addition, it creates a policy called `<gitopscluster-name>-argocd-policy` that manages the ArgoCD resource on the spokes. This policy is created once and then belongs to you: the controller does not update it afterwards. That makes it the natural place to add the permissions the local Argo CD needs (step 2).
+When we update the GitOpsCluster resource, that we have created in the previous chapter, the managed clusters will start to install OpenShift GitOps. The Argo CD instance `acm-openshift-gitops` will be created in the namespace `openshift-gitops`.
 
-Further options in the `gitopsAddon` section include `gitOpsOperatorNamespace` and `gitOpsNamespace` (where the components are installed), `reconcileScope` (`Single-Namespace` or `All-Namespaces`), custom images and `olmSubscription` (OLM-based installation, which is auto-detected for OpenShift clusters).
+TIP: This is by far the easiest way to get a local Argo CD onto every spoke as you need to configure the GitOpsCluster resource anyway. This automatically creates an ACM policy `gitops-production-argocd-policy` that manages the Argo CD resource on the spokes.
+
 
 [WARNING]
 ====
 * Enabling the GitOps add-on through a GitOpsCluster **disables the push model for all applications**. This is a fleet-wide decision. If you need push and pull side by side, use option B.
-* The Basic mode is supported for OpenShift managed clusters only.
+* The Basic mode is supported for **OpenShift** managed clusters only.
 * To customise the ArgoCD resource on a single spoke without the add-on reverting it, annotate it with `gitops-addon.open-cluster-management.io/skip: "true"`.
 ====
 
@@ -563,10 +582,6 @@ Verify the add-on:
 
 [source,bash]
 ----
-# on the hub
-oc get gitopscluster gitops-production -n openshift-gitops -o jsonpath='{.status.conditions}' | jq
-oc get policy gitops-production-argocd-policy -n openshift-gitops
-
 # on a managed cluster
 oc get pods -n open-cluster-management-agent-addon
 oc get pods -n openshift-gitops-operator
@@ -575,10 +590,10 @@ oc get pods -n openshift-gitops
 
 ==== Option B: your own policy
 
-If you want full control over the operator version, or you need the push model as well, install OpenShift GitOps with your own policy. This is the same OperatorPolicy pattern as in Ep.18:
+If you want better control over the operator version, or you need the push model as well, install OpenShift GitOps with your **own policy**. This is the same OperatorPolicy pattern as in link:/gitopscollection/2026-10-20-openshift-gitops-vs-acm/#_option_2_acm_with_an_operatorpolicy[Ep.18]:
 
 .Policy that installs OpenShift GitOps on the managed clusters
-[source,yaml]
+[source,yaml,role=linenums]
 ----
 apiVersion: policy.open-cluster-management.io/v1
 kind: Policy
@@ -586,10 +601,10 @@ metadata:
   name: openshift-gitops-spoke
   namespace: acm-policies
 spec:
-  remediationAction: enforce
+  remediationAction: enforce <1>
   disabled: false
   policy-templates:
-    - objectDefinition:
+    - objectDefinition: <2>
         apiVersion: policy.open-cluster-management.io/v1
         kind: ConfigurationPolicy
         metadata:
@@ -603,7 +618,7 @@ spec:
                 kind: Namespace
                 metadata:
                   name: openshift-gitops-operator
-    - objectDefinition:
+    - objectDefinition: <3>
         apiVersion: policy.open-cluster-management.io/v1beta1
         kind: OperatorPolicy
         metadata:
@@ -614,26 +629,31 @@ spec:
           subscription:
             name: openshift-gitops-operator
             namespace: openshift-gitops-operator
-            channel: gitops-1.22 <1>
+            channel: gitops-1.22 <4>
             source: redhat-operators
             sourceNamespace: openshift-marketplace
           upgradeApproval: Automatic
 ----
-<1> Pin the channel. The hub must run the same or a newer OpenShift GitOps version than the spokes, so upgrade the hub first.
+<1> Enforce the policy.
+<2> Create the namespace `openshift-gitops-operator` on the managed clusters.
+<3> Install the OpenShift GitOps Operator.
+<4> Pin the channel. The hub must run the same or a newer OpenShift GitOps version than the spokes, so upgrade the hub first.
 
-Bind the policy with a Placement and a PlacementBinding in `acm-policies`, using the same label selector as the GitOps Placement, so that every cluster that should receive pull Applications also receives a local Argo CD.
+NOTE: This installs the Namespace and the Operator, the Argo CD instance is created automatically by the Operator.
+
+Bind the policy with a Placement and a PlacementBinding in `acm-policies`, using the same label selector as the GitOps Placement, so that every cluster that should receive pull Applications also receives a local Argo CD. See above for examples.
 
 === Step 2: Permissions for the local Argo CD
 
-The local application-controller must be allowed to create whatever the Applications contain. Without that, syncs fail with `forbidden` errors for the service account `openshift-gitops-argocd-application-controller`. The ACM documentation offers two ways:
+Now with Argo CD deployed on the managed cluster, the local application-controller must be allowed to create whatever the Applications contain. Without that, syncs fail with `forbidden` errors for the service account `openshift-gitops-argocd-application-controller`. The ACM documentation offers two ways:
 
-. **Cluster administrator**: a ClusterRoleBinding on every managed cluster. Simple, and for platform configuration usually what you want.
+. **Cluster administrator**: a ClusterRoleBinding on every managed cluster. Simple, and for platform configuration usually what you want. For example, to install a new Operator.
 . **Least privilege**: create every destination namespace on the managed cluster with the label `argocd.argoproj.io/managed-by: openshift-gitops`. The OpenShift GitOps Operator then grants the local instance admin rights in exactly these namespaces. The namespaces must be declared in Git, as part of the Application.
 
 For option 1, add the ClusterRoleBinding to the policy that manages the spokes (the `<gitopscluster-name>-argocd-policy` from option A or your own policy from option B):
 
 .Policy template granting the local controller cluster-admin
-[source,yaml]
+[source,yaml,role=linenums]
 ----
     - objectDefinition:
         apiVersion: policy.open-cluster-management.io/v1
@@ -661,15 +681,17 @@ For option 1, add the ClusterRoleBinding to the policy that manages the spokes (
 
 === Step 3: The ApplicationSet for the pull model
 
-The ApplicationSet uses the same generator as the push model. The template gets a label and three annotations, and the destination changes:
+The ApplicationSet uses the same generator as the push model: `clusterDecisionResource`. The template gets a label and three annotations, and the destination changes.
+
+NOTE: The Compliance Operator is already installed on `sno` and `bm` by the push model. To keep the two models from fighting over the same objects, the pull example deploys something else: the console branding from the folder https://github.com/tjungbauer/openshift-clusterconfig-gitops/tree/main/clusters/management-cluster/branding[clusters/<cluster>/branding^] of my GitOps repository.
 
 .ApplicationSet for the pull model
-[source,yaml]
+[source,yaml,role=linenums]
 ----
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: compliance-operator-pull
+  name: branding-pull
   namespace: openshift-gitops
 spec:
   generators:
@@ -681,7 +703,7 @@ spec:
         requeueAfterSeconds: 180
   template:
     metadata:
-      name: 'compliance-operator-{{name}}'
+      name: 'branding-{{name}}'
       labels:
         apps.open-cluster-management.io/pull-to-ocm-managed-cluster: 'true' <1>
       annotations:
@@ -693,9 +715,9 @@ spec:
       source:
         repoURL: https://github.com/tjungbauer/openshift-clusterconfig-gitops.git
         targetRevision: main
-        path: 'clusters/{{name}}/setup-compliance-operator'
+        path: 'clusters/{{name}}/branding' <6>
       destination:
-        server: https://kubernetes.default.svc <6>
+        server: https://kubernetes.default.svc <7>
       syncPolicy:
         automated:
           prune: true
@@ -706,9 +728,10 @@ spec:
 <3> The target managed cluster. The propagation controller only processes Applications with this annotation.
 <4> The namespace on the managed cluster where the Application is created, i.e. the namespace of the local Argo CD.
 <5> The AppProject must exist **on the managed cluster**. The default instance always has `default`. Custom projects, and the repository credentials for private repositories, have to be created on the spokes, for example by another policy.
-<6> From the perspective of the local Argo CD on the spoke, the destination is the cluster it runs on.
+<6> One folder per cluster: `clusters/sno/branding` and `clusters/bm/branding`.
+<7> From the perspective of the local Argo CD on the spoke, the destination is the cluster it runs on.
 
-[WARNING]
+[CAUTION]
 ====
 Do not forget the `skip-reconcile` annotation. Without it, the hub Argo CD tries to sync the Application to `https://kubernetes.default.svc`, which is the **hub** itself. You would deploy the configuration of every managed cluster onto the hub.
 ====
@@ -741,17 +764,17 @@ Back on the hub, the aggregated status per ApplicationSet:
 [source,bash]
 ----
 oc get multiclusterapplicationsetreports -n openshift-gitops
-oc get multiclusterapplicationsetreport compliance-operator-pull -n openshift-gitops -o yaml
+oc get multiclusterapplicationsetreport branding-pull -n openshift-gitops -o yaml
 ----
 
 The report lists the sync and health status per cluster and a summary. A shortened example with one failing cluster:
 
-[source,yaml]
+[source,yaml,role=linenums]
 ----
 apiVersion: apps.open-cluster-management.io/v1alpha1
 kind: MulticlusterApplicationSetReport
 metadata:
-  name: compliance-operator-pull
+  name: branding-pull
   namespace: openshift-gitops
 statuses:
   clusterConditions:
@@ -774,11 +797,32 @@ statuses:
 
 The `forbidden` message in the example is the most common error with the pull model: the local controller is missing permissions (step 2). The report is the first place to look. For the details, go to the Argo CD of the spoke: it has the full conditions and events.
 
+=== The visibility trade-off
+
+The pull model has one weak spot: **visibility**. The hub only gets an aggregated and delayed status. The hub cluster never connects directly to the spoke clusters and therefore never sees the full resource tree. 
+
+The result is the following: 
+
+While the ApplicationSet in the hub shows a healthy sync status: 
+
+.ApplicationSet in the hub shows a healthy sync status
+image::ep-19/pull-argocd-applicationset-branding-pull.png[Pull Model ApplicationSet]
+
+The Application itself shows also a healthy sync status BUT ... it does not show any child-resources. 
+
+.Pull Model UI Trade-off
+image::ep-19/pull-argocd-application-branding-bm.png[Pull Model UI Trade-off]
+
+CAUTION: The whole resource tree is missing in the UI. You are basically blind and you cannot see a Diff. You can check `oc get multiclusterapplicationsetreport branding-pull -n openshift-gitops -o yaml` to see the full status, but that's not as nice as seeing it in the UI.
+
 === Mixing push and pull
 
-The model is decided **per ApplicationSet**, by the label and annotations in the template. One hub Argo CD can therefore drive push and pull ApplicationSets side by side. A pattern I like: platform components via push (one UI, full visibility for a small platform team), application workloads via pull.
+The model is decided **per ApplicationSet**, by the label and annotations in the template. One hub Argo CD can therefore use push and pull ApplicationSets side by side. A pattern I like: platform components via push (one UI, full visibility for a small platform team), application workloads via pull.
 
 The one exception is the GitOps add-on: once it is enabled through a GitOpsCluster, the push model is switched off. If you want to mix, install OpenShift GitOps on the spokes with your own policy (option B).
+
+
+---
 
 == The Argo CD Agent via the GitOps add-on
 
@@ -788,36 +832,52 @@ The pull model has one weak spot: visibility. The hub only gets an aggregated, d
 
 Setting up the agent by hand means a lot of plumbing: a CA, certificates for the principal and for every agent, registering every agent, installing the agent on every spoke. This is where ACM helps. The GitOps add-on in **Agent mode** does all of that for the clusters of a Placement: it installs OpenShift GitOps and the agent on the spokes, manages the PKI and creates the cluster secrets in agent mode.
 
+pass:[{{< animated-svg src="ep-19/agent-model-animated.svg" title="Argo CD Agent: the agent opens the connection, receives the Applications and sends the full status back" >}}]
+
+What happens under the hood:
+
+. The Argo CD instance on the hub runs as **principal**. In the ACM configuration its application-controller is disabled, and a Route exposes the gRPC endpoint for the agents.
+. The **GitOpsCluster** with the add-on and the agent enabled creates the certificates, the cluster secrets in agent mode and the ManifestWorks for every cluster of the Placement.
+. The **gitops-addon** on the managed cluster installs OpenShift GitOps and the agent, including the client certificate of the agent.
+. The **agent** opens the connection to the principal: a gRPC stream with mutual TLS, initiated by the spoke.
+. The **ApplicationSet** generates the Applications on the hub. With destination-based mapping, the principal sends each Application to the agent whose name matches `spec.destination.name`.
+. The **local components** on the managed cluster pull Git and reconcile. The agent sends the full status back, so the Argo CD UI on the hub shows the resource tree, health and events of every cluster.
+
 [IMPORTANT]
 ====
-* The Agent mode of the GitOps add-on is **Technology Preview** in ACM 2.17. ACM 2.17 introduced destination-based mapping for it, which is what the example below uses.
+* The Agent mode of the GitOps add-on is **Technology Preview** in ACM 2.17. With ACM 5.0 which is planned for November 2026 this will become GA.
 * Every cluster that runs the Argo CD Agent requires an **OpenShift Platform Plus** subscription.
 ====
 
 === Step 1: Prepare the hub Argo CD
 
-This step has a consequence that is easy to overlook: the Argo CD instance on the hub becomes an agent **principal**, and its own application-controller is **disabled**. That instance can no longer push to anything.
+First we need to prepare Argo CD. We need to modify the Operator Subscription and the Argo CD resource. This step has an important consequence: the Argo CD instance on the hub becomes an agent **principal**. Its own application-controller is **disabled**, so this instance no longer pushes to any cluster.
 
-First, add the required environment variables to the Subscription of the OpenShift GitOps Operator on the hub:
+OpenShift GitOps 1.22 itself also supports a hybrid architecture (GA), where the application-controller stays enabled and push and agent Applications run side by side in one instance. The ACM 2.17 documentation for the add-on does not cover that combination yet.
+
+First, add the required environment variables to the `Subscription` of the OpenShift GitOps Operator on the hub:
 
 .Subscription of the OpenShift GitOps Operator on the hub (excerpt)
-[source,yaml]
+[source,yaml,role=linenums]
 ----
 spec:
   config:
     env:
-      - name: ARGOCD_CLUSTER_CONFIG_NAMESPACES
+      - name: ARGOCD_CLUSTER_CONFIG_NAMESPACES <1>
         value: openshift-gitops,local-cluster
-      - name: ARGOCD_PRINCIPAL_TLS_SERVER_ALLOW_GENERATE
+      - name: ARGOCD_PRINCIPAL_TLS_SERVER_ALLOW_GENERATE <2>
         value: "false"
-      - name: ARGOCD_PRINCIPAL_REDIS_SERVER_ADDRESS
+      - name: ARGOCD_PRINCIPAL_REDIS_SERVER_ADDRESS <3>
         value: openshift-gitops-redis:6379
 ----
+<1> Namespaces in which the OpenShift GitOps Operator runs Argo CD instances as cluster-scoped instances, with permissions for the whole cluster. The ACM documentation lists the default instance in `openshift-gitops` and `local-cluster`, the cluster namespace of the hub itself.
+<2> Do not let the principal generate a temporary, self-signed TLS certificate. That option is meant for development only. The server certificate of the principal is provided instead (the GitOps add-on manages the PKI).
+<3> The Redis instance the principal uses. The default of the principal is `argocd-redis:6379`, which does not exist with OpenShift GitOps. The Redis service of the default instance is called `openshift-gitops-redis`.
 
 Then configure the ArgoCD resource on the hub for agent mode:
 
 .ArgoCD resource on the hub in agent mode
-[source,yaml]
+[source,yaml,role=linenums]
 ----
 apiVersion: argoproj.io/v1beta1
 kind: ArgoCD
@@ -847,17 +907,14 @@ spec:
 <4> The agent identity is taken from the client certificate that the add-on issues.
 <5> Exposes the principal with a Route. The agents connect to it, and the GitOpsCluster controller discovers its address from there.
 
-Finally, the principal only propagates AppProjects whose `destinations` and `sourceNamespaces` match the agents. The ACM documentation therefore configures the `default` AppProject in `openshift-gitops` with matching (or wildcard) values. Check the chapter _Configuring subscriptions and resources for Argo CD_ for your version before you apply it, because a too generous AppProject is a security decision.
+Finally, the principal only propagates AppProjects whose `destinations` and `sourceNamespaces` match the agents. The ACM documentation therefore configures the `default` AppProject in `openshift-gitops` with matching (or wildcard) values.
 
-[WARNING]
-====
-If your hub Argo CD currently deploys anything via the push model, do not convert it. Install a second, dedicated Argo CD instance for the agent principal, or keep the agent for a separate hub. OpenShift GitOps 1.22 itself supports a **hybrid architecture** (push and agent Applications in one control plane, GA in 1.22), but the ACM add-on in 2.17 still expects the controller to be disabled.
-====
+WARNING: If your hub Argo CD currently deploys anything via the push model, do not convert it. Install a second, dedicated Argo CD instance for the agent principal, or keep the agent for a separate hub. OpenShift GitOps 1.22 itself supports a **hybrid architecture** (push and agent Applications in one control plane, GA in 1.22), but the ACM 2.17 documentation for the add-on configures the hub instance with its controller disabled.
 
 === Step 2: The GitOpsCluster in agent mode
 
 .GitOpsCluster with the GitOps add-on and the Argo CD Agent
-[source,yaml]
+[source,yaml,role=linenums]
 ----
 apiVersion: apps.open-cluster-management.io/v1beta1
 kind: GitOpsCluster
@@ -882,7 +939,11 @@ spec:
 <2> Additionally deploys the agent, creates the PKI and the cluster secrets in agent mode.
 <3> `managed`: the hub is the source of truth for Applications. `autonomous`: the spoke owns its Applications and the hub only observes them. The default is `managed`.
 
-The controller discovers the principal address from the Route. Check what it found:
+The controller discovers the principal address from the Route.
+
+You can check the discovered address with the following command:
+
+WARNING: It will take a while until it appears.
 
 [source,bash]
 ----
@@ -890,14 +951,17 @@ oc get gitopscluster gitops-agent-clusters -n openshift-gitops \
   -o jsonpath='{.spec.gitopsAddon.argoCDAgent.serverAddress}{"\n"}'
 ----
 
-If the auto-discovery does not fit your setup, set `serverAddress` and `serverPort` in the `argoCDAgent` section yourself.
 
-=== Step 3: Permissions for the agent
 
-The agent's service account on the spokes needs read access to the cluster. Add a ClusterRoleBinding to the policy `<gitopscluster-name>-argocd-policy` that the add-on created on the hub:
+=== Step 3: Permissions on the managed clusters
 
-.Additional object template in the gitops-agent-clusters-argocd-policy
-[source,yaml]
+When the GitOpsCluster is created, ACM also creates the policy `<gitopscluster-name>-argocd-policy` on the hub. It is created once and then belongs to you, so it is the right place to add the permissions. Two service accounts on the spokes need them:
+
+* the **agent** itself, which reports the status and the live resources to the principal, needs read access,
+* the local **application-controller**, which actually applies the manifests, needs write access to everything the Applications deploy.
+
+.Additional object templates in the gitops-agent-clusters-argocd-policy
+[source,yaml,role=linenums]
 ----
             - complianceType: musthave
               objectDefinition:
@@ -907,27 +971,45 @@ The agent's service account on the spokes needs read access to the cluster. Add 
                   name: acm-openshift-gitops-argocd-agent-cluster-reader
                 subjects:
                   - kind: ServiceAccount
-                    name: acm-openshift-gitops-agent-agent
+                    name: acm-openshift-gitops-agent-agent <1>
                     namespace: openshift-gitops
                 roleRef:
                   apiGroup: rbac.authorization.k8s.io
                   kind: ClusterRole
                   name: view
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: rbac.authorization.k8s.io/v1
+                kind: ClusterRoleBinding
+                metadata:
+                  name: argo-admin
+                subjects:
+                  - kind: ServiceAccount
+                    name: acm-openshift-gitops-argocd-application-controller <2>
+                    namespace: openshift-gitops
+                roleRef:
+                  apiGroup: rbac.authorization.k8s.io
+                  kind: ClusterRole
+                  name: cluster-admin <3>
 ----
+<1> The agent: read access is enough.
+<2> The local application-controller of the instance the add-on creates.
+<3> Simple and usually fine for platform configuration. For application teams, use the least-privilege approach from the pull model instead: the label `argocd.argoproj.io/managed-by` on the destination namespaces.
 
-Depending on what your Applications deploy, the local Argo CD on the spokes needs write permissions as well, exactly as in the pull model.
 
 === Step 4: The ApplicationSet
 
 With destination-based mapping, the ApplicationSet looks almost like a push ApplicationSet. The only difference is the destination: `name` instead of `server`.
 
+NOTE: The push example already installed the Compliance Operator and the pull example the console branding. The agent example therefore uses a third folder, `clusters/<cluster>/branding-bottom`, so that the three models do not manage the same objects.
+
 .ApplicationSet for agent mode
-[source,yaml]
+[source,yaml,role=linenums]
 ----
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: compliance-operator-agent
+  name: branding-bottom-agent
   namespace: openshift-gitops
 spec:
   generators:
@@ -939,21 +1021,22 @@ spec:
         requeueAfterSeconds: 30
   template:
     metadata:
-      name: 'compliance-operator-{{name}}'
+      name: 'branding-bottom-{{name}}'
     spec:
       project: default
       source:
         repoURL: https://github.com/tjungbauer/openshift-clusterconfig-gitops.git
         targetRevision: main
-        path: 'clusters/{{name}}/setup-compliance-operator'
+        path: 'clusters/{{name}}/branding-bottom' <1>
       destination:
-        name: '{{name}}' <1>
+        name: '{{name}}' <2>
       syncPolicy:
         automated:
           prune: true
           selfHeal: true
 ----
-<1> The principal routes the Application to the agent with this name, which is the name of the managed cluster.
+<1> One folder per cluster: `clusters/sno/branding-bottom` and `clusters/bm/branding-bottom`.
+<2> The principal routes the Application to the agent with this name, which is the name of the managed cluster.
 
 === Step 5: Verify
 
@@ -973,7 +1056,21 @@ oc get pods -n openshift-gitops -l app.kubernetes.io/part-of=argocd-agent
 oc get applications.argoproj.io -n openshift-gitops
 ----
 
-The conditions of the GitOpsCluster are helpful, because they follow the setup step by step: `PlacementResolved`, `ClustersRegistered`, `AddOnDeploymentConfigsReady`, `ManagedClusterAddOnsReady`, `AddOnTemplateReady`, `ArgoCDAgentPrereqsReady`, `CertificatesReady`, `ManifestWorksApplied`, `ArgoCDPolicyReady` and finally `Ready`. The first condition that is not `True` tells you where to look.
+
+=== The visibility in the UI
+
+The big advantage of the Argo CD Agent is the visibility in the UI. While the ApplicationSet in the hub shows a healthy sync status: 
+
+.ApplicationSet in the hub shows a healthy sync status
+image::ep-19/agent-argocd-applicationset-branding-bottom-agent.png[Agent Model ApplicationSet]
+
+The Application itself now also shows the full resource tree.
+
+.Agent Model UI Visibility
+image::ep-19/agent-argocd-application-branding-bottom-bm.png[Agent Model UI Visibility]
+
+
+---
 
 == Side by side
 
@@ -984,7 +1081,7 @@ The conditions of the GitOpsCluster are helpful, because they follow the setup s
 |Status in ACM 2.17
 |GA, default
 |GA
-|Technology Preview
+|Technology Preview (GA in ACM 5.0)
 
 |Where Argo CD reconciles
 |Hub
@@ -992,12 +1089,12 @@ The conditions of the GitOpsCluster are helpful, because they follow the setup s
 |Managed cluster (agent with local Argo CD components)
 
 |Network direction
-|Hub ▶ spoke (cluster proxy or API)
-|Spoke ▶ hub (klusterlet)
-|Spoke ▶ hub (agent ▶ principal)
+|Hub -> spoke (cluster proxy or API)
+|Spoke -> hub (klusterlet)
+|Spoke -> hub (agent -> principal)
 
 |Spoke credentials on the hub
-|Token per cluster (`application-manager` or own MSA)
+|Token per cluster
 |Cluster secret exists, not used for delivery
 |mTLS certificates, managed by the add-on
 
@@ -1024,36 +1121,30 @@ The conditions of the GitOpsCluster are helpful, because they follow the setup s
 |Can be mixed with push on the same hub instance
 |–
 |Yes (unless the add-on is enabled)
-|No (hub controller disabled)
+|Not in the ACM 2.17 documented setup (hub controller disabled)
 |===
-
-== Which model when?
-
-Five questions, answered top-down. The first clear "yes" usually decides:
-
-. **Is the hub forbidden to hold credentials for, or to reach, the spoke APIs?** Pull, or the agent.
-. **Are the sites at the edge or intermittently connected?** Pull or agent. Plain push will not work reliably.
-. **Do the operators need live sync status, diffs and logs in one UI?** Push, or the agent once it is supported for you.
-. **Is it platform configuration applied by a small platform team?** Push with `application-manager` is fine.
-. **Do application teams deploy to shared spokes?** Push with a customised ManagedServiceAccount, or pull with namespace-scoped permissions.
-
-Whatever you choose, keep to one model per set of clusters and per ApplicationSet. Switching later is possible, but it means regenerating every Application.
 
 == Summary
 
-* The **GitOpsCluster** is the bridge: it turns placed managed clusters into Argo CD cluster secrets and keeps the tokens rotated.
-* **Push** is the default and the easiest start: one Argo CD on the hub, full visibility, but the hub holds cluster-admin tokens for every spoke unless you use your own ManagedServiceAccount.
-* **Pull** moves the reconciliation to the spokes: the hub ships Applications as ManifestWorks, a local Argo CD does the work. More scalable and outbound-only, at the price of an Argo CD per cluster and a delayed, aggregated status.
-* The **Argo CD Agent add-on** combines pull-style distribution with a full UI on the hub, and ACM takes care of the PKI. It is Technology Preview in ACM 2.17 and turns the hub Argo CD into a principal without its own controller.
+I have to admit that this article is a bit long. But I hope it gives you a good overview of the different models and how to set them up.
 
-In the link:/gitopscollection/2026-10-22-acm-policies-with-gitops/[last part], we turn the integration around: Argo CD deploys ACM policies.
+Always keep in mind:
+
+* The **GitOpsCluster** is the bridge: it turns placed managed clusters into Argo CD cluster secrets and keeps the tokens rotated.
+* **Push** is the default and the easiest start: one Argo CD on the hub, full visibility, but the hub holds cluster-admin tokens for every spoke unless you use your own ManagedServiceAccount. With a huge fleet, usually greater than 20 clusters, it becomes unmanageable.
+* **Pull** moves the reconciliation to the spokes: the hub ships Applications as ManifestWorks, a local Argo CD does the work. More scalable and outbound-only, at the price of an Argo CD per cluster and a delayed, aggregated status as well as a trade-off in visibility.
+* The **Argo CD Agent add-on** combines pull-style distribution with a full UI on the hub, and ACM takes care of the PKI. It is Technology Preview in ACM 2.17 and in the documented setup it turns the hub Argo CD into a principal without its own controller.
+
+In the link:/gitopscollection/2026-10-24-acm-policies-with-gitops/[last part], we turn the integration around: Argo CD deploys ACM policies.
 
 And as always: **If it is not in Git, it does not exist.**
+
+NOTE: The diagrams in this article have been manually drawn on a whiteboard. AI then generated the SVGs from photos and made them look equal in all articles.
+
 
 == References
 
 * https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes/2.17/html/gitops/gitops-overview[ACM 2.17: GitOps (registering clusters, push and pull model, GitOps add-on, Argo CD Agent)^]
 * https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/1.22/html/release_notes/gitops-release-notes[Red Hat OpenShift GitOps 1.22 release notes^]
-* https://github.com/open-cluster-management-io/argocd-pull-integration[Open Cluster Management: argocd-pull-integration^]
 * https://www.redhat.com/en/blog/manage-clusters-and-applications-scale-argo-cd-agent-red-hat-openshift-gitops[Red Hat blog: Manage clusters and applications at scale with the Argo CD Agent^]
 * link:/gitopscollection/2026-01-14-argocd-agent/[[Ep.15\] OpenShift GitOps - Argo CD Agent]
