@@ -27,7 +27,7 @@ OUT_DIR = THEME / "webfonts" / "subset"
 OUT_CSS = THEME / "css" / "fontawesome-subset.min.css"
 
 # Icon class -> which font family (override heuristics)
-BRANDS = {"github", "java", "microsoft", "redhat", "opensuse"}
+BRANDS = {"github", "java", "microsoft", "redhat", "opensuse", "suse"}
 REGULAR = {"clock", "calendar-alt", "calendar"}  # far uses these in theme
 
 

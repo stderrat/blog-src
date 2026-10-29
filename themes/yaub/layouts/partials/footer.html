@@ -165,6 +165,11 @@
     
     <!-- Keyboard Shortcuts Help Modal (?) -->
     <script defer src="{{ partialCached "yaub/asset-url.html" "js/shortcuts-modal.js" "js/shortcuts-modal.js" }}"></script>
+
+    {{/* Animated diagrams: only on pages using the animated-svg shortcode */}}
+    {{ if .HasShortcode "animated-svg" }}
+    <script defer src="{{ partialCached "yaub/asset-url.html" "js/animated-svg.js" "js/animated-svg.js" }}"></script>
+    {{ end }}
     <script>
         function topFunction() {
           document.body.scrollTop = 0; // For Safari

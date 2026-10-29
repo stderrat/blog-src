@@ -1,0 +1,46 @@
+{{/*
+  animated-svg — inline an SVG prepared by scripts/animate-svg.py so it can
+  animate when it scrolls into view (opt-in per diagram): flow dots along
+  arrows and/or an optional step-by-step build-up, as defined in the YAML.
+
+  Usage (AsciiDoc):
+    pass:[{{< animated-svg src="ep-19/foo-animated.svg" title="Caption" >}}]
+
+  Params:
+    src    path relative to the page bundle, the section bundle, or the
+           section's images/ folder (same value as in image::)
+    title  optional caption, rendered like an AsciiDoc image title
+    alt    optional accessible label (overrides the SVG's aria-label)
+
+  IDs are prefixed per instance so multiple Inkscape SVGs on one page
+  (or several posts on a list page) cannot collide on id="rect10" etc.
+  Without JS or with prefers-reduced-motion the diagram is shown complete.
+*/}}
+{{- $src := .Get "src" -}}
+{{- $title := .Get "title" -}}
+{{- $alt := .Get "alt" -}}
+{{- if not $src -}}{{- errorf "animated-svg: missing src at %s" .Position -}}{{- end -}}
+{{- $res := .Page.Resources.Get $src -}}
+{{- with .Page.CurrentSection -}}
+  {{- if not $res -}}{{- $res = .Resources.Get $src -}}{{- end -}}
+  {{- if not $res -}}{{- $res = .Resources.Get (printf "images/%s" $src) -}}{{- end -}}
+{{- end -}}
+{{- if not $res -}}{{- errorf "animated-svg: %q not found (page or section bundle) at %s" $src .Position -}}{{- end -}}
+{{- $pfx := printf "as%s%d-" (substr (md5 (printf "%s|%s" .Page.RelPermalink $src)) 0 6) .Ordinal -}}
+{{- $svg := $res.Content -}}
+{{- $svg = replaceRE `(?s)<\?xml.*?\?>` "" $svg -}}
+{{- $svg = replaceRE `(?s)<!DOCTYPE.*?>` "" $svg -}}
+{{- $svg = replaceRE `(?s)<sodipodi:namedview\b.*?(?:/>|</sodipodi:namedview>)` "" $svg -}}
+{{- $svg = replaceRE `(?s)<metadata\b.*?</metadata>` "" $svg -}}
+{{- $svg = replaceRE `(?s)<style id="asvg-style">.*?</style>` "" $svg -}}
+{{- $svg = replaceRE `\s(?:inkscape|sodipodi):[\w-]+="[^"]*"` "" $svg -}}
+{{- $svg = replaceRE `\bid="` (printf `id="%s` $pfx) $svg -}}
+{{- $svg = replaceRE `url\(#` (printf `url(#%s` $pfx) $svg -}}
+{{- $svg = replaceRE `href="#` (printf `href="#%s` $pfx) $svg -}}
+{{- with $alt -}}{{- $svg = replaceRE `(<svg\b[^>]*?)\saria-label="[^"]*"` (printf `$1 aria-label="%s"` (. | htmlEscape)) $svg -}}{{- end -}}
+<div class="imageblock animated-svg" data-animated-svg>
+  <div class="content">{{ $svg | safeHTML }}</div>
+  {{- with $title }}
+  <div class="title">{{ . }}</div>
+  {{- end }}
+</div>

@@ -28,6 +28,37 @@
 
 {{ if ge $section_count 1 }}
 
+  {{/* Reading order for series in this section. Linked from series-nav.html
+       ("All n parts", anchor #series-overview). Sections without series
+       articles are unchanged. */}}
+  {{ $seriesInSection := where $section "Params.series" "!=" nil }}
+  {{ with $seriesInSection }}
+  <section id="series-overview" class="series-overview" aria-label="Series reading order">
+    {{ range .GroupByParam "series" }}
+    <div class="series-nav series-overview-group">
+      <div class="series-header">
+        <span class="series-icon"><i class="fas fa-layer-group"></i></span>
+        <span class="series-title">{{ .Key }}: reading order</span>
+        <span class="series-progress">{{ len .Pages }} parts</span>
+      </div>
+      <ol class="series-parts series-overview-list">
+        {{ range sort .Pages "Params.series_part" }}
+        <li>
+          <a href="{{ .RelPermalink }}" class="series-part" title="{{ .Title }}">
+            <span class="part-number">{{ .Params.series_part }}</span>
+            <span class="series-overview-text">
+              <span class="part-title">{{ .Title }}</span>
+              <span class="series-overview-meta">{{ .Date.Format "January 2, 2006" }}{{ with .Description }} · {{ . }}{{ end }}</span>
+            </span>
+          </a>
+        </li>
+        {{ end }}
+      </ol>
+    </div>
+    {{ end }}
+  </section>
+  {{ end }}
+
   <div class="article-cards-grid">
 
 	{{/* Section title */}}

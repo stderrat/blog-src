@@ -5,7 +5,7 @@ date: "2026-10-20"
 doctype: book
 authors: [Thomas Jungbauer]
 type: post
-draft: true
+draft: false
 
 series: "GitOps Episodes"
 series_part: 18
@@ -32,11 +32,11 @@ In this article I will try to explain what each tool is (and also what it is not
 
 <!--more-->
 
-The topic turned out to be too big for a single article, so I have split it into three parts. This is the first:
+The topic turned out to be too big for a single article, so I have split it into multiple parts and maybe I should have split into even more. This is the first:
 
 . **[Ep.18] OpenShift GitOps or Advanced Cluster Management?** (this article): what each tool does, where they overlap and a decision guide.
-. link:/gitopscollection/2026-10-21-acm-gitops-push-pull-agent/[[Ep.20\] ACM and OpenShift GitOps: push, pull and the Argo CD Agent]: how ACM registers clusters in Argo CD, and how to set up each of the three delivery models.
-. link:/gitopscollection/2026-10-22-acm-policies-with-gitops/[[Ep.21\] Managing ACM Policies with OpenShift GitOps]: policies as code, the PolicyGenerator, hub templates and bootstrapping Argo CD with a policy.
+. link:/gitopscollection/2026-10-23-acm-gitops-push-pull-agent/[[Ep.19\] ACM and OpenShift GitOps: push, pull and the Argo CD Agent]: how ACM registers clusters in Argo CD, and how to set up each of the three delivery models.
+. link:/gitopscollection/2026-10-24-acm-policies-with-gitops/[[Ep.20\] Managing ACM Policies with OpenShift GitOps]: policies as code, the PolicyGenerator, hub templates and bootstrapping Argo CD with a policy.
 
 NOTE: Everything in this series was written against **OpenShift GitOps 1.22** (Argo CD 3.5) and **Advanced Cluster Management 2.17** (Open Cluster Management). Technology Preview and GA states move quickly in both products, so check the release notes of your versions before you commit to a design.
 
@@ -51,7 +51,7 @@ NOTE: While I am using the term "Advanced Cluster Management" in this article, I
 
 Or, in one sentence I like to use with customers: **ACM decides _where_ and checks _compliance_. Argo CD decides _what_ and keeps it _in sync_.**
 
-TIP: Another features ACM offers are an automated cluster deployment and centralized observability. But these are not the focus of this article.
+TIP: Other features ACM offers are an automated cluster deployment and centralized observability. But these are not the focus of this article.
 
 == What OpenShift GitOps is
 
@@ -59,7 +59,7 @@ OpenShift GitOps is Red Hat's distribution of **Argo CD**, delivered and lifecyc
 
 The core job of Argo CD is **reconciliation**: it renders manifests (plain YAML, Kustomize, Helm, etc.), compares them with the live state of a cluster and syncs differences. Everything else (ApplicationSets, sync waves, hooks, RBAC via AppProjects, the UI) is built around that job.
 
-TIP: If you want to dig into the details of the GitOps process link:/gitopscollection/2023-12-11-gitops-intro/[Ep.1] is a good introduction to the topic.
+TIP: If you want to dig into the details of the GitOps process, link:/gitopscollection/2023-12-11-gitops-intro/[Ep.1] is a good introduction to the topic.
 
 
 What OpenShift GitOps does **not** do:
@@ -107,7 +107,7 @@ The building blocks you will meet everywhere in ACM are:
 
 The Placement is the important concept for this series. Argo CD selects clusters by looking at labels on cluster _secrets_ that someone created. ACM selects clusters by looking at the actual fleet, including whether a cluster is available right now.
 
-NOTE: ACM also has its own, older application model based on **Channels** and **Subscriptions** objcts. That model is deprecated and will be removed in a future release.
+NOTE: ACM also has its own, older application model based on **Channels** and **Subscriptions** objects. That model is deprecated and will be removed in a future release.
 
 == Side-by-side comparison
 
@@ -467,7 +467,7 @@ GitOps needs one first imperative step: somebody has to install the OpenShift Gi
 |The hub becomes part of the critical path.
 |===
 
-TIP: My recommendation: fewer than five clusters, use a script or Ansible. For a fleet that is managed by ACM, use a policy or the GitOpsCluster. Never: "we click it in the console once". The bootstrap policy is shown in link:/gitopscollection/2026-10-22-acm-policies-with-gitops/[Ep.21].
+TIP: My recommendation: fewer than five clusters, use a script or Ansible. For a fleet that is managed by ACM, use a policy or the GitOpsCluster. Never: "we click it in the console once". The bootstrap policy is shown in link:/gitopscollection/2026-10-24-acm-policies-with-gitops/[Ep.20].
 
 == Working together: ACM as the brain for Argo CD
 
@@ -484,7 +484,7 @@ The bridge between the two worlds is the **GitOpsCluster** custom resource. On t
 |A moderate number of clusters, good connectivity from hub to spokes, and you want **one UI with full visibility**.
 
 |**Pull**
-|Applications are created on the hub but not reconciled there. Instead the target cluster pulls it and a local Argo CD instance on the target cluster  reconciles it.
+|Applications are created on the hub but not reconciled there. Instead the target cluster pulls it and a local Argo CD instance on the target cluster reconciles it.
 |Many clusters, outbound-only networks, or the hub must not hold credentials for the spokes.
 
 |**Argo CD Agent**
@@ -497,10 +497,10 @@ The following diagram shows how the three models fit together.
 .Three ways an Argo CD Application reaches a managed cluster
 image::ep-18/ep18-delivery-models.png?width=1000px[Push reconciles on the hub, pull and the Argo CD Agent reconcile on the managed cluster]
 
-NOTE: Yes, you have seen right, the version will jump from 2.17 to 5.0 for ACM in the next release, to harmonize with OpenShift versioning.
+NOTE: Yes, you read that right, the version will jump from 2.17 to 5.0 for ACM in the next release, to harmonize with OpenShift versioning.
 
 
-What each model actually is, how the data flows in which direction and how to set it up step by step is the topic of the next part: link:/gitopscollection/2026-10-21-acm-gitops-push-pull-agent/[[Ep.19\] ACM and OpenShift GitOps: push, pull and the Argo CD Agent].
+What each model actually is, how the data flows in which direction and how to set it up step by step is the topic of the next part: link:/gitopscollection/2026-10-23-acm-gitops-push-pull-agent/[[Ep.19\] ACM and OpenShift GitOps: push, pull and the Argo CD Agent].
 
 
 ---
@@ -577,9 +577,12 @@ So, which one is better? Neither. They are not competitors, they are layers.
 * The real decision is not "GitOps or ACM", but "do I need fleet management?" For a handful of clusters, usually not. For many clusters, dynamic cluster creation, regulated environments or edge sites, almost certainly yes.
 * Where both tools can do the same job, cluster configuration, use policies for the audited baseline and Argo CD for everything that needs rendering, and keep exactly one owner per object.
 
-In the link:/gitopscollection/2026-10-21-acm-gitops-push-pull-agent/[next part], we look under the hood of the integration: push, pull and the Argo CD Agent.
+In the link:/gitopscollection/2026-10-23-acm-gitops-push-pull-agent/[next part], we look under the hood of the integration: push, pull and the Argo CD Agent.
 
 And as always: **If it is not in Git, it does not exist.**
+
+NOTE: The diagrams in this article have been manually drawn on a whiteboard. AI then generated the SVGs from photos and made them look equal in all articles.
+
 
 == References
 

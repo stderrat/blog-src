@@ -31,6 +31,31 @@
         {{- if findRE `(?i)\bstyle=["']` $tag -}}
           {{- $style = replaceRE `(?is).*?\bstyle=["']([^"']*)["'].*` `$1` $tag -}}
         {{- end -}}
+        {{- /* Learn-style URL parameters (img.png?width=50%&height=200px&classes=border,shadow).
+               The <picture> rewrite drops the query string, so yaub.js never sees them:
+               turn them into inline style and classes here. Same validation as yaub.js. */ -}}
+        {{- if in $src "?" -}}
+          {{- $query := index (split $src "?") 1 | htmlUnescape -}}
+          {{- if and $style (not (hasSuffix $style ";")) -}}{{- $style = printf "%s;" $style -}}{{- end -}}
+          {{- range split $query "&" -}}
+            {{- $kv := split . "=" -}}
+            {{- if eq (len $kv) 2 -}}
+              {{- $k := index $kv 0 -}}
+              {{- $v := index $kv 1 -}}
+              {{- if and (in (slice "width" "height") $k) (findRE `^\d+(\.\d+)?(px|%|em|rem|vw)?$` $v) -}}
+                {{- if findRE `^\d+(\.\d+)?$` $v -}}{{- $v = printf "%spx" $v -}}{{- end -}}
+                {{- $style = printf "%s%s:%s;" $style $k $v -}}
+              {{- else if eq $k "classes" -}}
+                {{- range split $v "," -}}
+                  {{- $c := trim . " " -}}
+                  {{- if findRE `^[A-Za-z0-9_-]+$` $c -}}
+                    {{- $class = trim (printf "%s %s" $class $c) " " -}}
+                  {{- end -}}
+                {{- end -}}
+              {{- end -}}
+            {{- end -}}
+          {{- end -}}
+        {{- end -}}
         {{- $loading := "lazy" -}}
         {{- if findRE `(?i)\bloading=["']eager["']` $tag -}}
           {{- $loading = "eager" -}}

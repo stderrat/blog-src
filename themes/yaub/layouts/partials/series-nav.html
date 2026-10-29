@@ -1,13 +1,17 @@
 {{/* Series Navigation Partial
-     
+
      Usage in front matter:
      ---
      series: "My Series Name"
      series_part: 1
      ---
-     
-     Articles with the same "series" value will be linked together,
-     ordered by "series_part" number.
+
+     Articles with the same "series" value are linked together, ordered by
+     "series_part". To keep the box short for long series, only a window of
+     parts around the current one is shown (site param seriesNavWindow,
+     default 2 before and 2 after); the full list sits in a collapsed
+     <details>. "All parts" links to the reading-order overview on the
+     section page of the series (summary.html, anchor #series-overview).
 */}}
 
 {{ if and .Params.series .Params.series_part }}
@@ -20,33 +24,77 @@
 {{ $totalParts := len $seriesPages }}
 
 {{ if gt $totalParts 1 }}
+{{/* Position of the current page in the sorted list */}}
+{{ $currentIdx := 0 }}
+{{ range $i, $p := $seriesPages }}{{ if eq $p.Params.series_part $currentPart }}{{ $currentIdx = $i }}{{ end }}{{ end }}
+
+{{/* Window: $window parts on each side, shifted at the ends so that the
+     number of visible parts stays the same */}}
+{{ $window := site.Params.seriesNavWindow | default 2 }}
+{{ $size := add (mul $window 2) 1 }}
+{{ $start := sub $currentIdx $window }}
+{{ if lt $start 0 }}{{ $start = 0 }}{{ end }}
+{{ $end := add $start (sub $size 1) }}
+{{ if ge $end $totalParts }}{{ $end = sub $totalParts 1 }}{{ $start = sub $end (sub $size 1) }}{{ end }}
+{{ if lt $start 0 }}{{ $start = 0 }}{{ end }}
+{{ $collapsed := gt $totalParts $size }}
+
+{{/* Overview: section page of the first part, if it lists the series */}}
+{{ $overview := (index $seriesPages 0).CurrentSection }}
+
 <div class="series-nav">
     <div class="series-header">
         <span class="series-icon"><i class="fas fa-layer-group"></i></span>
         <span class="series-title">{{ $currentSeries }}</span>
         <span class="series-progress">Part {{ $currentPart }} of {{ $totalParts }}</span>
     </div>
-    
+
     <div class="series-parts">
-        {{ range $index, $page := $seriesPages }}
+        {{ range $i, $page := $seriesPages }}
+        {{ if or (not $collapsed) (and (ge $i $start) (le $i $end)) }}
         {{ $partNum := $page.Params.series_part }}
-        <a href="{{ $page.RelPermalink }}" 
+        <a href="{{ $page.RelPermalink }}"
            class="series-part {{ if eq $partNum $currentPart }}current{{ end }}"
-           title="{{ $page.Title }}">
+           title="{{ $page.Title }}"{{ if eq $partNum $currentPart }} aria-current="page"{{ end }}>
             <span class="part-number">{{ $partNum }}</span>
             <span class="part-title">{{ $page.Title | truncate 70 }}</span>
         </a>
         {{ end }}
+        {{ end }}
     </div>
-    
+
+    {{ if $collapsed }}
+    <details class="series-all">
+        <summary>Show all {{ $totalParts }} parts</summary>
+        <div class="series-parts">
+            {{ range $seriesPages }}
+            {{ $partNum := .Params.series_part }}
+            <a href="{{ .RelPermalink }}"
+               class="series-part {{ if eq $partNum $currentPart }}current{{ end }}"
+               title="{{ .Title }}">
+                <span class="part-number">{{ $partNum }}</span>
+                <span class="part-title">{{ .Title | truncate 70 }}</span>
+            </a>
+            {{ end }}
+        </div>
+    </details>
+    {{ end }}
+
     <div class="series-nav-buttons">
         {{ range $index, $page := $seriesPages }}
-            {{ if eq $page.Params.series_part (sub $currentPart 1) }}
+            {{ if eq $index (sub $currentIdx 1) }}
             <a href="{{ $page.RelPermalink }}" class="series-btn series-prev">
                 <i class="fas fa-arrow-left"></i> Previous: {{ $page.Title | truncate 30 }}
             </a>
             {{ end }}
-            {{ if eq $page.Params.series_part (add $currentPart 1) }}
+        {{ end }}
+        {{ with $overview }}
+            <a href="{{ .RelPermalink }}#series-overview" class="series-btn series-overview-link">
+                <i class="fas fa-list-alt"></i> All {{ $totalParts }} parts
+            </a>
+        {{ end }}
+        {{ range $index, $page := $seriesPages }}
+            {{ if eq $index (add $currentIdx 1) }}
             <a href="{{ $page.RelPermalink }}" class="series-btn series-next">
                 Next: {{ $page.Title | truncate 30 }} <i class="fas fa-arrow-right"></i>
             </a>
@@ -56,4 +104,3 @@
 </div>
 {{ end }}
 {{ end }}
-
