@@ -1,0 +1,117 @@
+---
+title: "Improving Windows VM performance on Harvester"
+description: "How to configure Harvester for improved Windows Virtual Machine performance"
+date: "2026-10-22"
+doctype: book
+weight: 10
+
+draft: true
+
+featured_image: /suse/images/logos/opensuse_cloud_init.png
+show_featured_image_summary: true
+show_featured_image_article: true
+disableBreadcrumb: false
+
+authors: [Toni Schmidbauer]
+type: post
+categories:
+   - SUSE
+   - Harvester
+   - Virtualization
+
+tags: ["SUSE", "Harvester"", "Virtualization"]
+
+aliases: [
+]
+---
+
+:imagesdir: /suse/Harvester/images/
+:icons: font
+:toc:
+
+While setting up Windows virtual machines on a Harvester 1.8 cluster we experienced the following issues:
+
+- After logging in to the Windows VM via RDP we experienced sever lagging. Every click to around 30 seconds
+- While live-migrating the Windows VM to another Harvester node we lost multiple ping packets. This was not the case for a Linux VM on migrated between the same machines.
+
+This blog post describes the configuration settings we had to modify
+to improve the performance of the affected Windows VM.
+
+<!--more-->
+
+== The issue(s)
+
+The VM was installed with Windows 11 from a standard ISO. After the
+successful installation, upon first login via RDP we discovered that
+working with the machine was nearly impossible. Every click to 30
+seconds to proceed.
+
+Furthermore while live-migration of the Windows VM to another node in
+the Harvester cluster succeeded, we experienced packet loss. A Linux
+guest running on the same nodes in the cluster did not loose any
+packets during live migration. The test we did was very simple: we just
+ran "ping <ip address of windows machine>".
+
+This was done on SUSE Virtualization 1.8, which is based on
+Harvester 1.8.
+
+== Researching the issue
+
+After opening a support ticket and doing some research we discovered
+the following settings in the Harvester 1.9 documetation: https://docs.harvesterhci.io/v1.9/vm/create-windows-vm/#enable-hyper-v-enlightenments[Enable Hyper-V Enlightenments].
+You have to add the following settings in the VM CRD under _spec.template.spec.domain_:
+
+[source,yaml]
+----------
+features:
+  acpi: { enabled: true }
+  apic: { enabled: true }
+  smm:  { enabled: true }
+  hyperv:
+    relaxed:    { enabled: true }
+    vapic:      { enabled: true }
+    spinlocks:  { enabled: true, spinlocks: 8191 }
+    vpindex:    { enabled: true }
+    synic:      { enabled: true }
+    synictimer: { enabled: true }
+    ipi:        { enabled: true }
+    runtime:    { enabled: true }
+    reset:      { enabled: true }
+clock:
+  utc: {}
+  timer:
+    hpet:   { present: false }
+    hyperv: { present: true }
+    pit:    { tickPolicy: delay }
+    rtc:    { tickPolicy: catchup }
+----------
+
+More information about Hyper-V Enlightenments is available in the
+https://www.qemu.org/docs/master/system/i386/hyperv.html[upstream]
+documentation.
+
+Harvester 1.9 is already released, the current version is 1.9.0
+(2026-10-22). SUSE Virtualziation is still based on Harvester 1.8. As
+far as we understood the
+https://www.suse.com/lifecycle/#suse-virtualization[SUSE Virtualization lifecycle]
+lifecycle, SUSE Virtualization 1.9 will be released as soon as Harvester 1.9.1 is available.
+
+
+
+
+
+
++
+image::obs_new_image.png[alt=Create new image]
+
+2. Select the _openSUSE Leap 16.0 Minimal_ image:
++
+image::obs_leap_image.png[alt=Select the LEAP image]
+
+3. Give the new appliance a name and click _Create appliance_:
+
+image::obs_appliance_name.png[alt=Select the LEAP image]
+
+This takes you to the web editor for the file _Minimal.kiwi_:
+
+image::obs_edit_kiwi.png[alt=Edit kiwi file]
