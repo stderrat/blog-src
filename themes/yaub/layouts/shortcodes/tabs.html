@@ -7,7 +7,7 @@
           data-tab-item="{{ .name }}"
           data-tab-group="{{ $groupId }}"
           class="tab-nav-button btn {{ cond (eq $idx 0) "active" ""}}"
-          onclick="switchTab('{{ $groupId }}','{{ .name }}')"
+          data-action="switch-tab"
          >{{ .name }}</button>
     {{ end }}
     </div>

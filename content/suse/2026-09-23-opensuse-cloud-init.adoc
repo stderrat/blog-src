@@ -78,8 +78,7 @@ The first step for using OBS is to create a user. As this is pretty
 much straight forward we will not cover all the details here. Just
 head over to https://build.opensuse.org/ and hit _Sign up_ in the upper left corner. This
 takes you to the
-https://idp-portal.suse.com/univention/self-service/#page=createaccount[create
-account] page.
+https://idp-portal.suse.com/univention/self-service/#page=createaccount[create account] page.
 
 After signing up and login in for the first time you are redirected to
 the Welcome page.

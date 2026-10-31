@@ -54,14 +54,14 @@
 
                   <!-- Help Button (keyboard shortcuts) -->
                   <li class="list-horizontal topnav-help-li">
-                      <button class="topnav-help-btn" onclick="window.ShortcutsModal && window.ShortcutsModal.open()" title="Keyboard shortcuts" aria-label="Show keyboard shortcuts">
+                      <button class="topnav-help-btn" data-action="shortcuts-open" title="Keyboard shortcuts" aria-label="Show keyboard shortcuts">
                           <kbd>?</kbd>
                       </button>
                   </li>
 
                   <!-- Search Button -->
                   <li class="list-horizontal topnav-search-li">
-                      <button class="topnav-search-btn" onclick="window.SearchModal && window.SearchModal.open()" title="Search" aria-label="Search">
+                      <button class="topnav-search-btn" data-action="search-open" title="Search" aria-label="Search">
                           <i class="fas fa-search" aria-hidden="true"></i>
                           <kbd class="topnav-search-kbd" aria-hidden="true"><span class="kbd-mac">⌘K</span><span class="kbd-other">Ctrl+K</span></kbd>
                       </button>
@@ -143,6 +143,17 @@
                 <div class="resp-sharing-button resp-sharing-button--linkedin resp-sharing-button--small">
                   <div aria-hidden="true" class="resp-sharing-button__icon resp-sharing-button__icon--solid">
                     {{ partial "svg/linkedin.svg" (dict "size" "32px") }}
+                  </div>
+                </div>
+              </a>
+                  {{ end }}
+
+                  <!-- Bluesky: https://docs.bsky.app/docs/advanced-guides/intent-links -->
+                  {{ if .Site.Params.social.share.bluesky }}
+              <a href="https://bsky.app/intent/compose?text={{ (printf "%s %s" $title $url) | urlquery }}" target="_blank" rel="noopener noreferrer" class="bluesky no-highlight" aria-label="share on Bluesky">
+                <div class="resp-sharing-button resp-sharing-button--bluesky resp-sharing-button--small">
+                  <div aria-hidden="true" class="resp-sharing-button__icon resp-sharing-button__icon--solid">
+                    {{ partial "svg/bluesky.svg" (dict "size" "32px") }}
                   </div>
                 </div>
               </a>

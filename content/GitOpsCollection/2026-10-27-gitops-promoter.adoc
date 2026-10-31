@@ -1,0 +1,582 @@
+---
+title: "[Ep.21] GitOps Promoter: Environment Promotion with Pull Requests"
+description: "Set up the GitOps Promoter (Technology Preview in OpenShift GitOps 1.22) with the Argo CD Source Hydrator and promote a first application across three clusters."
+date: "2026-10-27"
+doctype: book
+authors: [Thomas Jungbauer]
+type: post
+draft: true
+
+series: "GitOps Episodes"
+series_part: 21
+
+featured_image: /gitopscollection/images/logos/ep-21-gitops.png
+show_featured_image_summary: true
+show_featured_image_article: true
+featured_image_position: 50% 40%
+
+categories:
+   - OpenShift
+   - GitOps
+tags: ["Argo CD", "OpenShift GitOps", "GitOps Promoter", "Source Hydrator", "Rendered Manifests", "Promotion", "Pull Request", "Multi-Cluster", "OpenShift", "OCP", "GitOps"]
+---
+
+////
+Featured image prompt (Gemini). Prepend the style block from claude/featured-image-prompts.md.
+Output: PNG, 2:1, scale to 1600 x 800 px, save as ep-21-gitops.png
+
+A wizard cat in a deep blue starry robe stands at a tall lectern in a stone tower and writes into one large
+open book whose pages glow with cyan runes. From the book a brass clockwork scribe copies the text onto three
+sealed scrolls. A ginger messenger cat carries the scrolls along a winding road through three stone gates
+in a row, each with a lantern above it: the first two lanterns glow green and their gates stand open, the third
+gate is closed and guarded by a small knight cat holding a wax seal, waiting for approval. Warm amber candle light
+in the tower, cool cyan and violet magic on the road. Labels on wooden signs above the three gates: "DEV", "TEST", "PROD".
+////
+
+:imagesdir: /gitopscollection/images/
+:icons: font
+:toc:
+
+Ask ten teams how they promote a change from development to production with GitOps and you will get ten answers: a folder per environment and a lot of copy and paste, a pipeline that rewrites an image tag in a values file, an ApplicationSet with progressive sync, or a separate tool such as Kargo. All of them work somehow, but none of them felt really "GitOps" to me. With OpenShift GitOps 1.22, Red Hat ships the *GitOps Promoter* as Technology Preview. Its idea is simple: promotion is just a pull request, and Git stays the place where you see what is deployed where.
+
+In this article I set it up on a hub cluster that manages three test clusters and promote a first application from dev to test to prod.
+
+<!--more-->
+
+== The Idea Behind GitOps Promoter
+
+The Promoter is built around the *rendered manifests pattern*. You do not deploy Helm charts or Kustomize overlays directly any more. Instead, a *hydrator* renders them into plain YAML and commits the result to Git. Argo CD then deploys exactly that YAML.
+
+The branches in the repository have clear roles:
+
+* *main (DRY branch)*: the only branch you work on. It contains the configuration for all environments, for example a Kustomize base and one overlay per environment.
+* *environment/<env>-next (proposed branch)*: the hydrator pushes the rendered manifests for each environment here. Nothing is deployed from these branches.
+* *environment/<env> (active branch)*: what is live. Argo CD syncs from these branches only.
+
+The GitOps Promoter opens a pull request from every `-next` branch to its active branch and merges it once all configured checks are green. These checks are called *commit statuses*. The most important one is `argocd-health`, which the Promoter maintains itself by watching the Argo CD Applications. A change goes to test only after dev reports healthy, and to prod only after test is healthy.
+
+.Promotion flow with GitOps Promoter
+image::ep-21/gitops-promoter-flow.png?width=1000px[Promotion flow from the DRY branch via hydrated -next branches and pull requests to three clusters]
+
+What I like about this approach:
+
+* *You commit once.* No tool rewrites files in your `main` branch.
+* *Git shows the truth.* `main` is the desired state for all environments, `environment/prod` is what runs in prod, and the open PRs show what is still on its way.
+* *Your SCM rules still apply.* Branch protection, required reviews or GitHub Actions can block a promotion PR like any other PR.
+
+The Promoter is a set of small custom resources. For this article you only need to know a few of them:
+
+[cols="1,3",options="header"]
+|===
+|Resource|Purpose
+
+|`ScmProvider`
+|How to talk to GitHub, GitLab, Gitea, Forgejo, Bitbucket or Azure DevOps (credentials).
+
+|`GitRepository`
+|Which repository to work on.
+
+|`PromotionStrategy`
+|The environments, their order, which checks must pass and whether a PR is merged automatically.
+
+|`ArgoCDCommitStatus`
+|Watches the Argo CD Applications and writes the `argocd-health` commit status for each environment.
+|===
+
+The Promoter creates further resources itself: a `ChangeTransferPolicy` per environment, `PullRequest` and `CommitStatus` objects. You can look at them for troubleshooting, but you do not write them.
+
+IMPORTANT: OpenShift GitOps 1.22 ships *GitOps Promoter 0.35*. The upstream documentation already describes newer versions. Since 0.38/0.39, a `PromotionStrategy` needs a separate `DependentsSuccessfulCommitStatus` and the field `orderCommitStatusRef`. Version 0.35 does *not* know these: it orders the environments by the list in the `PromotionStrategy` and adds the check `promoter-previous-environment` automatically. If you copy examples from the upstream docs, keep this in mind.
+
+== The Lab
+
+My lab looks like this:
+
+* One *hub cluster* with OpenShift GitOps 1.22. The default Argo CD instance in `openshift-gitops` manages everything.
+* Three *target clusters*: `dev-cluster`, `test-cluster` and `prod-cluster`. They are registered in Argo CD as cluster secrets and Argo CD pushes the manifests to them (push model, no Argo CD Agent).
+* A *GitHub* repository called `promoter-demo` and a GitHub App that is used by both Argo CD and the Promoter.
+
+.Lab setup
+image::ep-21/gitops-promoter-lab.png?width=1000px[Hub cluster with OpenShift GitOps, a GitHub repository and three target clusters]
+
+The push model makes things easy here. All three Argo CD Applications live on the hub, in the same place as the Promoter. The Promoter can read their health status directly and needs no access to the target clusters.
+
+NOTE: With the Argo CD Agent (pull model) the Applications live on the managed clusters. The Promoter can watch them through additional kubeconfig secrets (multi-cluster support of `ArgoCDCommitStatus`). I described the Agent itself in link:/gitopscollection/2026-01-14-argocd-agent/[[Ep.15\] OpenShift GitOps - Argo CD Agent]; combining it with the Promoter is a topic for another day.
+
+== Prerequisites
+
+* OpenShift GitOps *1.22* on the hub cluster.
+* The three target clusters registered in Argo CD. Check the names:
++
+[source,bash,role=linenums]
+----
+oc get secret -n openshift-gitops -l argocd.argoproj.io/secret-type=cluster \
+  -o go-template='{{range .items}}{{.data.name | base64decode}}{{"\n"}}{{end}}'
+----
++
+In this article they are called `dev-cluster`, `test-cluster` and `prod-cluster`.
+* A GitHub account or organisation where you can create a repository and a GitHub App.
+* `oc` and `git` on your workstation.
+
+WARNING: Both the GitOps Promoter and the Source Hydrator are *Technology Preview* in OpenShift GitOps 1.22. Use them on test clusters only.
+
+== Step 1: Enable the Source Hydrator and the Promoter
+
+Both features are switched on in the `ArgoCD` resource. The Promoter only works with a *cluster-scoped* Argo CD instance. The default instance `openshift-gitops` is cluster-scoped, so we can use it directly.
+
+[source,bash,role=linenums]
+----
+oc patch argocd openshift-gitops -n openshift-gitops --type merge -p '
+spec:
+  sourceHydrator:
+    enabled: true          # <1>
+  promoter:
+    enabled: true          # <2>
+    argoCDUIExtensionEnabled: true  # <3>
+'
+----
+<1> Enables the Source Hydrator. The operator deploys the Argo CD commit server automatically, which does the actual push to Git.
+<2> Deploys the Promoter controller and its API server into `openshift-gitops`.
+<3> Optional: adds a Promoter view to the Argo CD UI. The view only appears on an Argo CD Application that itself deploys a `PromotionStrategy`. In this article I create the Promoter resources with `oc`, so the view stays empty until you manage them with Argo CD as well.
+
+Check the new pods:
+
+[source,bash,role=linenums]
+----
+oc get pods -n openshift-gitops | grep -E 'commit-server|promoter'
+----
+
+You will see that the API server pod of the Promoter does not start yet. It needs a TLS certificate, which we create in the next step.
+
+== Step 2: Certificates for the Promoter API Server
+
+The Promoter API server is registered as a Kubernetes `APIService`. It serves the data for the dashboard and the Argo CD UI extension. The API server needs a serving certificate, and the `APIService` needs the CA that signed it.
+
+On OpenShift, the service CA operator can create the certificate for us. First, find the service (the name is `<argocd-instance>-promoter-apiserver`):
+
+[source,bash,role=linenums]
+----
+oc get svc -n openshift-gitops | grep promoter
+----
+
+Then let the service CA create a serving certificate for it:
+
+[source,bash,role=linenums]
+----
+oc annotate service openshift-gitops-promoter-apiserver -n openshift-gitops \
+  service.beta.openshift.io/serving-cert-secret-name=openshift-gitops-promoter-apiserver-tls
+----
+
+The CA of the service CA operator is available in every namespace in the ConfigMap `openshift-service-ca.crt`. Copy it into a Secret, because the `ArgoCD` resource expects a Secret:
+
+[source,bash,role=linenums]
+----
+oc create secret generic promoter-apiserver-ca -n openshift-gitops \
+  --from-literal=ca.crt="$(oc get configmap openshift-service-ca.crt -n openshift-gitops \
+    -o jsonpath='{.data.service-ca\.crt}')"
+----
+
+Now point the Promoter to both secrets:
+
+[source,bash,role=linenums]
+----
+oc patch argocd openshift-gitops -n openshift-gitops --type merge -p '
+spec:
+  promoter:
+    apiserver:
+      enabled: true
+      tls:
+        certSecretName: openshift-gitops-promoter-apiserver-tls  # <1>
+        caSecretName: promoter-apiserver-ca                       # <2>
+        caSecretKey: ca.crt
+'
+----
+<1> Serving certificate and key, created by the service CA operator.
+<2> The CA that ends up in the `caBundle` of the `APIService`.
+
+After a moment the API server pod is running and the `APIService` reports `Available`:
+
+[source,bash,role=linenums]
+----
+oc get apiservice v1alpha1.view.promoter.argoproj.io
+----
+
+NOTE: The "What's new" blog post for 1.22 uses `caSecretKey: tls.key` of the serving secret. The `caBundle` of an `APIService` must contain the CA certificate, not a private key, which is why I use the service CA from the ConfigMap. Also note that the copied CA does not rotate by itself. When the service CA is renewed, update the Secret.
+
+== Step 3: Prepare the Git Repository
+
+=== The GitHub App
+
+Argo CD and the Promoter both need to write to the repository. A GitHub App is the cleanest way. Create one under *Settings → Developer settings → GitHub Apps* with these repository permissions:
+
+[cols="1,1",options="header"]
+|===
+|Permission|Access
+|Checks|Read and write
+|Contents|Read and write
+|Pull requests|Read and write
+|===
+
+Leave the webhook disabled for now. Then:
+
+. Generate a private key and save the `.pem` file.
+. Note the *App ID* (on the *General* page of the app).
+. Install the app into your account and select only the `promoter-demo` repository. The *Installation ID* is the number at the end of the URL of the installation settings page.
+
+Put the values into variables, we will need them several times:
+
+[source,bash,role=linenums]
+----
+export GH_ORG=<your-github-account>
+export GH_REPO=promoter-demo
+export GH_APP_ID=<app-id>
+export GH_APP_INSTALLATION_ID=<installation-id>
+export GH_APP_KEY=~/Downloads/<your-app>.private-key.pem
+----
+
+=== The Content of main
+
+The test application is a small Apache httpd with a Kustomize base and one overlay per environment:
+
+[source,role=linenums]
+----
+promoter-demo/
+└── apps/hello/
+    ├── base/
+    │   ├── deployment.yaml
+    │   ├── service.yaml
+    │   └── kustomization.yaml
+    └── overlays/
+        ├── dev/kustomization.yaml
+        ├── test/kustomization.yaml
+        └── prod/kustomization.yaml
+----
+
+.apps/hello/base/deployment.yaml
+[source,yaml,role=linenums]
+----
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hello
+  template:
+    metadata:
+      labels:
+        app: hello
+    spec:
+      containers:
+        - name: httpd
+          image: registry.access.redhat.com/ubi9/httpd-24:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: GREETING
+              value: "Hello v1"   # <1>
+          readinessProbe:         # <2>
+            tcpSocket:
+              port: 8080
+----
+<1> This is what we will change later to test the promotion.
+<2> The health of the Application is our promotion gate, so the probe matters. I use a TCP check, because the httpd welcome page answers with HTTP 403.
+
+.apps/hello/base/service.yaml
+[source,yaml,role=linenums]
+----
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello
+spec:
+  selector:
+    app: hello
+  ports:
+    - port: 8080
+      targetPort: 8080
+----
+
+.apps/hello/base/kustomization.yaml
+[source,yaml,role=linenums]
+----
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - deployment.yaml
+  - service.yaml
+----
+
+.apps/hello/overlays/prod/kustomization.yaml
+[source,yaml,role=linenums]
+----
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: hello-promoter
+resources:
+  - ../../base
+labels:
+  - pairs:
+      environment: prod
+replicas:
+  - name: hello
+    count: 2
+----
+
+The overlays for `dev` and `test` look the same, just with their own `environment` label and `count: 1`. Commit everything to `main` and push it.
+
+=== The Environment Branches
+
+The Promoter needs six branches: an active and a `-next` branch for each environment. I create all of them from one empty commit, so they share a common history and GitHub can open pull requests between them:
+
+[source,bash,role=linenums]
+----
+git checkout --orphan environments-init
+git rm -rf --quiet .
+git commit --allow-empty -m "Initialise environment branches"
+for env in dev test prod; do
+  git push origin HEAD:refs/heads/environment/${env}
+  git push origin HEAD:refs/heads/environment/${env}-next
+done
+git checkout main
+git branch -D environments-init
+----
+
+IMPORTANT: The `-next` branches must survive a merged pull request. Disable *Settings → General → Automatically delete head branches*, or protect them with a branch rule for the pattern `environment/*-next`. If GitHub deletes them, the promotion of that environment stops.
+
+== Step 4: Repository Credentials for Argo CD
+
+The Source Hydrator requires *two* secrets for the same repository: one for reading (`repository`) and one for writing (`repository-write`). Argo CD keeps them separate on purpose.
+
+[source,bash,role=linenums]
+----
+for type in repository repository-write; do
+  oc create secret generic promoter-demo-${type} -n openshift-gitops \
+    --from-literal=type=git \
+    --from-literal=url=https://github.com/${GH_ORG}/${GH_REPO} \
+    --from-literal=githubAppID=${GH_APP_ID} \
+    --from-literal=githubAppInstallationID=${GH_APP_INSTALLATION_ID} \
+    --from-file=githubAppPrivateKey=${GH_APP_KEY}
+  oc label secret promoter-demo-${type} -n openshift-gitops \
+    argocd.argoproj.io/secret-type=${type}
+done
+----
+
+== Step 5: Three Argo CD Applications
+
+Each environment gets its own Application. Instead of `spec.source` they use `spec.sourceHydrator`:
+
+[source,bash,role=linenums]
+----
+for env in dev test prod; do
+cat <<EOF | oc apply -f -
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: hello-${env}
+  namespace: openshift-gitops
+  labels:
+    app-name: hello                                   # <1>
+spec:
+  project: default
+  destination:
+    name: ${env}-cluster                              # <2>
+    namespace: hello-promoter
+  sourceHydrator:
+    drySource:                                        # <3>
+      repoURL: https://github.com/${GH_ORG}/${GH_REPO}  # <4>
+      path: apps/hello/overlays/${env}
+      targetRevision: main
+    hydrateTo:
+      targetBranch: environment/${env}-next          # <5>
+    syncSource:
+      targetBranch: environment/${env}               # <6>
+      path: hello                                     # <7>
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+EOF
+done
+----
+<1> The `ArgoCDCommitStatus` finds the Applications by this label.
+<2> The target cluster, as registered in Argo CD. This is the push part.
+<3> Where the unrendered configuration lives: the overlay of the environment on `main`.
+<4> Must be *exactly* the same URL the Promoter builds from the `GitRepository` (`https://github.com/<owner>/<name>`, no `.git` at the end). Otherwise the health check is never matched to the environment.
+<5> The hydrator pushes the rendered YAML here.
+<6> Argo CD deploys from here. This branch name must match the environment branch in the `PromotionStrategy`.
+<7> The folder for the rendered manifests in the environment branch. It must not be the repository root.
+
+After a short time the hydrator pushes a commit to each `-next` branch. Have a look at one of them on GitHub: you will find the plain, rendered YAML in the folder `hello/` and a `hydrator.metadata` file that points back to the commit on `main`.
+
+The Applications themselves show an error that the app path does not exist. That is expected: `environment/dev` is still empty, because nobody has promoted anything yet. That is the job of the Promoter.
+
+== Step 6: The Promoter Resources
+
+I keep the Promoter resources in their own namespace on the hub. The Secret, the `ScmProvider`, the `GitRepository` and the `PromotionStrategy` must all be in the same namespace.
+
+[source,bash,role=linenums]
+----
+oc new-project promoter-demo
+
+oc create secret generic github-app -n promoter-demo \
+  --from-file=githubAppPrivateKey=${GH_APP_KEY}
+----
+
+[source,bash,role=linenums]
+----
+cat <<EOF | oc apply -n promoter-demo -f -
+apiVersion: promoter.argoproj.io/v1alpha1
+kind: ScmProvider
+metadata:
+  name: github
+spec:
+  secretRef:
+    name: github-app
+  github:
+    appID: ${GH_APP_ID}
+    installationID: ${GH_APP_INSTALLATION_ID}
+---
+apiVersion: promoter.argoproj.io/v1alpha1
+kind: GitRepository
+metadata:
+  name: promoter-demo
+spec:
+  github:
+    owner: ${GH_ORG}
+    name: ${GH_REPO}
+  scmProviderRef:
+    name: github
+EOF
+----
+
+Now the interesting part, the `PromotionStrategy` and the health check:
+
+.promotionstrategy.yaml
+[source,yaml,role=linenums]
+----
+apiVersion: promoter.argoproj.io/v1alpha1
+kind: PromotionStrategy
+metadata:
+  name: hello
+  namespace: promoter-demo
+spec:
+  gitRepositoryRef:
+    name: promoter-demo
+  activeCommitStatuses:       # <1>
+    - key: argocd-health
+  environments:               # <2>
+    - branch: environment/dev
+      autoMerge: true
+    - branch: environment/test
+      autoMerge: true
+    - branch: environment/prod
+      autoMerge: false        # <3>
+---
+apiVersion: promoter.argoproj.io/v1alpha1
+kind: ArgoCDCommitStatus
+metadata:
+  name: hello
+  namespace: promoter-demo
+spec:
+  promotionStrategyRef:
+    name: hello
+  applicationSelector:        # <4>
+    matchLabels:
+      app-name: hello
+----
+<1> Active commit statuses are checked on the *live* branch after a merge. An environment is only "done" when its Applications are healthy. The next environment waits for that.
+<2> The order of this list is the promotion order. In version 0.35 the Promoter adds the check `promoter-previous-environment` to every environment except the first one by itself.
+<3> Production is merged by a human.
+<4> Selects the three Applications from step 5. The resulting commit status is called `argocd-health`.
+
+[source,bash,role=linenums]
+----
+oc apply -f promotionstrategy.yaml
+----
+
+TIP: In the CommitStatus world, there are two kinds of checks: `activeCommitStatuses` are evaluated on the live branch (did it work?), `proposedCommitStatuses` on the proposed change before it is merged (is it allowed?). A change freeze or a security scan would be a proposed check.
+
+== Step 7: The First Promotion
+
+As soon as the `PromotionStrategy` exists, the Promoter compares each `-next` branch with its active branch. All three differ, so it opens three pull requests.
+
+What happens now:
+
+. The PR for *dev* is merged immediately, because dev has no gate.
+. Argo CD syncs `hello-dev` to `dev-cluster`. When the Application is healthy, `argocd-health` turns green for dev.
+. The PR for *test* now passes `promoter-previous-environment` and is merged. Argo CD syncs `hello-test`.
+. The PR for *prod* shows all checks green, but stays open because of `autoMerge: false`.
+
+Watch it on the hub:
+
+[source,bash,role=linenums]
+----
+oc get promotionstrategy,changetransferpolicy,pullrequest -n promoter-demo
+oc get application -n openshift-gitops -l app-name=hello
+----
+
+Merge the prod PR in GitHub and the application is running on all three clusters.
+
+NOTE: Without a webhook, the Promoter polls. It can take a few minutes until a PR appears or gets merged. Be patient, or configure the webhook (see below).
+
+=== Now a Real Change
+
+This is the moment where the Promoter shows its value. Change the greeting in `apps/hello/base/deployment.yaml` on `main` from `Hello v1` to `Hello v2`, then commit and push:
+
+[source,bash,role=linenums]
+----
+git commit -am "Say hello v2"
+git push
+----
+
+One commit, and then:
+
+* The hydrator pushes new rendered manifests to all three `-next` branches.
+* The Promoter opens a PR for each environment. Look at the diff of a PR: it is the *rendered* YAML of exactly that environment. No guessing what Kustomize will make out of it.
+* Dev is merged, deployed, healthy. Then test. Then prod waits for you.
+
+If you push another commit while the promotion is still running, the open PRs are simply updated with the newer state.
+
+== Optional: Webhook
+
+The Promoter can react to push events instead of polling. Enable the receiver in the `ArgoCD` resource:
+
+[source,bash,role=linenums]
+----
+oc patch argocd openshift-gitops -n openshift-gitops --type merge \
+  -p '{"spec":{"promoter":{"webhook":{"enabled":true}}}}'
+----
+
+The operator creates a service called `openshift-gitops-promoter-controller-manager`. Expose it with a Route and enter the URL as webhook in the GitHub App (event: *Push*):
+
+[source,bash,role=linenums]
+----
+oc get svc openshift-gitops-promoter-controller-manager -n openshift-gitops
+oc create route edge promoter-webhook -n openshift-gitops \
+  --service=openshift-gitops-promoter-controller-manager
+----
+
+== Things to Keep in Mind
+
+* *Version mismatch*: as mentioned above, the upstream documentation is ahead of the shipped 0.35. Check the CRDs on your cluster (`oc explain promotionstrategy.spec`) before you copy examples.
+* *Exact repository URL*: the URL in the Argo CD Applications must match the one the Promoter builds from the `GitRepository`. A trailing `.git` is enough to break the health gate.
+* *Nobody pushes to environment branches.* They are generated. Changes always go to `main`.
+* *Technology Preview*: APIs will change, as you can see from the changes between 0.35 and the current upstream version.
+
+== Summary
+
+The GitOps Promoter turns environment promotion into something that every Git user already understands: a pull request. You commit once to `main`, the Source Hydrator renders the manifests, and the Promoter walks the change from dev over test to prod, using the health of the Argo CD Applications as gate. In a push setup with a central Argo CD this works out of the box, because all Applications live next to the Promoter.
+
+It is still a Technology Preview, and the API is moving quickly. But the concept convinced me, and I will keep an eye on it. Next steps for me: additional gates such as a time window for prod, and the Argo CD Agent setup.
+
+== References
+
+* https://developers.redhat.com/blog/2026/10/06/whats-new-openshift-gitops-122[Red Hat Developer: What's New in OpenShift GitOps 1.22^]
+* https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/1.22/html/release_notes/gitops-release-notes[Red Hat OpenShift GitOps 1.22 release notes^]
+* https://argocd-operator.readthedocs.io/en/latest/usage/gitops-promoter/[Argo CD Operator: GitOps Promoter^]
+* https://gitops-promoter.readthedocs.io/en/latest/[GitOps Promoter documentation^]
+* https://argo-cd.readthedocs.io/en/stable/user-guide/source-hydrator/[Argo CD: Source Hydrator^]

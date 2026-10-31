@@ -4,6 +4,25 @@
   <head>
     <script>
       document.documentElement.className = document.documentElement.className.replace('no-js', 'js');
+
+      {{- if not .Site.Params.allowFraming }}
+      // Clickjacking protection. GitHub Pages cannot send X-Frame-Options or CSP frame-ancestors,
+      // so a page that is framed by a foreign origin hides itself and offers a link to the article.
+      (function() {
+        if (window.self === window.top) return;
+        var sameOrigin = false;
+        try { sameOrigin = window.top.location.origin === window.location.origin; } catch (e) {}
+        if (sameOrigin) return;
+        document.documentElement.style.display = 'none';
+        document.addEventListener('DOMContentLoaded', function() {
+          var a = document.createElement('a');
+          a.href = window.location.href; a.target = '_top'; a.rel = 'noopener';
+          a.textContent = 'Open this page on ' + window.location.host;
+          document.body.replaceChildren(a);
+          document.documentElement.style.display = '';
+        });
+      })();
+      {{- end }}
       
       {{- if not .Site.Params.disableThemeToggle }}
       // Apply theme immediately to prevent flash of wrong theme
@@ -65,21 +84,20 @@
     <meta name="color-scheme" content="dark light">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <!-- Baseline CSP via meta (GitHub Pages cannot set HTTP CSP). Prefer static/_headers on hosts that support it. -->
-    <meta http-equiv="Content-Security-Policy" content="
-        default-src 'self';
-        script-src 'self' 'unsafe-inline' https://giscus.app;
-        style-src 'self' 'unsafe-inline' https://giscus.app;
-        img-src 'self' data: https: blob:;
-        font-src 'self' data:;
-        connect-src 'self' https://giscus.app https://charts.stderr.at;
-        worker-src 'self';
-        frame-src https://giscus.app;
-        object-src 'none';
-        base-uri 'self';
-        form-action 'self';
-        upgrade-insecure-requests
-    ">
+    {{- /*
+      Content Security Policy as <meta>, because GitHub Pages cannot send HTTP headers.
+      - The boot script above runs before this element and is therefore not affected by the policy
+        (a meta CSP only applies to content that follows it). Keep it first in <head>.
+      - All other JavaScript lives in files (js/, js/inline/). No inline <script> blocks and no
+        onclick=/onchange= attributes: use data-action (js/inline/actions.js) instead.
+      - style-src keeps 'unsafe-inline' for style="" attributes used all over theme and content.
+      - The Helm pages render chart icons from many external hosts and read charts.stderr.at.
+      - Not possible with a meta tag (and not possible on GitHub Pages at all): frame-ancestors,
+        X-Frame-Options, X-Content-Type-Options, Permissions-Policy, own HSTS settings.
+        Framing is handled by the boot script.
+    */ -}}
+    {{- $helm := or (eq .Section "helm-charts") (.HasShortcode "helm-changelog") }}
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://giscus.app; style-src 'self' 'unsafe-inline' https://giscus.app; img-src 'self' data: blob:{{ if $helm }} https:{{ end }}; font-src 'self' data:; connect-src 'self' https://giscus.app{{ if $helm }} https://charts.stderr.at{{ end }}; worker-src 'self'; manifest-src 'self'; frame-src https://giscus.app; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
     <meta name="referrer" content="strict-origin-when-cross-origin">
     
     {{ hugo.Generator }}
@@ -143,7 +161,8 @@
 
 
     {{/* jQuery stays sync in <head> — learn.js / expand shortcode / footer handlers depend on $ */}}
-    <script src="{{ partialCached "yaub/asset-url.html" "js/jquery-3.7.1.min.js" "js/jquery-3.7.1.min.js" }}"></script>
+    {{- /* defer: no synchronous script uses jQuery; deferred scripts run in document order, so this one runs first */}}
+    <script defer src="{{ partialCached "yaub/asset-url.html" "js/jquery-3.7.1.min.js" "js/jquery-3.7.1.min.js" }}"></script>
 
     <style>
       /* Hide content until fonts are ready to prevent FOUT */
@@ -265,7 +284,7 @@
     <!-- Skip to content link for keyboard navigation accessibility -->
     <a href="#main-content" class="skip-to-content">Skip to main content</a>
     
-    <button onclick="scrollTopAnimated()" id="myBtn" class="top-btn button fa fa-arrow-up" title="Go to top" aria-label="Go to top"></button>
+    <button type="button" data-action="scroll-top" id="myBtn" class="top-btn button fa fa-arrow-up" title="Go to top" aria-label="Go to top"></button>
 
     <span class="read-progress"></span>
 

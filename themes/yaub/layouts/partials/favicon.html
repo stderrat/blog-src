@@ -1,18 +1,11 @@
-<link rel="icon" href="{{"images/favicon.ico" | relURL}}" type="image/png">
-
-<link rel="apple-touch-icon" sizes="152x152" href="{{"images/apple-touch-icon-152x152.png" | relURL}}">
-<link rel="apple-touch-icon" sizes="180x180" href="{{"images/apple-touch-icon-180x180.png" | relURL}}">
-<link rel="apple-touch-icon" sizes="128x128" href="{{"images/apple-touch-icon-128x128.png" | relURL}}">
-<link rel="apple-touch-icon" sizes="144x144" href="{{"images/apple-touch-icon-144x144.png" | relURL}}">
-<link rel="apple-touch-icon" sizes="114x114" href="{{"images/apple-touch-icon-114x114.png" | relURL}}">
-<link rel="apple-touch-icon" sizes="72x72" href="{{"images/apple-touch-icon-72x72.png" | relURL}}">
-<link rel="apple-touch-icon" href="{{"images/apple-touch-icon-57x57.png" | relURL}}">
-<link rel="shortcut icon" href="{{"images/favicon.ico" | relURL}}">
-<link rel="apple-touch-icon" sizes="57x57" href="{{"images/apple-icon-57x57.png" | relURL}}">
-<link rel="apple-touch-icon" sizes="60x60" href="{{"images/apple-icon-60x60.png" | relURL}}">
-<link rel="apple-touch-icon" sizes="76x76" href="{{"images/apple-icon-76x76.png" | relURL}}">
-<link rel="apple-touch-icon" sizes="120x120" href="{{"images/apple-icon-120x120.png" | relURL}}">
-<link rel="icon" type="image/png" sizes="192x192"  href="{{"images/android-icon-192x192.png" | relURL}}">
-<link rel="icon" type="image/png" sizes="32x32" href="{{"images/favicon-32x32.png" | relURL}}">
-<link rel="icon" type="image/png" sizes="96x96" href="{{"images/favicon-96x96.png" | relURL}}">
-<link rel="icon" type="image/png" sizes="16x16" href="{{"images/favicon-16x16.png" | relURL}}">
+{{- /*
+  Three links are enough for current browsers:
+  - favicon.ico for tabs and bookmarks (sizes="any" so browsers prefer the PNG where it fits better),
+  - a 32 px PNG,
+  - one 180 px apple-touch-icon (iOS scales it down for all other sizes).
+  Android and installed-app icons come from manifest.json. The old icon files stay in static/images/
+  because external links and older caches may still request them.
+*/ -}}
+<link rel="icon" href="{{ "images/favicon.ico" | relURL }}" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="{{ "images/favicon-32x32.png" | relURL }}">
+<link rel="apple-touch-icon" href="{{ "images/apple-touch-icon-180x180.png" | relURL }}">

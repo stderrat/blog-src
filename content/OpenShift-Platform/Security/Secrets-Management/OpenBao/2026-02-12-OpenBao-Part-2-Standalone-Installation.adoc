@@ -283,7 +283,7 @@ For a proper standalone installation, follow these steps:
 
 Create `/etc/openbao.d/openbao.hcl`:
 
-[source,ini]
+[source,hcl]
 ----
 # Full configuration for standalone OpenBao server
 
@@ -641,7 +641,7 @@ That's it for the basic verification. You can now start to use OpenBao in your p
 
 If you watched the previous commands closely, you will have noticed that the UI has been enabled in the configuration file: 
 
-[source,ini]
+[source,hcl]
 ----
 # UI enabled
 ui = true

@@ -8,8 +8,12 @@ theme = ["yaub"]
 enableGitInfo = true
 copyright = "Toni Schmidbauer & Thomas Jungbauer"
 enableRobotsTXT = true
-rssLimit = 50
 timeZone = "Europe/Vienna"
+
+[services]
+  [services.rss]
+    # 20 newest articles per feed, full content in <content:encoded> (was 50, ~1.6 MB)
+    limit = 20
 
 [frontmatter]
   # Default Hugo order starts with :git when enableGitInfo is true.
@@ -36,7 +40,7 @@ priority = 0.5
     notAlternate = true
 
 [outputs]
-home = [ "HTML", "RSS", "JSON", "TJFeed", "NavTree"]
+home = [ "HTML", "RSS", "TJFeed", "NavTree"]
 
 [permalinks]
     posts = "/:sections/:year/:month/:slug/"
@@ -54,7 +58,7 @@ home = [ "HTML", "RSS", "JSON", "TJFeed", "NavTree"]
   # Palettes: themes/yaub/static/css/modular/base/accent.css
   accentColor = "blue"
   # Font Awesome: subset (~10 kB woff2) vs full (~300 kB). Rollback: set false
-  # (full CSS + webfonts stay in place; backup also under static/_font-backups/).
+  # (full CSS + webfonts stay in place under themes/yaub/static/).
   useFontAwesomeSubset = true
   # Asset cache-busting: fingerprint via Hugo Pipes (see layouts/partials/yaub/asset-url.html).
   # Optional manual pin if fingerprint is unavailable: assetsVersion = "2026-10-21"
@@ -128,8 +132,9 @@ home = [ "HTML", "RSS", "JSON", "TJFeed", "NavTree"]
   copyrightstart = "2020"
 
 [params.social.share]
-  facebook = true
+  facebook = false
   linkedin = true
+  bluesky = true
   twitter = true
   whatsapp = true
   email = true
@@ -329,9 +334,12 @@ staticDir = ['themes/hugo-theme-learn/static', 'static']
 
 # Mount raster images into assets for resources.Process (full default mounts required)
 [module]
+  # Diagram sources (images/*/sources/: .anim.yaml, editable .svg) and *.bak files stay in the
+  # repository but are not published.
   [[module.mounts]]
     source = "content"
     target = "content"
+    files = ["! **/sources/**", "! **.bak*"]
   [[module.mounts]]
     source = "data"
     target = "data"

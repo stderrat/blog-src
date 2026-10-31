@@ -90,43 +90,7 @@
     {{ end }}
 
 <!-- READING PROGRESS BAR -->
-<script>
-(function(){
-    document.addEventListener('DOMContentLoaded', function() {
-        var progressBar = document.querySelector('.read-progress');
-        if (!progressBar) return;
-        
-        // Add the animation class
-        progressBar.classList.add('position-fixed');
-        
-        function updateProgress() {
-            var scrollTop = window.scrollY || document.documentElement.scrollTop;
-            var docHeight = document.documentElement.scrollHeight - window.innerHeight;
-            
-            if (docHeight > 0) {
-                var progress = Math.min((scrollTop / docHeight) * 100, 100);
-                progressBar.style.width = progress + '%';
-            }
-        }
-        
-        // Throttle scroll events for better performance
-        var ticking = false;
-        window.addEventListener('scroll', function() {
-            if (!ticking) {
-                window.requestAnimationFrame(function() {
-                    updateProgress();
-                    ticking = false;
-                });
-                ticking = true;
-            }
-        }, { passive: true });
-        
-        // Initial call and resize handler
-        updateProgress();
-        window.addEventListener('resize', updateProgress, { passive: true });
-    });
-})();
-</script>
+<script defer src="{{ partialCached "yaub/asset-url.html" "js/inline/read-progress.js" "js/inline/read-progress.js" }}"></script>
 
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
@@ -136,21 +100,20 @@
     <script defer src="{{ partialCached "yaub/asset-url.html" "js/perfect-scrollbar.jquery.min.js" "js/perfect-scrollbar.jquery.min.js" }}"></script>
     <script defer src="{{ partialCached "yaub/asset-url.html" "js/featherlight.min.js" "js/featherlight.min.js" }}"></script>
     
+    {{- /* highlight.js (~184 kB) only where a code block exists. helm-charts renders <pre> in its template. */}}
+    {{- if or (strings.Contains (string .Content) "<pre") (eq .Section "helm-charts") }}
     <script defer src="{{ partialCached "yaub/asset-url.html" "js/highlight.min.js" "js/highlight.min.js" }}"></script>
+    {{- /* Terraform/HCL (highlightjs-terraform) only on pages with [source,hcl|terraform|tf] blocks */}}
+    {{- if findRE `class="language-(hcl|terraform|tf)\b` (string .Content) 1 }}
+    <script defer src="{{ partialCached "yaub/asset-url.html" "js/highlightjs-terraform.js" "js/highlightjs-terraform.js" }}"></script>
+    {{- end }}
     <!-- Opt-in line numbers for code blocks: [source,yaml,role=linenums] -->
     <script defer src="{{ partialCached "yaub/asset-url.html" "js/yaub-linenums.js" "js/yaub-linenums.js" }}"></script>
     <script defer src="{{ partialCached "yaub/asset-url.html" "js/merge-html.js" "js/merge-html.js" }}"></script>
-    <script>
-      // Runs after deferred scripts above (DOMContentLoaded waits for defer)
-      document.addEventListener('DOMContentLoaded', function () {
-        if (typeof hljs === 'undefined') return;
-        hljs.configure({ ignoreUnescapedHTML: true });
-        if (typeof mergeHTMLPlugin !== 'undefined') hljs.addPlugin(mergeHTMLPlugin);
-        if (typeof yaubLineNumbersPlugin !== 'undefined') hljs.addPlugin(yaubLineNumbersPlugin);
-        hljs.highlightAll();
-      });
-    </script>
+    <script defer src="{{ partialCached "yaub/asset-url.html" "js/inline/hljs-init.js" "js/inline/hljs-init.js" }}"></script>
+    {{- end }}
 
+    <script defer src="{{ partialCached "yaub/asset-url.html" "js/inline/actions.js" "js/inline/actions.js" }}"></script>
     <script defer src="{{ partialCached "yaub/asset-url.html" "js/learn.js" "js/learn.js" }}"></script>
     <script defer src="{{ partialCached "yaub/asset-url.html" "js/yaub.js" "js/yaub.js" }}"></script>
     <script defer src="{{ partialCached "yaub/asset-url.html" "js/reader-mode.js" "js/reader-mode.js" }}"></script>
@@ -159,8 +122,7 @@
     {{- end }}
     
     <!-- Search Modal (Cmd/Ctrl+K) -->
-    <link href="/pagefind/pagefind-ui.css" rel="stylesheet">
-    <script defer src="/pagefind/pagefind-ui.js"></script>
+    {{- /* pagefind-ui.js/.css (~130 kB) are loaded by search-modal.js on first open */}}
     <script defer src="{{ partialCached "yaub/asset-url.html" "js/search-modal.js" "js/search-modal.js" }}"></script>
     
     <!-- Keyboard Shortcuts Help Modal (?) -->
@@ -170,21 +132,7 @@
     {{ if .HasShortcode "animated-svg" }}
     <script defer src="{{ partialCached "yaub/asset-url.html" "js/animated-svg.js" "js/animated-svg.js" }}"></script>
     {{ end }}
-    <script>
-        function topFunction() {
-          document.body.scrollTop = 0; // For Safari
-          document.documentElement.scrollTop = 0; // For Chrome, Firefox, IE and Opera
-        }
-
-        document.addEventListener('DOMContentLoaded', function () {
-          if (typeof jQuery === 'undefined') return;
-          jQuery(".article-box").click(function(event) {
-            window.location = jQuery(this).attr('href');
-            event.stopPropagation();
-            return false;
-          });
-        });
-    </script>
+    <script defer src="{{ partialCached "yaub/asset-url.html" "js/inline/article-box.js" "js/inline/article-box.js" }}"></script>
 
     {{/* Mermaid (~2.7 MB) + d3/js-yaml: load only when the page needs diagrams.
          Opt-in: front matter mermaid: true, or auto-detect ```mermaid / language-mermaid.
@@ -221,41 +169,15 @@
         {{ else }}
             <script defer src="{{ partialCached "yaub/asset-url.html" "mermaid/mermaid.js" "mermaid/mermaid.js" }}"></script>
         {{ end }}
-        <script>
-            {{/* Flag must be sync so yaub.js $(document).ready can see it.
-                 mermaid.initialize waits for DOMContentLoaded (after deferred mermaid.js). */}}
-            window.relearn = window.relearn || {};
-            window.relearn.themeUseMermaid = true;
-            window.relearn.mermaidConfig = { securityLevel: 'antiscript' };
-            window.T_Reset_view = 'Reset view';
-            window.T_View_reset = 'View reset';
-            window.showToast = window.showToast || function(msg) {
-                console.log('Toast:', msg);
-            };
-            document.addEventListener('DOMContentLoaded', function () {
-                if (typeof mermaid !== 'undefined') {
-                    mermaid.initialize({
-                        startOnLoad: false,
-                        securityLevel: 'antiscript',
-                        theme: 'default'
-                    });
-                }
-            });
-        </script>
+        {{/* No defer: the flag must be set synchronously so yaub.js $(document).ready can see it.
+             mermaid.initialize waits for DOMContentLoaded (after deferred mermaid.js). */}}
+        <script src="{{ partialCached "yaub/asset-url.html" "js/inline/mermaid-config.js" "js/inline/mermaid-config.js" }}"></script>
     {{ end }}
 
     {{ partial "keyboard-hints.html" . }}
     {{ partial "custom-footer.html" . }}
 
     <!-- PWA: register root-scoped service worker (manifest + /offline/ already present) -->
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function () {
-          navigator.serviceWorker.register('/sw.js').catch(function (err) {
-            console.warn('Service worker registration failed:', err);
-          });
-        });
-      }
-    </script>
+    <script defer src="{{ partialCached "yaub/asset-url.html" "js/inline/sw-register.js" "js/inline/sw-register.js" }}"></script>
   </body>
 </html>

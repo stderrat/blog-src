@@ -13,5 +13,4 @@ fi
 
 echo "Set useFontAwesomeSubset = false in config.toml"
 echo "Full FA: css/fontawesome-all.min.css + webfonts/fa-*.woff2"
-echo "Backup copy: themes/yaub/static/_font-backups/2026-10-21/"
 echo "Restart hugo server to pick up the change."
