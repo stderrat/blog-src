@@ -57,7 +57,10 @@ openSUSE provides an https://get.opensuse.org/leap/16.0/#download[KVM
 and XEN image] (you have to click on _Alternative Downloads_). The
 problem with this image is that does **NOT** come with
 cloud-init. Upon first-boot it will ask some basic questions about the
-root password and timezones, so not what we want.
+root password and timezones, so not what we want. Another issue is the
+image size. The Synology Virtual Machine Manager does not allow image
+resizing and the default image is ~30GB in size, which is too small
+for our use case.
 
 But thanks to openSUSE's https://openbuildservice.org/[Open Build
 Service (OBS)] it relativly easy to create a custom KVM image with
@@ -333,3 +336,205 @@ changes we did are marked with number and explain below the XML file):
 ----------
 <1> We would like to increase the disk size to 100GB (default is 24GB)
 <2> We added cloud-init to profiles mentioning KVM
+
+After modifying the XML file click **SAVE**. You can download the new
+images after a successful build under **Repositories/images**:
+
+image::obs_images.png[alt=Download images]
+
+The image with _.qcow_ at the end is the one we are looking for:
+
+image::obs_image_download.png[alt=Download the qcow image]
+
+== Import our VM image to the Synology Virtual Machine Manager
+
+The first step is installing VMM (Virtual Machine Manager) on the
+Synology NAS. Open the *Package Center* and search for "Virtual" and click on "Install".
+
+image::syn_vmm_install.png[alt=VMM installation]
+
+Next we can import our _.qcow_ image:
+
+image::syn_create_disk_image.png[alt=VMM image import]
+
+After launching VMM, click on *Image* -> *Disk Image* -> *Add* -> *From computer*.
+We also changed the name of the image to the name of the appliance we would like to create.
+
+After selecting the data store where you would like to store the
+image, click *Save* and wait for the import to finish.
+
+The imported image should be in the *Healty* state.
+
+image::syn_svcs_image_health.png[alt=VMM installation]
+
+== Creating a cloud-init ISO for configuring our Virtual Machine
+
+Before we can go ahead and create our VM, we also need to create a
+cloud-init ISO file that stores the configuration we would like to
+deploy.
+
+For this we created the following Makefile:
+
+[source,bash]
+----------
+.PHONY: iso
+iso:
+	cd cloud-init-iso \
+	&& genisoimage -output ../svc-cloud-init.iso -volid cidata -joliet -rock user-data meta-data network-config
+
+----------
+
+Important is the _-volid_ option. For discovering the configuration _cloud-init_ looks
+ISO with the label `cidata`. If this is missing cloud-init will not configure the VM.
+
+IMPORTANT: Always use the `cidata` label/volume id on ISO files.
+
+So before running `make` we need to create a _cloud-init-iso_ directory and store our
+cloud-init configuration files there:
+
+[source,bash]
+----------
+$   tree cloud-init-iso/
+cloud-init-iso/
+├── meta-data <1>
+├── network-config <2>
+└── user-data <3>
+
+1 directory, 3 files
+----------
+<1> https://docs.cloud-init.io/en/latest/explanation/instancedata.html#instance-data[_meta-data_] (or instance-data) contains platform data
+<2> _network-config_[https://docs.cloud-init.io/en/latest/reference/network-config.html#network-config] contains our network configuration
+<3> https://docs.cloud-init.io/en/latest/explanation/format/index.html#user-data-formats[_user-data_] contains the configuration we would like to apply
+
+We used the following _meta-data_:
+
+[source,yaml]
+----------
+instance-id: svcs
+local-hostname: svcs
+----------
+
+This is the _user-data_ configuration for our VM:
+
+[source,yaml]
+----------
+#cloud-config
+user:
+  name: admin
+  ssh_authorized_keys:
+    - <our ssh public key>
+chpasswd:
+  expire: false
+ssh_pwauth: false
+hostname: svcs
+create_hostname_file: true
+fqdn: svcs.lan.stderr.at
+----------
+
+And finally the networking configuration for the VM:
+
+[source,yaml]
+----------
+version: 1
+config:
+  - type: physical
+    name: ens3
+    mac_address: '02:11:32:2a:d7:3c' <1>
+    subnets:
+      - type: static
+        address: 10.0.0.253
+        gateway: 10.0.0.1
+----------
+<1> we are going to use this MAC address when creating the VM
+
+Now we are read to run make:
+
+[source,bash]
+----------
+$ make
+cd cloud-init-iso \
+&& genisoimage -output ../svc-cloud-init.iso -volid cidata -joliet -rock user-data meta-data network-config
+I: -input-charset not specified, using utf-8 (detected in locale settings)
+Total translation table size: 0
+Total rockridge attributes bytes: 417
+Total directory bytes: 0
+Path table size(bytes): 10
+Max brk space used 0
+184 extents written (0 MB)
+----------
+
+We now have an ISO file called `svc-cloud-init.iso` in the same directory as the _Makefile_ which we need to upload to our Synlogy (see next section).
+
+Some important points about cloud-init:
+
+- You cannot modify network configuration settings in _user-data_
+- Network configuration is only applied once upon first boot
+
+If you need to force _cloud-init_ to re-apply the network configuration (which we had
+to do during testing) you need to run `cloud-init clean`.
+
+Some helpful _cloud-init_ commands
+
+- `cloud-init status --long`: check the status of cloud init
+- `cloud-init schema --system`: check the schema deploy to a machine
+- `cloud-init clean`: wipe the cloud init cache
+- `cloud-init init`: run cloud-init manually
+- `cloud-init analyze show`: show which stages where actually run by cloud-init
+
+== Creating the VM
+
+Now we need to head over to the Synology web interface. First we to upload the _cloud-init_ ISO file we created in the previous section.
+
+image::syn_upload_cloud-init_iso.png[alt=ISO upload]
+
+Launch the Virtual Machine Manager and click *Image* -> *Add* -> *From
+computer*.  Specify the ISO image we created in the previous section
+and click *Next* and select your data store. After a few seconds the
+ISO should be in the `Healthy` state.
+
+Now we need to *Import* the VM. This is important, as the Synlogy Web
+UI is a bit confusing. You need to select the *Import* option because
+we are _importing_ a VM from an existing disk image:
+
+image::syn_import_vm.png[alt=VMM installation]
+
+Next select *Import from disk image*:
+
+image::syn_import_disk_image_option.png[alt=Import from disk image]
+
+Select a storage where you would like to store the VM:
+
+image::syn_import_select_storage.png[alt=Select VM storage]
+
+Now configure the VM, we use *svcs* as name and we would like to have
+2 CPUS and 16 GB of RAM:
+
+image::syn_vm_config.png[alt=Specify VM configuration]
+
+As a virtual disk we select the *svcs* image we upload in the first
+section of this post:
+
+image::syn_select_image.png[alt=Select the disk image]
+
+For optimal disk performance we are going to change the virtual disk
+configuration, click on the cogwheel next to the virual disk:
+
+image::syn_disk_options.png[alt=Modify disk options]
+
+Change the `Virtual Disk Controller` to `VirtIO Block Controller`:
+
+image::syn_virtio_block.png[alt=Select VirtIO Block Controller]
+
+Click on *Next*. In the networking configuration section we need to
+change the MAC address. It needs to match the MAC we specifed in the
+_network-config_ cloud-init configuration (see previous section):
+
+image::syn_network_mac.png[alt=Specify the MAC address]
+
+Finally we need to attach our _cloud-init_ ISO image as an additional
+ISO file to the VM:
+
+image::syn_select_cloud-init_iso.png[alt=Additional ISO file]
+
+Now we are ready to launch our VM. After launching click on *Connect*
+to launch a VNC console.

@@ -19,7 +19,7 @@ categories:
    - Harvester
    - Virtualization
 
-tags: ["SUSE", "Harvester"", "Virtualization"]
+tags: ["SUSE", "Harvester", "Virtualization"]
 
 aliases: [
 ]
